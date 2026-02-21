@@ -331,3 +331,48 @@ html, body {
     justify-content: center;
   }
 }
+
+/* ===== PRICING - MOBILE ===== */
+.pricing-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.pricing-card{
+  padding: 18px;
+}
+
+@media (max-width: 720px){
+  .pricing-grid{
+    grid-template-columns: 1fr;
+  }
+
+  .pricing-card{
+    padding: 20px;
+  }
+
+  .pricing-card h2,
+  .pricing-card h3{
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .pricing-card p,
+  .pricing-card li{
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .pricing-card .price{
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  /* Se alguma caixinha “sobrou” e aparecer só no pricing, esconde */
+  .pricing-page .pill,
+  .pricing-page .filters,
+  .pricing-page .mobile-list{
+    display: none !important;
+  }
+}
