@@ -189,6 +189,7 @@ def new_proposal_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("new_proposal.html", {"request": request, "error": None})
 
 @app.post("/proposals/new")
+
 def create_proposal(
     request: Request,
     client_name: str = Form(...),
@@ -201,6 +202,19 @@ def create_proposal(
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
+
+    count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+
+    if count >= user.proposal_limit:
+        return templates.TemplateResponse(
+            "dashboard.html",
+            {
+                "request": request,
+                "user": user,
+                "proposals": db.query(Proposal).filter(Proposal.owner_id == user.id).all(),
+                "error": "Você atingiu o limite do plano gratuito."
+            }
+        )
 
     p = Proposal(
         client_name=client_name.strip(),
@@ -343,7 +357,12 @@ def profile_save(
 
     return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": True})
 
-
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing(request: Request):
+    return templates.TemplateResponse(
+        "pricing.html",
+        {"request": request}
+    )
 
 
 
