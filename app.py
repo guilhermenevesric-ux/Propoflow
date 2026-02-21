@@ -33,15 +33,27 @@ COOKIE_NAME = "user_id"
 
 def get_current_user(request: Request, db: Session):
     user_id = request.cookies.get(COOKIE_NAME)
-    if not user_id:
+    if not user_id or user_id in ("None", "null", ""):
         return None
-    return db.query(User).filter(User.id == int(user_id)).first()
+    try:
+        user_id_int = int(user_id)
+    except ValueError:
+        return None
+    return db.query(User).filter(User.id == user_id_int).first()
+
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
+    user_id = request.cookies.get(COOKIE_NAME)
     user = get_current_user(request, db)
+
     if not user:
-        return RedirectResponse("/login", status_code=302)
+        resp = RedirectResponse("/login", status_code=302)
+        # limpa cookie inválido
+        if user_id in ("None", "null", ""):
+            resp.delete_cookie(COOKIE_NAME)
+        return resp
+
     return RedirectResponse("/dashboard", status_code=302)
 
 @app.get("/login", response_class=HTMLResponse)
@@ -55,15 +67,8 @@ def login(
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    # bcrypt limita 72 bytes
-    if len(password.encode("utf-8")) > 72:
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Senha muito longa. Use até 72 caracteres."}
-        )
-
     user = db.query(User).filter(User.email == email.strip().lower()).first()
-    if not user or not bcrypt.verify(password, user.password_hash):
+    if (not user) or (not pbkdf2_sha256.verify(password, user.password_hash)):
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": "Email ou senha inválidos."}
@@ -81,12 +86,6 @@ def register(
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    # bcrypt limita 72 bytes
-    if len(password.encode("utf-8")) > 72:
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Senha muito longa. Use até 72 caracteres."}
-        )
 
     email = email.strip().lower()
     if db.query(User).filter(User.email == email).first():
@@ -101,6 +100,10 @@ def register(
         proposal_limit=5,
         plan="free"
     )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
 
     resp = RedirectResponse("/dashboard", status_code=302)
     resp.set_cookie(COOKIE_NAME, str(user.id), httponly=True)
@@ -246,18 +249,6 @@ def create_proposal(
             }
         )
 
-    count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
-
-    if count >= user.proposal_limit:
-        return templates.TemplateResponse(
-            "dashboard.html",
-            {
-                "request": request,
-                "user": user,
-                "proposals": db.query(Proposal).filter(Proposal.owner_id == user.id).all(),
-                "error": "Você atingiu o limite do plano gratuito."
-            }
-        )
 
     p = Proposal(
         client_name=client_name.strip(),
