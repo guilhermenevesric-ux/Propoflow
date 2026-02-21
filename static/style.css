@@ -343,7 +343,7 @@ html, body {
   padding: 18px;
 }
 
-@media (max-width: 720px){
+@media (max-width: 1050px){
   .pricing-grid{
     grid-template-columns: 1fr;
   }
