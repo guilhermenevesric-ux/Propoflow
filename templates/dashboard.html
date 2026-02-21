@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>PropoFlow</h1>
+          <p>Gerador de propostas profissionais</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn btn-ghost" href="/profile">Perfil</a>
+        <a class="btn" href="/proposals/new">+ Nova proposta</a>
+        <a class="btn btn-ghost" href="/logout">Sair</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="h2">Suas propostas</h2>
+      <p class="small">Crie, envie e acompanhe propostas em link público e PDF profissional.</p>
+
+      <!-- KPIs -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0 12px;">
+        <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
+        <span class="pill">✅ Aceitas: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
+        <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
+      </div>
+
+      <!-- Filtros -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 0 0 14px;">
+        <a class="btn btn-ghost" href="/dashboard?status=all"
+           style="{% if status == 'all' %}border-color: rgba(79,124,255,0.8);{% endif %}">
+          Todas
+        </a>
+
+        <a class="btn btn-ghost" href="/dashboard?status=pending"
+           style="{% if status == 'pending' %}border-color: rgba(79,124,255,0.8);{% endif %}">
+          Pendentes
+        </a>
+
+        <a class="btn btn-ghost" href="/dashboard?status=accepted"
+           style="{% if status == 'accepted' %}border-color: rgba(79,124,255,0.8);{% endif %}">
+          Aceitas
+        </a>
+      </div>
+
+      {% if proposals|length == 0 %}
+        <p class="small">
+          Nenhuma proposta encontrada neste filtro.
+          <a href="/proposals/new">Criar nova proposta</a>.
+        </p>
+      {% else %}
+        <table class="table">
+          <tr>
+            <th>Data</th>
+            <th>Cliente</th>
+            <th>Projeto</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+
+          {% for p in proposals %}
+          <tr>
+            <td>{{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
+            <td>{{ p.client_name }}</td>
+            <td>{{ p.project_name }}</td>
+
+            <td>
+              {% if p.accepted_at %}
+                <span style="color:#22c55e; font-weight:700;">✓ ACEITA</span>
+                <div class="small">{{ p.accepted_name }}</div>
+                <div class="small" style="opacity:0.8;">{{ p.accepted_at.strftime("%d/%m/%Y") }}</div>
+              {% else %}
+                <span class="small">Pendente</span>
+              {% endif %}
+            </td>
+
+            <td>
+              <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
+              <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
+              <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

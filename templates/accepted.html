@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Proposta aceita</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>PropoFlow</h1>
+          <p>
+            {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Proposta profissional{% endif %}
+            {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
+          </p>
+        </div>
+      </div>
+      <div class="right-actions">
+        <span>ID: {{ p.public_id }}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div>
+          <h2 class="h2" style="margin-bottom:6px;">✅ Proposta aceita com sucesso</h2>
+          <p class="small" style="margin:0;">
+            Obrigado, <b>{{ p.accepted_name }}</b>. Seu aceite foi registrado.
+          </p>
+        </div>
+        <a class="btn btn-ghost" href="/p/{{ p.public_id }}">Voltar à proposta</a>
+      </div>
+
+      <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
+
+      <div style="display:grid; grid-template-columns: 1.4fr 0.6fr; gap:14px;">
+        <div class="card" style="padding:14px;">
+          <p class="small" style="margin:0 0 6px;">Projeto</p>
+          <div style="font-size:18px; font-weight:800;">{{ p.project_name }}</div>
+          <p class="small" style="margin:8px 0 0;">
+            Cliente: <b>{{ p.client_name }}</b>
+          </p>
+        </div>
+
+        <div class="card" style="padding:14px;">
+          <p class="small" style="margin:0 0 6px;">Aceite</p>
+          <div style="font-weight:800;">{{ p.accepted_at.strftime("%d/%m/%Y %H:%M") }}</div>
+          <p class="small" style="margin:8px 0 0;">
+            Email: <b>{{ p.accepted_email }}</b>
+          </p>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:14px;">
+        <div class="card" style="padding:14px;">
+          <p class="small" style="margin:0 0 6px;">Investimento</p>
+          <div style="font-size:20px; font-weight:900;">{{ p.price }}</div>
+        </div>
+        <div class="card" style="padding:14px;">
+          <p class="small" style="margin:0 0 6px;">Prazo</p>
+          <div style="font-size:20px; font-weight:900;">{{ p.deadline }}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="btn" href="/p/{{ p.public_id }}/pdf">Baixar PDF</a>
+        <button class="btn btn-ghost" onclick="copyLink()">Copiar link</button>
+      </div>
+
+      <p class="small" style="margin-top:12px;">
+        Link: <span style="color: rgba(232,238,252,0.85);">{{ base_url }}/p/{{ p.public_id }}</span>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    function copyLink(){
+      const url = "{{ base_url }}/p/{{ p.public_id }}";
+      navigator.clipboard.writeText(url);
+      alert("Link copiado!");
+    }
+  </script>
+</body>
+</html>

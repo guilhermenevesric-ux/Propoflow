@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Nova Proposta</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>PropoFlow</h1>
+          <p>Nova proposta</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="h2">Criar proposta</h2>
+      <p class="small">Preencha os dados e gere um PDF com layout profissional.</p>
+
+      <form method="post" action="/proposals/new">
+        <div class="row">
+          <div>
+            <label>Nome do cliente</label>
+            <input name="client_name" required placeholder="Ex: João Silva">
+          </div>
+          <div>
+            <label>Nome do projeto</label>
+            <input name="project_name" required placeholder="Ex: Identidade visual">
+          </div>
+        </div>
+
+        <br>
+
+        <label>Descrição (escopo)</label>
+        <textarea name="description" required placeholder="Liste o que será entregue, etapas e detalhes importantes."></textarea>
+
+        <br><br>
+
+        <div class="row">
+          <div>
+            <label>Preço</label>
+            <input name="price" required placeholder="Ex: R$ 2.500">
+          </div>
+          <div>
+            <label>Prazo</label>
+            <input name="deadline" required placeholder="Ex: 7 dias úteis">
+          </div>
+        </div>
+
+        <br><br>
+
+        <button class="btn" type="submit">Gerar PDF</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Proposta</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>PropoFlow</h1>
+          <p>
+  {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Proposta profissional{% endif %}
+  {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
+</p>
+        </div>
+      </div>
+      <div class="right-actions">
+        <span>ID: {{ p.public_id }}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="h2">{{ p.project_name }}</h2>
+      <p class="small">Cliente: <b>{{ p.client_name }}</b> • Criada em {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</p>
+{% if owner %}
+  <p class="small" style="margin-top:-6px;">
+    Emitente:
+    <b>
+      {% if owner.display_name %}{{ owner.display_name }}{% else %}{{ owner.email }}{% endif %}
+    </b>
+    {% if owner.company_name %} • {{ owner.company_name }}{% endif %}
+  </p>
+{% endif %}
+      <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:14px 0;">
+
+      <h3 class="h2" style="font-size:15px;">Escopo</h3>
+      <p style="color: rgba(232,238,252,0.85); line-height:1.5; white-space: pre-wrap;">{{ p.description }}</p>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:18px;">
+        <div class="card" style="padding:14px;">
+          <p class="small" style="margin:0 0 6px;">Investimento</p>
+          <div style="font-size:20px; font-weight:800;">{{ p.price }}</div>
+        </div>
+        <div class="card" style="padding:14px;">
+          <p class="small" style="margin:0 0 6px;">Prazo</p>
+          <div style="font-size:20px; font-weight:800;">{{ p.deadline }}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
+  <a class="btn" href="/p/{{ p.public_id }}/pdf">Baixar PDF</a>
+  <button class="btn btn-ghost" onclick="copyLink()">Copiar link</button>
+</div>
+
+{% if p.accepted_at %}
+  <div class="card" style="margin-top:14px; padding:14px;">
+    <h3 class="h2" style="font-size:15px; margin-bottom:6px;">✅ Proposta já aceita</h3>
+    <p class="small" style="margin:0;">
+      Aceita por <b>{{ p.accepted_name }}</b> em {{ p.accepted_at.strftime("%d/%m/%Y %H:%M") }}.
+    </p>
+  </div>
+{% else %}
+  <!-- SEU BLOCO DO FORM DE ACEITE AQUI (igual já está) -->
+{% endif %}
+  <form method="post" action="/p/{{ p.public_id }}/accept">
+    <div class="row">
+      <div>
+        <label>Seu nome</label>
+        <input name="name" placeholder="Ex: João Cliente" required>
+      </div>
+      <div>
+        <label>Seu email</label>
+        <input name="email" placeholder="Ex: cliente@email.com" required>
+      </div>
+    </div>
+
+    <br>
+    <button class="btn" type="submit">Aceitar proposta</button>
+  </form>
+</div>
+
+      <p class="small" style="margin-top:12px;">
+        Link desta proposta: <span style="color: rgba(232,238,252,0.85);">{{ base_url }}/p/{{ p.public_id }}</span>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    function copyLink(){
+      const url = "{{ base_url }}/p/{{ p.public_id }}";
+      navigator.clipboard.writeText(url);
+      alert("Link copiado!");
+    }
+  </script>
+</body>
+</html>
