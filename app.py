@@ -95,10 +95,12 @@ def register(
             {"request": request, "error": "Esse email já existe. Faça login."}
         )
 
-    user = User(email=email, password_hash=bcrypt.hash(password))
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    user = User(
+        email=email,
+        password_hash=pbkdf2_sha256.hash(password),
+        proposal_limit=5,
+        plan="free"
+    )
 
     resp = RedirectResponse("/dashboard", status_code=302)
     resp.set_cookie(COOKIE_NAME, str(user.id), httponly=True)
