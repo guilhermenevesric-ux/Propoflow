@@ -250,3 +250,84 @@ html, body {
   .table-wrap { display: none; }
   .mobile-list { display: block; }
 }
+
+/* ===== MOBILE FIX: NAV / TOPBAR ===== */
+@media (max-width: 640px) {
+
+  .container{
+    padding: 16px;
+  }
+
+  .nav{
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .brand{
+    width: 100%;
+  }
+
+  .actions{
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-start;
+  }
+
+  /* evita botão ficar “gigante” e estourar */
+  .actions .btn{
+    padding: 10px 12px;
+    font-size: 14px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* faz o "+ Nova proposta" caber (sem cortar) */
+  .actions .btn[href="/proposals/new"]{
+    flex: 1 1 160px; /* ocupa linha mas quebra se precisar */
+    text-align: center;
+  }
+}
+
+/* ===== MOBILE FIX: PRICING ===== */
+.pricing-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.plan-card{
+  padding: 18px;
+}
+
+/* Mobile: vira 1 coluna, texto maior e botão grande */
+@media (max-width: 640px){
+  .pricing-grid{
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .plan-card{
+    padding: 18px;
+  }
+
+  .plan-card h2,
+  .plan-card h3{
+    font-size: 18px;
+  }
+
+  .plan-card p,
+  .plan-card li,
+  .plan-card .small{
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .plan-card .btn{
+    width: 100%;
+    display: inline-flex;
+    justify-content: center;
+  }
+}
