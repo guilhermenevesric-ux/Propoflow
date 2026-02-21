@@ -27,29 +27,38 @@
 
     <div class="card">
       <h2 class="h2">Suas propostas</h2>
+
       {% if error %}
-  <div class="error">
-    {{ error }}
-    {% if show_upgrade %}
-      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-        <a class="btn" href="/pricing">Upgrade para Pro</a>
-        <a class="btn btn-ghost" href="/pricing">Ver planos</a>
-      </div>
-    {% endif %}
-  </div>
-{% endif %}
+        <div class="error">
+          {{ error }}
+          {% if show_upgrade %}
+            <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="btn" href="/pricing">Upgrade para Pro</a>
+              <a class="btn btn-ghost" href="/pricing">Ver planos</a>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
       <p class="small">Crie, envie e acompanhe propostas em link público e PDF profissional.</p>
+
       <!-- KPIs -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0 12px;">
         <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
         <span class="pill">✅ Aceitas: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
         <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
       </div>
-{% if user.plan == 'free' %}
-  <p class="small" style="margin-top:0;">
-    Exclusões restantes no plano gratuito: <b>{{ user.delete_credits or 0 }}</b>
-  </p>
-{% endif %}
+
+      {% if user.plan == 'free' %}
+        <p class="small" style="margin-top:0;">
+          Plano gratuito: você ainda tem <b>1 exclusão</b> disponível.
+        </p>
+      {% elif user.plan == 'free_used_delete' %}
+        <p class="small" style="margin-top:0;">
+          Plano gratuito: exclusão já utilizada. <a href="/pricing">Upgrade</a> para excluir ilimitado.
+        </p>
+      {% endif %}
+
       <!-- Filtros -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 0 0 14px;">
         <a class="btn btn-ghost" href="/dashboard?status=all"
@@ -74,73 +83,83 @@
           <a href="/proposals/new">Criar nova proposta</a>.
         </p>
       {% else %}
-      <div class="mobile-list">
-  {% for p in proposals %}
-    <div class="card proposal-card">
-      <p class="title">{{ p.project_name }}</p>
-      <p class="meta">
-        Cliente: <b>{{ p.client_name }}</b><br>
-        {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}
-      </p>
 
-      <p class="small" style="margin-top:0;">
-        Status:
-        {% if p.accepted_at %}
-          <span style="color:#22c55e; font-weight:700;">✓ ACEITA</span>
-          <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m/%Y") }}</span>
-        {% else %}
-          <span class="small">Pendente</span>
-        {% endif %}
-      </p>
-      <div class="actions">
-  <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
-  <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
-  <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
-
-  <form method="post" action="/proposals/{{ p.id }}/delete"
-        onsubmit="return confirm('Tem certeza que deseja excluir esta proposta?');">
-    <button class="btn btn-ghost" type="submit">Excluir</button>
-  </form>
-    </div>
-</div>
-      <div class="table-wrap">
-        <table class="table">
-          <tr>
-            <th>Data</th>
-            <th>Cliente</th>
-            <th>Projeto</th>
-            <th>Status</th>
-            <th>Ações</th>
-          </tr>
-
+        <!-- Mobile cards -->
+        <div class="mobile-list">
           {% for p in proposals %}
-          <tr>
-            <td>{{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
-            <td>{{ p.client_name }}</td>
-            <td>{{ p.project_name }}</td>
+            <div class="card proposal-card">
+              <p class="title">{{ p.project_name }}</p>
+              <p class="meta">
+                Cliente: <b>{{ p.client_name }}</b><br>
+                {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}
+              </p>
 
-            <td>
-              {% if p.accepted_at %}
-                <span style="color:#22c55e; font-weight:700;">✓ ACEITA</span>
-                <div class="small">{{ p.accepted_name }}</div>
-                <div class="small" style="opacity:0.8;">{{ p.accepted_at.strftime("%d/%m/%Y") }}</div>
-              {% else %}
-                <span class="small">Pendente</span>
-              {% endif %}
-            </td>
+              <p class="small" style="margin-top:0;">
+                Status:
+                {% if p.accepted_at %}
+                  <span style="color:#22c55e; font-weight:700;">✓ ACEITA</span>
+                  <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m/%Y") }}</span>
+                {% else %}
+                  <span class="small">Pendente</span>
+                {% endif %}
+              </p>
 
-            <td>
-              <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
-              <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
-              <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
-              <form method="post" action="/proposals/{{ p.id }}/delete" style="display:inline;"
-      onsubmit="return confirm('Tem certeza que deseja excluir esta proposta?');">
-  <button class="btn btn-ghost" type="submit">Excluir</button>
-</form>
-            </td>
-          </tr>
+              <div class="actions">
+                <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
+                <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+
+                <form method="post" action="/proposals/{{ p.id }}/delete"
+                      onsubmit="return confirm('Tem certeza que deseja excluir esta proposta?');">
+                  <button class="btn btn-ghost" type="submit">Excluir</button>
+                </form>
+              </div>
+            </div>
           {% endfor %}
-        </table>
+        </div>
+
+        <!-- Desktop table -->
+        <div class="table-wrap">
+          <table class="table">
+            <tr>
+              <th>Data</th>
+              <th>Cliente</th>
+              <th>Projeto</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+
+            {% for p in proposals %}
+            <tr>
+              <td>{{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
+              <td>{{ p.client_name }}</td>
+              <td>{{ p.project_name }}</td>
+
+              <td>
+                {% if p.accepted_at %}
+                  <span style="color:#22c55e; font-weight:700;">✓ ACEITA</span>
+                  <div class="small">{{ p.accepted_name }}</div>
+                  <div class="small" style="opacity:0.8;">{{ p.accepted_at.strftime("%d/%m/%Y") }}</div>
+                {% else %}
+                  <span class="small">Pendente</span>
+                {% endif %}
+              </td>
+
+              <td>
+                <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
+                <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+
+                <form method="post" action="/proposals/{{ p.id }}/delete" style="display:inline;"
+                      onsubmit="return confirm('Tem certeza que deseja excluir esta proposta?');">
+                  <button class="btn btn-ghost" type="submit">Excluir</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+
       {% endif %}
     </div>
   </div>

@@ -2,7 +2,6 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db import Base
-
 import uuid
 
 class User(Base):
@@ -15,15 +14,18 @@ class User(Base):
     company_name = Column(String(255), nullable=True)
     phone = Column(String(50), nullable=True)
 
-    delete_credits = Column(Integer, default=1)
+    # "free" ou "free_used_delete" (MVP) ou "pro" (futuro)
     plan = Column(String, default="free")
     proposal_limit = Column(Integer, default=5)
+
     proposals = relationship("Proposal", back_populates="owner")
+
 
 class Proposal(Base):
     __tablename__ = "proposals"
     id = Column(Integer, primary_key=True, index=True)
     public_id = Column(String(16), unique=True, index=True, nullable=False, default=lambda: uuid.uuid4().hex[:12])
+
     client_name = Column(String(255), nullable=False)
     project_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
