@@ -199,3 +199,54 @@ input:focus, textarea:focus{
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Mobile: evitar arrasto horizontal da página */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Container da tabela com scroll horizontal só nela */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 16px;
+}
+
+/* Garantir que a tabela não quebre feio */
+.table {
+  min-width: 720px; /* ajusta se quiser */
+}
+
+/* Lista em cards para mobile */
+.mobile-list { display: none; }
+
+.proposal-card {
+  padding: 14px;
+  margin: 10px 0;
+}
+
+.proposal-card .title {
+  font-weight: 800;
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+.proposal-card .meta {
+  font-size: 13px;
+  opacity: 0.85;
+  margin: 0 0 10px;
+}
+
+.proposal-card .actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Breakpoint */
+@media (max-width: 820px) {
+  .table-wrap { display: none; }
+  .mobile-list { display: block; }
+}

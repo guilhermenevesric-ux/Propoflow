@@ -70,6 +70,34 @@
           <a href="/proposals/new">Criar nova proposta</a>.
         </p>
       {% else %}
+      <div class="mobile-list">
+  {% for p in proposals %}
+    <div class="card proposal-card">
+      <p class="title">{{ p.project_name }}</p>
+      <p class="meta">
+        Cliente: <b>{{ p.client_name }}</b><br>
+        {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}
+      </p>
+
+      <p class="small" style="margin-top:0;">
+        Status:
+        {% if p.accepted_at %}
+          <span style="color:#22c55e; font-weight:700;">✓ ACEITA</span>
+          <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m/%Y") }}</span>
+        {% else %}
+          <span class="small">Pendente</span>
+        {% endif %}
+      </p>
+
+      <div class="actions">
+        <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
+        <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
+        <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+      <div class="table-wrap">
         <table class="table">
           <tr>
             <th>Data</th>
