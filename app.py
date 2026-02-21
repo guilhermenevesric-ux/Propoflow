@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Form, Depends, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from passlib.hash import bcrypt
+from passlib.hash import pbkdf2_sha256
 from fastapi.staticfiles import StaticFiles
 from datetime import datetime
 
