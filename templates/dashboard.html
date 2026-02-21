@@ -19,7 +19,7 @@
 
       <div class="actions">
         <a class="btn btn-ghost" href="/profile">Perfil</a>
-        <a class="btn btn-ghost" href="/pricing">Planos</a>
+        <a class="btn" href="/pricing">Upgrade</a>
         <a class="btn" href="/proposals/new">+ Nova proposta</a>
         <a class="btn btn-ghost" href="/logout">Sair</a>
       </div>
@@ -27,6 +27,17 @@
 
     <div class="card">
       <h2 class="h2">Suas propostas</h2>
+      {% if error %}
+  <div class="error">
+    {{ error }}
+    {% if show_upgrade %}
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="btn" href="/pricing">Upgrade para Pro</a>
+        <a class="btn btn-ghost" href="/pricing">Ver planos</a>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}
       <p class="small">Crie, envie e acompanhe propostas em link público e PDF profissional.</p>
       {% if error %}
       <div class="error">{{ error }}</div>

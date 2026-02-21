@@ -210,6 +210,41 @@ def create_proposal(
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
+    # limite do plano (MVP)
+    count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+    if count >= (user.proposal_limit or 5):
+        # Recalcula dados do dashboard para renderizar corretamente
+        proposals = (
+            db.query(Proposal)
+            .filter(Proposal.owner_id == user.id)
+            .order_by(Proposal.created_at.desc())
+            .all()
+        )
+
+        total = count
+        accepted = db.query(Proposal).filter(
+            Proposal.owner_id == user.id,
+            Proposal.accepted_at.isnot(None)
+        ).count()
+
+        rate = 0
+        if total > 0:
+            rate = round((accepted / total) * 100)
+
+        return templates.TemplateResponse(
+            "dashboard.html",
+            {
+                "request": request,
+                "user": user,
+                "proposals": proposals,
+                "total": total,
+                "accepted": accepted,
+                "rate": rate,
+                "status": "all",
+                "error": f"Você atingiu o limite do plano gratuito ({user.proposal_limit or 5} propostas).",
+                "show_upgrade": True
+            }
+        )
 
     count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
 
