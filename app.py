@@ -98,8 +98,8 @@ def register(
         email=email,
         password_hash=pbkdf2_sha256.hash(password),
         proposal_limit=5,
-        plan="free"
-    )
+        plan="free",
+        delete_credits=1
 
     db.add(user)
     db.commit()
@@ -334,6 +334,60 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     filename = f"proposta_{p.client_name.replace(' ', '_')}_{p.id}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+
+
+@app.post("/proposals/{proposal_id}/delete")
+def delete_proposal(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    p = db.query(Proposal).filter(
+        Proposal.id == proposal_id,
+        Proposal.owner_id == user.id
+    ).first()
+
+    if not p:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # Regra do plano gratuito: só 1 exclusão
+    if user.plan == "free":
+        credits = user.delete_credits or 0
+        if credits <= 0:
+            # Volta pro dashboard com mensagem e CTA
+            proposals = (
+                db.query(Proposal)
+                .filter(Proposal.owner_id == user.id)
+                .order_by(Proposal.created_at.desc())
+                .all()
+            )
+
+            total = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+            accepted = db.query(Proposal).filter(
+                Proposal.owner_id == user.id,
+                Proposal.accepted_at.isnot(None)
+            ).count()
+            rate = round((accepted / total) * 100) if total else 0
+
+            return templates.TemplateResponse("dashboard.html", {
+                "request": request,
+                "user": user,
+                "proposals": proposals,
+                "total": total,
+                "accepted": accepted,
+                "rate": rate,
+                "status": "all",
+                "error": "No plano gratuito você só pode excluir 1 proposta. Faça upgrade para excluir ilimitado.",
+                "show_upgrade": True
+            })
+
+        user.delete_credits = credits - 1
+
+    db.delete(p)
+    db.add(user)
+    db.commit()
+
+    return RedirectResponse("/dashboard", status_code=302)
 
 @app.get("/proposals/{proposal_id}/duplicate")
 def duplicate_proposal(proposal_id: int, request: Request, db: Session = Depends(get_db)):

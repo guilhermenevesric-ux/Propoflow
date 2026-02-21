@@ -88,13 +88,21 @@
           <span class="small">Pendente</span>
         {% endif %}
       </p>
-
+{% if user.plan == 'free' %}
+  <p class="small" style="margin-top:0;">
+    Exclusões restantes no plano gratuito: <b>{{ user.delete_credits or 0 }}</b>
+  </p>
+{% endif %}
       <div class="actions">
         <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
         <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
         <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
       </div>
     </div>
+        <form method="post" action="/proposals/{{ p.id }}/delete" style="display:inline;"
+      onsubmit="return confirm('Tem certeza que deseja excluir esta proposta?');">
+  <button class="btn btn-ghost" type="submit">Excluir</button>
+</form>
   {% endfor %}
 </div>
       <div class="table-wrap">

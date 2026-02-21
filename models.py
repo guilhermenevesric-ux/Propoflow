@@ -15,6 +15,7 @@ class User(Base):
     company_name = Column(String(255), nullable=True)
     phone = Column(String(50), nullable=True)
 
+    delete_credits = Column(Integer, default=1)
     plan = Column(String, default="free")
     proposal_limit = Column(Integer, default=5)
     proposals = relationship("Proposal", back_populates="owner")
