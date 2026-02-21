@@ -45,7 +45,11 @@
         <span class="pill">✅ Aceitas: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
         <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
       </div>
-
+{% if user.plan == 'free' %}
+  <p class="small" style="margin-top:0;">
+    Exclusões restantes no plano gratuito: <b>{{ user.delete_credits or 0 }}</b>
+  </p>
+{% endif %}
       <!-- Filtros -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 0 0 14px;">
         <a class="btn btn-ghost" href="/dashboard?status=all"
@@ -88,22 +92,16 @@
           <span class="small">Pendente</span>
         {% endif %}
       </p>
-{% if user.plan == 'free' %}
-  <p class="small" style="margin-top:0;">
-    Exclusões restantes no plano gratuito: <b>{{ user.delete_credits or 0 }}</b>
-  </p>
-{% endif %}
       <div class="actions">
-        <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
-        <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
-        <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
-      </div>
+  <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
+  <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
+  <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+
+  <form method="post" action="/proposals/{{ p.id }}/delete"
+        onsubmit="return confirm('Tem certeza que deseja excluir esta proposta?');">
+    <button class="btn btn-ghost" type="submit">Excluir</button>
+  </form>
     </div>
-        <form method="post" action="/proposals/{{ p.id }}/delete" style="display:inline;"
-      onsubmit="return confirm('Tem certeza que deseja excluir esta proposta?');">
-  <button class="btn btn-ghost" type="submit">Excluir</button>
-</form>
-  {% endfor %}
 </div>
       <div class="table-wrap">
         <table class="table">
@@ -135,6 +133,10 @@
               <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
               <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
               <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+              <form method="post" action="/proposals/{{ p.id }}/delete" style="display:inline;"
+      onsubmit="return confirm('Tem certeza que deseja excluir esta proposta?');">
+  <button class="btn btn-ghost" type="submit">Excluir</button>
+</form>
             </td>
           </tr>
           {% endfor %}

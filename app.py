@@ -100,6 +100,7 @@ def register(
         proposal_limit=5,
         plan="free",
         delete_credits=1
+    )
 
     db.add(user)
     db.commit()
@@ -263,8 +264,6 @@ def create_proposal(
     db.refresh(p)
 
     return RedirectResponse(f"/proposals/{p.id}/pdf", status_code=302)
-
-  # se ainda não tiver no topo
 
 
 @app.get("/p/{public_id}/pdf")
