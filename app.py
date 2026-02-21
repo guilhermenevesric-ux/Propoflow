@@ -11,6 +11,12 @@ from models import User, Proposal
 from pdf_gen import generate_proposal_pdf
 
 Base.metadata.create_all(bind=engine)
+import subprocess, sys, os
+
+try:
+    subprocess.run([sys.executable, "migrate.py"], check=False)
+except Exception:
+    pass
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
