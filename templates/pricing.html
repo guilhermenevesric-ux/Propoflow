@@ -1,159 +1,213 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>PropoFlow • Planos</title>
+<meta charset="utf-8">
 
-  <!-- Anti-cache -->
-  <link rel="stylesheet" href="/static/style.css?v=1002">
+<title>PropoFlow • Planos</title>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css?v=2001">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
+
 
 <body>
 
+
 <div class="container">
 
-  <!-- NAV -->
-  <div class="nav">
 
-    <div class="brand">
-      <div class="logo"></div>
-      <div>
-        <h1>PropoFlow</h1>
-        <p>Escolha seu plano</p>
-      </div>
-    </div>
+<div class="nav">
 
-    <div class="actions">
-      <a class="btn btn-ghost" href="/dashboard">Voltar</a>
-    </div>
+<div class="brand">
 
-  </div>
+<div class="logo"></div>
 
+<div>
 
-  <!-- GRID PLANOS -->
-  <div class="pricing-grid">
+<h1>PropoFlow</h1>
 
+<p>Escolha seu plano</p>
 
-    <!-- GRATUITO -->
-    <div class="card pricing-card">
+</div>
 
-      <h2 class="h2">Plano Gratuito</h2>
+</div>
 
-      <p class="small">
-        Ideal para começar e testar o sistema
-      </p>
 
+<div class="actions">
 
-      <ul class="small" style="margin-top:14px; padding-left:18px;">
+<a class="btn btn-ghost" href="/dashboard">
 
-        <li>✓ Até 5 propostas</li>
+Voltar
 
-        <li>✓ Link público profissional</li>
+</a>
 
-        <li>✓ Aceite online do cliente</li>
+</div>
 
-        <li>✓ 1 exclusão disponível</li>
+</div>
 
-      </ul>
 
 
-      <div class="price">
-        R$ 0
-      </div>
+<div class="pricing-grid">
 
 
-      <button class="btn btn-ghost"
-              style="margin-top:16px; width:100%; cursor:default;">
+<!-- FREE -->
 
-        Plano atual
+<div class="card pricing-card">
 
-      </button>
 
+<h2 class="h2">
 
-    </div>
+Plano Gratuito
 
+</h2>
 
 
-    <!-- PRO -->
-    <div class="card pricing-card"
-         style="border:1px solid rgba(79,124,255,0.5);">
+<p class="small">
 
-      <h2 class="h2">
+Ideal para começar
 
-        Plano Pro
+</p>
 
-      </h2>
 
 
-      <p class="small">
+<ul class="small" style="margin-top:14px; padding-left:18px;">
 
-        Para profissionais que enviam propostas com frequência
+<li>✓ Até 5 propostas</li>
 
-      </p>
+<li>✓ Link público profissional</li>
 
+<li>✓ Aceite online</li>
 
+<li>✓ 1 exclusão</li>
 
-      <ul class="small"
-          style="margin-top:14px; padding-left:18px;">
+</ul>
 
-        <li>✓ Propostas ilimitadas</li>
 
-        <li>✓ Exclusões ilimitadas</li>
 
-        <li>✓ Sistema completo liberado</li>
+<div class="price">
 
-        <li>✓ Sem limitações</li>
+R$ 0
 
-        <li>✓ Prioridade em atualizações</li>
+</div>
 
-      </ul>
 
 
+{% if user and user.plan != "pro" %}
 
-      <div class="price">
+<button class="btn btn-ghost"
 
-        R$ 19/mês
+style="margin-top:16px; width:100%; cursor:default;">
 
-      </div>
+Plano atual
 
+</button>
 
+{% else %}
 
-      <!-- BOTÃO CORRETO -->
-      <a href="/upgrade/pro"
-         class="btn"
-         style="margin-top:16px; width:100%;">
+<button class="btn btn-ghost"
 
-         Quero acesso Pro
+style="margin-top:16px; width:100%; opacity:.5; cursor:default;">
 
-      </a>
+Disponível
 
+</button>
 
+{% endif %}
 
-      <p class="small"
-         style="margin-top:12px; text-align:center;">
 
-         Cancele quando quiser
+</div>
 
-      </p>
 
 
 
-    </div>
+<!-- PRO -->
 
+<div class="card pricing-card"
 
+style="border:1px solid rgba(79,124,255,0.5);">
 
-  </div>
 
+<h2 class="h2">
 
+Plano Pro
 
-  <p class="small"
-     style="margin-top:24px; text-align:center; opacity:.6;">
+</h2>
 
-     PropoFlow • Sistema profissional de propostas
 
-  </p>
+<p class="small">
+
+Sistema completo liberado
+
+</p>
+
+
+
+<ul class="small"
+
+style="margin-top:14px; padding-left:18px;">
+
+<li>✓ Propostas ilimitadas</li>
+
+<li>✓ Exclusões ilimitadas</li>
+
+<li>✓ Sem limitações</li>
+
+<li>✓ Prioridade</li>
+
+</ul>
+
+
+
+<div class="price">
+
+R$ 19/mês
+
+</div>
+
+
+
+{% if user and user.plan == "pro" %}
+
+<button class="btn"
+
+style="margin-top:16px; width:100%; cursor:default; background:#22c55e; border:none;">
+
+Você já é PRO ✓
+
+</button>
+
+{% else %}
+
+<a href="/upgrade/pro"
+
+class="btn"
+
+style="margin-top:16px; width:100%;">
+
+Quero acesso Pro
+
+</a>
+
+{% endif %}
+
+
+
+</div>
+
+
+
+</div>
+
+
+
+<p class="small"
+
+style="margin-top:24px; text-align:center; opacity:.6;">
+
+PropoFlow • Sistema profissional de propostas
+
+</p>
 
 
 
@@ -161,4 +215,5 @@
 
 
 </body>
+
 </html>

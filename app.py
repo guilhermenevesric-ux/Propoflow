@@ -473,9 +473,17 @@ def profile_save(
 
 
 @app.get("/pricing", response_class=HTMLResponse)
-def pricing(request: Request):
-    return templates.TemplateResponse("pricing.html", {"request": request})
+def pricing(request: Request, db: Session = Depends(get_db)):
 
+    user = get_current_user(request, db)
+
+    return templates.TemplateResponse(
+        "pricing.html",
+        {
+            "request": request,
+            "user": user
+        }
+    )
 
 # ====== UPGRADE PRO (ASSINATURA) ======
 @app.get("/upgrade/pro")
