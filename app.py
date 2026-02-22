@@ -35,6 +35,23 @@ def get_db():
 
 COOKIE_NAME = "user_id"
 
+# ===== Mercado Pago (assinatura simples) =====
+MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "")
+APP_BASE_URL = os.getenv("APP_BASE_URL", "").rstrip("/")
+
+def mp_headers():
+    return {
+        "Authorization": f"Bearer {MP_ACCESS_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+def set_user_pro(db: Session, user: User):
+    user.plan = "pro"
+    user.proposal_limit = 999999  # ilimitado no MVP
+    user.delete_credits = 999999  # ilimitado no MVP
+    db.add(user)
+    db.commit()
+
 MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "").strip()
 MP_API = "https://api.mercadopago.com"
 
@@ -634,29 +651,112 @@ def pricing(request: Request):
 from fastapi import Header
 import json
 
+@app.get("/upgrade/pro")
+def upgrade_pro(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    if not MP_ACCESS_TOKEN:
+        return HTMLResponse("MP_ACCESS_TOKEN não configurado no Render.", status_code=500)
+
+    base_url = APP_BASE_URL or str(request.base_url).rstrip("/")
+
+    payload = {
+        "reason": "PropoFlow Pro (assinatura mensal)",
+        "external_reference": f"user_{user.id}",
+        "payer_email": user.email,
+        "back_url": f"{base_url}/billing/success",
+        "auto_recurring": {
+            "frequency": 1,
+            "frequency_type": "months",
+            "transaction_amount": 19.0,
+            "currency_id": "BRL"
+        }
+    }
+
+    r = requests.post(
+        "https://api.mercadopago.com/preapproval",
+        headers=mp_headers(),
+        json=payload,
+        timeout=20
+    )
+
+    if r.status_code not in (200, 201):
+        return HTMLResponse(f"Erro Mercado Pago: {r.status_code}<br><pre>{r.text}</pre>", status_code=500)
+
+    data = r.json()
+    init_point = data.get("init_point")
+    if not init_point:
+        return HTMLResponse(f"Mercado Pago não retornou init_point.<br><pre>{data}</pre>", status_code=500)
+
+    return RedirectResponse(init_point, status_code=302)
+
+
 @app.post("/webhooks/mercadopago")
-async def mercadopago_webhook(
-    request: Request,
-    x_signature: str = Header(default=None),
-    x_request_id: str = Header(default=None),
-):
-    # Mercado Pago pode mandar JSON ou form. Vamos tentar ler tudo.
-    raw = await request.body()
-    try:
-        payload = json.loads(raw.decode("utf-8")) if raw else {}
-    except Exception:
-        payload = {"raw": raw.decode("utf-8", errors="ignore")}
+async def mp_webhook(request: Request, db: Session = Depends(get_db)):
+    # 1) sempre responder rápido 200 (MP gosta disso)
+    body = await request.json()
 
-    # Log simples pra você ver no Render Logs
-    print("=== MERCADOPAGO WEBHOOK RECEBIDO ===")
-    print("x-signature:", x_signature)
-    print("x-request-id:", x_request_id)
-    print("payload:", payload)
+    # Exemplo de body no teste: { action, api_version, data:{id}, date_created, id, live_mode, type, user_id }
+    data = body.get("data") or {}
+    mp_id = data.get("id")
 
-    # IMPORTANTE: responder 200 rápido
+    # Sem id, só confirma OK e sai
+    if not mp_id:
+        return {"ok": True}
+
+    event_type = body.get("type")  # "payment" ou "subscription_preapproval" etc
+    action = body.get("action")    # "payment.updated" etc
+
+    # 2) Se for pagamento: não é o que a gente quer (assinatura é preapproval)
+    # 3) O mais importante: subscription_preapproval / preapproval.
+    # Vamos buscar a assinatura no Mercado Pago e validar status = authorized
+    if not MP_ACCESS_TOKEN:
+        return {"ok": True}
+
+    # Quando vem como "payment.updated", às vezes é só evento genérico.
+    # Vamos tentar buscar como preapproval primeiro:
+    preapproval = None
+
+    # tenta buscar assinatura
+    r = requests.get(
+        f"https://api.mercadopago.com/preapproval/{mp_id}",
+        headers=mp_headers(),
+        timeout=20
+    )
+
+    if r.status_code == 200:
+        preapproval = r.json()
+
+    # Se não achou como preapproval, só encerra (evita quebrar)
+    if not preapproval:
+        return {"ok": True}
+
+    status = preapproval.get("status")  # esperado: "authorized" quando pagou/ativou
+    external_reference = preapproval.get("external_reference")  # "user_123"
+
+    if status == "authorized" and external_reference and external_reference.startswith("user_"):
+        try:
+            user_id = int(external_reference.replace("user_", ""))
+        except ValueError:
+            return {"ok": True}
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            set_user_pro(db, user)
+
     return {"ok": True}
 
-
+@app.get("/billing/success", response_class=HTMLResponse)
+def billing_success(request: Request):
+    return HTMLResponse("""
+    <div style="font-family:system-ui; padding:24px;">
+      <h2>Pagamento recebido! ✅</h2>
+      <p>Se sua assinatura foi confirmada, seu plano PRO será liberado automaticamente.</p>
+      <p><a href="/dashboard">Voltar ao dashboard</a></p>
+    </div>
+    """)
 
 
 

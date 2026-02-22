@@ -14,12 +14,16 @@ class User(Base):
     company_name = Column(String(255), nullable=True)
     phone = Column(String(50), nullable=True)
 
-    # "free" ou "free_used_delete" (MVP) ou "pro" (futuro)
-    plan = Column(String, default="free")
-    proposal_limit = Column(Integer, default=5)
+    # Plano
+    plan = Column(String, default="free")                 # free | pro
+    proposal_limit = Column(Integer, default=5)           # free=5
+    delete_credits = Column(Integer, default=1)           # free=1
+
+    # Auditoria / Pagamento (MVP)
+    plan_updated_at = Column(DateTime, nullable=True)
+    mp_last_payment_id = Column(String(64), nullable=True)
 
     proposals = relationship("Proposal", back_populates="owner")
-
 
 class Proposal(Base):
     __tablename__ = "proposals"

@@ -4,63 +4,161 @@
   <meta charset="utf-8">
   <title>PropoFlow • Planos</title>
 
-  <!-- Anti-cache (importante no celular) -->
-  <link rel="stylesheet" href="/static/style.css?v=1001">
+  <!-- Anti-cache -->
+  <link rel="stylesheet" href="/static/style.css?v=1002">
 
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 
 <body>
-  <div class="container">
-    <div class="nav">
-      <div class="brand">
-        <div class="logo"></div>
-        <div>
-          <h1>PropoFlow</h1>
-          <p>Planos</p>
-        </div>
-      </div>
 
-      <div class="actions">
-        <a class="btn btn-ghost" href="/dashboard">Voltar</a>
+<div class="container">
+
+  <!-- NAV -->
+  <div class="nav">
+
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Escolha seu plano</p>
       </div>
     </div>
 
-    <div class="pricing-grid">
-      <div class="card pricing-card">
-        <h2 class="h2">Plano Gratuito</h2>
-        <p class="small">Perfeito para começar</p>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">Voltar</a>
+    </div>
 
-        <ul class="small" style="margin: 10px 0 0; padding-left: 18px;">
-          <li>✓ Até 5 propostas</li>
-          <li>✓ Link público</li>
-          <li>✓ Aceite online</li>
-          <li>✓ 1 exclusão no gratuito</li>
-        </ul>
+  </div>
 
-        <div class="price">R$ 0</div>
+
+  <!-- GRID PLANOS -->
+  <div class="pricing-grid">
+
+
+    <!-- GRATUITO -->
+    <div class="card pricing-card">
+
+      <h2 class="h2">Plano Gratuito</h2>
+
+      <p class="small">
+        Ideal para começar e testar o sistema
+      </p>
+
+
+      <ul class="small" style="margin-top:14px; padding-left:18px;">
+
+        <li>✓ Até 5 propostas</li>
+
+        <li>✓ Link público profissional</li>
+
+        <li>✓ Aceite online do cliente</li>
+
+        <li>✓ 1 exclusão disponível</li>
+
+      </ul>
+
+
+      <div class="price">
+        R$ 0
       </div>
 
-      <div class="card pricing-card">
-        <h2 class="h2">Plano Pro</h2>
-        <p class="small">Para quem envia propostas frequentemente</p>
 
-        <ul class="small" style="margin: 10px 0 0; padding-left: 18px;">
-          <li>✓ Propostas ilimitadas</li>
-          <li>✓ Exclusões ilimitadas</li>
-          <li>✓ Sem marca PropoFlow</li>
-          <li>✓ Prioridade em novas atualizações</li>
-        </ul>
+      <button class="btn btn-ghost"
+              style="margin-top:16px; width:100%; cursor:default;">
 
-        <div class="price">R$ 19/mês</div>
+        Plano atual
 
-        <form method="post" action="/mp/create_pro_checkout">
-  <button class="btn" type="submit">Quero acesso Pro</button>
-</form>
+      </button>
 
-    <p class="small" style="margin-top:14px;">
-      Versão: v5-free
-    </p>
+
+    </div>
+
+
+
+    <!-- PRO -->
+    <div class="card pricing-card"
+         style="border:1px solid rgba(79,124,255,0.5);">
+
+      <h2 class="h2">
+
+        Plano Pro
+
+      </h2>
+
+
+      <p class="small">
+
+        Para profissionais que enviam propostas com frequência
+
+      </p>
+
+
+
+      <ul class="small"
+          style="margin-top:14px; padding-left:18px;">
+
+        <li>✓ Propostas ilimitadas</li>
+
+        <li>✓ Exclusões ilimitadas</li>
+
+        <li>✓ Sistema completo liberado</li>
+
+        <li>✓ Sem limitações</li>
+
+        <li>✓ Prioridade em atualizações</li>
+
+      </ul>
+
+
+
+      <div class="price">
+
+        R$ 19/mês
+
+      </div>
+
+
+
+      <!-- BOTÃO CORRETO -->
+      <a href="/upgrade/pro"
+         class="btn"
+         style="margin-top:16px; width:100%;">
+
+         Quero acesso Pro
+
+      </a>
+
+
+
+      <p class="small"
+         style="margin-top:12px; text-align:center;">
+
+         Cancele quando quiser
+
+      </p>
+
+
+
+    </div>
+
+
+
   </div>
+
+
+
+  <p class="small"
+     style="margin-top:24px; text-align:center; opacity:.6;">
+
+     PropoFlow • Sistema profissional de propostas
+
+  </p>
+
+
+
+</div>
+
+
 </body>
 </html>
