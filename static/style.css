@@ -291,48 +291,9 @@ html, body {
   }
 }
 
-/* ===== MOBILE FIX: PRICING ===== */
-.pricing-grid{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
 
-.plan-card{
-  padding: 18px;
-}
 
-/* Mobile: vira 1 coluna, texto maior e botão grande */
-@media (max-width: 640px){
-  .pricing-grid{
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .plan-card{
-    padding: 18px;
-  }
-
-  .plan-card h2,
-  .plan-card h3{
-    font-size: 18px;
-  }
-
-  .plan-card p,
-  .plan-card li,
-  .plan-card .small{
-    font-size: 15px;
-    line-height: 1.45;
-  }
-
-  .plan-card .btn{
-    width: 100%;
-    display: inline-flex;
-    justify-content: center;
-  }
-}
-
-/* ===== PRICING - MOBILE ===== */
+/* ===== PRICING ===== */
 .pricing-grid{
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -343,36 +304,33 @@ html, body {
   padding: 18px;
 }
 
-@media (max-width: 1050px){
+.pricing-card .price{
+  margin-top: 10px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+/* Mobile */
+@media (max-width: 720px){
   .pricing-grid{
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr; /* 1 coluna no celular */
   }
 
   .pricing-card{
     padding: 20px;
   }
 
-  .pricing-card h2,
-  .pricing-card h3{
-    font-size: 20px;
-    line-height: 1.2;
+  .pricing-card .h2{
+    font-size: 22px;
   }
 
-  .pricing-card p,
+  .pricing-card .small,
   .pricing-card li{
     font-size: 15px;
-    line-height: 1.45;
+    line-height: 1.5;
   }
 
   .pricing-card .price{
-    font-size: 18px;
-    font-weight: 800;
-  }
-
-  /* Se alguma caixinha “sobrou” e aparecer só no pricing, esconde */
-  .pricing-page .pill,
-  .pricing-page .filters,
-  .pricing-page .mobile-list{
-    display: none !important;
+    font-size: 20px;
   }
 }
