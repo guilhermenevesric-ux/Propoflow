@@ -472,6 +472,13 @@ def profile_save(
     return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": True})
 
 
+@app.get("/billing", response_class=HTMLResponse)
+def billing(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    return templates.TemplateResponse("billing.html", {"request": request, "user": user})
+
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request, db: Session = Depends(get_db)):
 
@@ -599,3 +606,15 @@ async def webhooks_mercadopago(request: Request, db: Session = Depends(get_db)):
             set_user_pro(db, user, preapproval_id=resource_id)
 
     return {"ok": True}
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms(request: Request):
+    return templates.TemplateResponse("terms.html", {"request": request})
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy(request: Request):
+    return templates.TemplateResponse("privacy.html", {"request": request})
+
+@app.get("/support", response_class=HTMLResponse)
+def support(request: Request):
+    return templates.TemplateResponse("support.html", {"request": request})

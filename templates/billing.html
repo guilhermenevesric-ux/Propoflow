@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Assinatura</title>
+  <link rel="stylesheet" href="/static/style.css?v=2100">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<div class="container">
+
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Assinatura e plano</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">Voltar</a>
+    </div>
+  </div>
+
+  <div class="card">
+
+    <h2 class="h2">Seu plano</h2>
+    <p class="small">Veja seu status e gerencie sua assinatura.</p>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0;">
+      {% if user.plan == "pro" %}
+        <span class="pill">✨ Plano: <b style="color: rgba(232,238,252,0.95);">PRO</b></span>
+        <span class="pill">📄 Propostas: <b style="color: rgba(232,238,252,0.95);">Ilimitadas</b></span>
+        <span class="pill">🗑️ Exclusões: <b style="color: rgba(232,238,252,0.95);">Ilimitadas</b></span>
+      {% else %}
+        <span class="pill">🆓 Plano: <b style="color: rgba(232,238,252,0.95);">Gratuito</b></span>
+        <span class="pill">📄 Limite: <b style="color: rgba(232,238,252,0.95);">{{ user.proposal_limit or 5 }}</b></span>
+        <span class="pill">🗑️ Exclusão: <b style="color: rgba(232,238,252,0.95);">1x</b></span>
+      {% endif %}
+    </div>
+
+    {% if user.plan_updated_at %}
+      <p class="small">Última atualização do plano: <b>{{ user.plan_updated_at.strftime("%d/%m/%Y %H:%M") }}</b></p>
+    {% endif %}
+
+    <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
+
+    {% if user.plan == "pro" %}
+      <h3 class="h2" style="font-size:15px;">Cancelar assinatura</h3>
+      <p class="small">
+        Para cancelar, abra o Mercado Pago onde você fez a assinatura e cancele por lá.
+        (Em breve vamos colocar o link direto aqui.)
+      </p>
+
+      <a class="btn btn-ghost" href="/support" style="margin-top:10px;">Preciso de ajuda</a>
+
+    {% else %}
+      <h3 class="h2" style="font-size:15px;">Fazer upgrade</h3>
+      <p class="small">Libere propostas ilimitadas e remova limitações.</p>
+
+      <a class="btn" href="/upgrade/pro" style="margin-top:10px;">Virar PRO</a>
+      <a class="btn btn-ghost" href="/pricing" style="margin-top:10px;">Ver planos</a>
+    {% endif %}
+
+  </div>
+
+  <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+    <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
+  </p>
+
+</div>
+
+</body>
+</html>
