@@ -387,6 +387,7 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         "author_name": user.display_name if user and user.display_name else "",
         "company_name": user.company_name if user and user.company_name else "",
         "phone": user.phone if user and user.phone else "",
+        "is_pro": (user is not None and user.plan == "pro"),
     })
 
     filename = f"proposta_{p.client_name.replace(' ', '_')}_{p.public_id}.pdf"
@@ -435,6 +436,7 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
         "author_name": user.display_name if user and user.display_name else "",
         "company_name": user.company_name if user and user.company_name else "",
         "phone": user.phone if user and user.phone else "",
+        "is_pro": (user is not None and user.plan == "pro"),
     })
 
     filename = f"proposta_{p.client_name.replace(' ', '_')}_{p.id}.pdf"

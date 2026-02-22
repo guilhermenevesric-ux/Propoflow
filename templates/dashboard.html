@@ -12,17 +12,37 @@
       <div class="brand">
         <div class="logo"></div>
         <div>
-          <h1>PropoFlow</h1>
-          <p>Gerador de propostas profissionais</p>
+          {% if owner and owner.plan == "pro" %}
+  <h1>{{ owner.company_name or (owner.display_name or "Proposta") }}</h1>
+  <p>
+    {% if owner.company_name and owner.display_name %}
+      {{ owner.display_name }}
+    {% endif %}
+    {% if owner.phone %} • {{ owner.phone }}{% endif %}
+  </p>
+{% else %}
+  <h1>PropoFlow</h1>
+  <p>
+    {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Proposta profissional{% endif %}
+    {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
+  </p>
+{% endif %}
         </div>
       </div>
 
       <div class="actions">
-        <a class="btn btn-ghost" href="/profile">Perfil</a>
-<a class="btn btn-ghost" href="/billing">Assinatura</a>
-<a class="btn" href="/pricing">Upgrade</a>
-<a class="btn" href="/proposals/new">+ Nova proposta</a>
-      </div>
+  <a class="btn btn-ghost" href="/profile">Perfil</a>
+  <a class="btn btn-ghost" href="/billing">Assinatura</a>
+
+  {% if user and user.plan == "pro" %}
+    <span class="pill">✨ PRO</span>
+  {% else %}
+    <a class="btn" href="/pricing">Upgrade</a>
+  {% endif %}
+
+  <a class="btn" href="/proposals/new">+ Nova proposta</a>
+  <a class="btn btn-ghost" href="/logout">Sair</a>
+</div>
     </div>
 
     <div class="card">
