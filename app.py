@@ -576,6 +576,57 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
 
     return {"ok": True}
 
+import os
+import mercadopago
+
+PRO_PRICE = 19.00  # preço do Pro
+
+@app.post("/mp/create_pro_checkout")
+def mp_create_pro_checkout(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    access_token = os.getenv("MP_ACCESS_TOKEN")
+    if not access_token:
+        return HTMLResponse("MP_ACCESS_TOKEN não configurado no Render.", status_code=500)
+
+    sdk = mercadopago.SDK(access_token)
+
+    base_url = str(request.base_url).rstrip("/")
+
+    preference_data = {
+        "items": [
+            {
+                "title": "PropoFlow PRO (mensal)",
+                "quantity": 1,
+                "unit_price": float(PRO_PRICE),
+                "currency_id": "BRL",
+            }
+        ],
+        "payer": {
+            "email": user.email
+        },
+        "notification_url": f"{base_url}/webhooks/mercadopago",
+        "external_reference": str(user.id),  # IMPORTANTÍSSIMO: liga o pagamento ao usuário
+        "back_urls": {
+            "success": f"{base_url}/dashboard",
+            "failure": f"{base_url}/pricing",
+            "pending": f"{base_url}/dashboard"
+        },
+        "auto_return": "approved",
+    }
+
+    preference_response = sdk.preference().create(preference_data)
+    pref = preference_response.get("response", {})
+
+    init_point = pref.get("init_point")
+    if not init_point:
+        return HTMLResponse("Não foi possível criar checkout no Mercado Pago.", status_code=500)
+
+    return RedirectResponse(init_point, status_code=302)
+
+
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request):
     return templates.TemplateResponse("pricing.html", {"request": request})
