@@ -1,0 +1,11 @@
+# banco local
+app.db
+*.db
+
+# venv
+.venv/
+venv/
+
+# caches
+__pycache__/
+*.pyc
