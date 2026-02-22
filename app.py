@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
 from fastapi.staticfiles import StaticFiles
 from datetime import datetime
+import os
+import requests
 
 from db import SessionLocal, engine, Base
 from models import User, Proposal
@@ -33,6 +35,8 @@ def get_db():
 
 COOKIE_NAME = "user_id"
 
+MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "").strip()
+MP_API = "https://api.mercadopago.com"
 
 def get_current_user(request: Request, db: Session):
     user_id = request.cookies.get(COOKIE_NAME)
@@ -446,6 +450,163 @@ def profile_save(
     return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": True})
 
 
+@app.get("/checkout/pro")
+def checkout_pro(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    if not MP_ACCESS_TOKEN:
+        return HTMLResponse("MP_ACCESS_TOKEN não configurado no Render (Environment).", status_code=500)
+
+    base_url = str(request.base_url).rstrip("/")
+
+    # Preço do PRO (MVP) - ajuste aqui
+    price_brl = 19.90
+
+    payload = {
+        "items": [
+            {
+                "title": "PropoFlow PRO (mensal)",
+                "quantity": 1,
+                "currency_id": "BRL",
+                "unit_price": price_brl
+            }
+        ],
+        "payer": {"email": user.email},
+        "external_reference": f"user:{user.id}:pro",
+        "back_urls": {
+            "success": f"{base_url}/payment/success",
+            "pending": f"{base_url}/payment/pending",
+            "failure": f"{base_url}/payment/failure"
+        },
+        "auto_return": "approved",
+        "notification_url": f"{base_url}/webhooks/mercadopago"
+    }
+
+    r = requests.post(
+        f"{MP_API}/checkout/preferences",
+        headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"},
+        json=payload,
+        timeout=30
+    )
+
+    if r.status_code not in (200, 201):
+        return HTMLResponse(f"Erro ao criar checkout MP: {r.status_code}<br>{r.text}", status_code=500)
+
+    data = r.json()
+    init_point = data.get("init_point") or data.get("sandbox_init_point")
+
+    if not init_point:
+        return HTMLResponse("Mercado Pago não retornou init_point.", status_code=500)
+
+    return RedirectResponse(init_point, status_code=302)
+
+@app.get("/payment/success", response_class=HTMLResponse)
+def payment_success(request: Request):
+    return templates.TemplateResponse("payment_success.html", {"request": request})
+
+@app.get("/payment/pending", response_class=HTMLResponse)
+def payment_pending(request: Request):
+    return templates.TemplateResponse("payment_pending.html", {"request": request})
+
+@app.get("/payment/failure", response_class=HTMLResponse)
+def payment_failure(request: Request):
+    return templates.TemplateResponse("payment_failure.html", {"request": request})
+
+@app.post("/webhooks/mercadopago")
+async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
+    if not MP_ACCESS_TOKEN:
+        return {"ok": True}
+
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    # Mercado Pago pode mandar "type":"payment" e "data":{"id":"..."}
+    payment_id = None
+    if isinstance(body, dict):
+        if "data" in body and isinstance(body["data"], dict) and body["data"].get("id"):
+            payment_id = str(body["data"]["id"])
+        elif body.get("id"):
+            payment_id = str(body["id"])
+
+    if not payment_id:
+        return {"ok": True}
+
+    # Busca detalhes do pagamento diretamente na API do MP (mais confiável que o payload)
+    r = requests.get(
+        f"{MP_API}/v1/payments/{payment_id}",
+        headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"},
+        timeout=30
+    )
+
+    if r.status_code != 200:
+        return {"ok": True}
+
+    pay = r.json()
+    status = (pay.get("status") or "").lower()
+    external_ref = pay.get("external_reference") or ""
+
+    # Só libera se aprovado e for do nosso plano PRO
+    if status == "approved" and external_ref.startswith("user:") and ":pro" in external_ref:
+        try:
+            user_id = int(external_ref.split(":")[1])
+        except Exception:
+            return {"ok": True}
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return {"ok": True}
+
+        # Idempotência: se já processou esse payment_id, não repete
+        if user.mp_last_payment_id == str(payment_id) and user.plan == "pro":
+            return {"ok": True}
+
+        user.plan = "pro"
+        user.proposal_limit = 999999
+        user.delete_credits = 999999
+        user.plan_updated_at = datetime.utcnow()
+        user.mp_last_payment_id = str(payment_id)
+
+        db.add(user)
+        db.commit()
+
+    return {"ok": True}
+
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request):
     return templates.TemplateResponse("pricing.html", {"request": request})
+
+from fastapi import Header
+import json
+
+@app.post("/webhooks/mercadopago")
+async def mercadopago_webhook(
+    request: Request,
+    x_signature: str = Header(default=None),
+    x_request_id: str = Header(default=None),
+):
+    # Mercado Pago pode mandar JSON ou form. Vamos tentar ler tudo.
+    raw = await request.body()
+    try:
+        payload = json.loads(raw.decode("utf-8")) if raw else {}
+    except Exception:
+        payload = {"raw": raw.decode("utf-8", errors="ignore")}
+
+    # Log simples pra você ver no Render Logs
+    print("=== MERCADOPAGO WEBHOOK RECEBIDO ===")
+    print("x-signature:", x_signature)
+    print("x-request-id:", x_request_id)
+    print("payload:", payload)
+
+    # IMPORTANTE: responder 200 rápido
+    return {"ok": True}
+
+
+
+
+
+
