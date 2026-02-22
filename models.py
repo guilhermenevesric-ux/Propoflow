@@ -4,8 +4,10 @@ from datetime import datetime
 from db import Base
 import uuid
 
+
 class User(Base):
     __tablename__ = "users"
+
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
@@ -15,20 +17,23 @@ class User(Base):
     phone = Column(String(50), nullable=True)
 
     # Plano
-    plan = Column(String, default="free")                 # free | pro
-    proposal_limit = Column(Integer, default=5)           # free=5
-    delete_credits = Column(Integer, default=1)           # free=1
+    plan = Column(String(32), default="free")        # free | pro
+    proposal_limit = Column(Integer, default=5)      # free=5
+    delete_credits = Column(Integer, default=1)      # free=1 (1 exclusão)
 
-    # Auditoria / Pagamento (MVP)
+    # Auditoria / Pagamento (assinatura)
     plan_updated_at = Column(DateTime, nullable=True)
-    mp_last_payment_id = Column(String(64), nullable=True)
+    mp_last_preapproval_id = Column(String(64), nullable=True)
 
     proposals = relationship("Proposal", back_populates="owner")
 
+
 class Proposal(Base):
     __tablename__ = "proposals"
+
     id = Column(Integer, primary_key=True, index=True)
-    public_id = Column(String(16), unique=True, index=True, nullable=False, default=lambda: uuid.uuid4().hex[:12])
+    public_id = Column(String(16), unique=True, index=True, nullable=False,
+                       default=lambda: uuid.uuid4().hex[:12])
 
     client_name = Column(String(255), nullable=False)
     project_name = Column(String(255), nullable=False)

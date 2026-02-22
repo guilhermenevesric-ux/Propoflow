@@ -1,23 +1,19 @@
+from sqlalchemy import inspect, text
 from db import engine
-from sqlalchemy import text
 
-def column_exists(conn, table_name: str, column_name: str) -> bool:
-    rows = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
-    cols = [r[1] for r in rows]  # pragma columns: cid, name, type, notnull, dflt_value, pk
-    return column_name in cols
+def ensure_column(conn, table: str, column: str, ddl: str):
+    insp = inspect(conn)
+    cols = [c["name"] for c in insp.get_columns(table)]
+    if column not in cols:
+        conn.execute(text(ddl))
 
 with engine.begin() as conn:
     # USERS
-    if not column_exists(conn, "users", "plan"):
-        conn.execute(text("ALTER TABLE users ADD COLUMN plan VARCHAR DEFAULT 'free'"))
-    if not column_exists(conn, "users", "proposal_limit"):
-        conn.execute(text("ALTER TABLE users ADD COLUMN proposal_limit INTEGER DEFAULT 5"))
-    if not column_exists(conn, "users", "delete_credits"):
-        conn.execute(text("ALTER TABLE users ADD COLUMN delete_credits INTEGER DEFAULT 1"))
+    ensure_column(conn, "users", "plan", "ALTER TABLE users ADD COLUMN plan VARCHAR(32) DEFAULT 'free'")
+    ensure_column(conn, "users", "proposal_limit", "ALTER TABLE users ADD COLUMN proposal_limit INTEGER DEFAULT 5")
+    ensure_column(conn, "users", "delete_credits", "ALTER TABLE users ADD COLUMN delete_credits INTEGER DEFAULT 1")
 
-    if not column_exists(conn, "users", "plan_updated_at"):
-        conn.execute(text("ALTER TABLE users ADD COLUMN plan_updated_at DATETIME"))
-    if not column_exists(conn, "users", "mp_last_payment_id"):
-        conn.execute(text("ALTER TABLE users ADD COLUMN mp_last_payment_id VARCHAR(64)"))
+    ensure_column(conn, "users", "plan_updated_at", "ALTER TABLE users ADD COLUMN plan_updated_at TIMESTAMP")
+    ensure_column(conn, "users", "mp_last_preapproval_id", "ALTER TABLE users ADD COLUMN mp_last_preapproval_id VARCHAR(64)")
 
-print("✅ migrate.py OK")
+print("✅ migrate.py OK (SQLite/Postgres)")

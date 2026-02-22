@@ -1,24 +1,27 @@
 from fastapi import FastAPI, Request, Form, Depends, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
-from fastapi.staticfiles import StaticFiles
 from datetime import datetime
 import os
 import requests
+import subprocess
+import sys
 
 from db import SessionLocal, engine, Base
 from models import User, Proposal
 from pdf_gen import generate_proposal_pdf
 
-Base.metadata.create_all(bind=engine)
 
-import subprocess, sys, os
+# ====== roda migração leve (SQLite/Postgres) ======
 try:
     subprocess.run([sys.executable, "migrate.py"], check=False)
 except Exception:
     pass
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -35,9 +38,10 @@ def get_db():
 
 COOKIE_NAME = "user_id"
 
-# ===== Mercado Pago (assinatura simples) =====
-MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "")
-APP_BASE_URL = os.getenv("APP_BASE_URL", "").rstrip("/")
+MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "").strip()
+APP_BASE_URL = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
+MP_API = "https://api.mercadopago.com"
+
 
 def mp_headers():
     return {
@@ -45,15 +49,6 @@ def mp_headers():
         "Content-Type": "application/json",
     }
 
-def set_user_pro(db: Session, user: User):
-    user.plan = "pro"
-    user.proposal_limit = 999999  # ilimitado no MVP
-    user.delete_credits = 999999  # ilimitado no MVP
-    db.add(user)
-    db.commit()
-
-MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "").strip()
-MP_API = "https://api.mercadopago.com"
 
 def get_current_user(request: Request, db: Session):
     user_id = request.cookies.get(COOKIE_NAME)
@@ -64,6 +59,17 @@ def get_current_user(request: Request, db: Session):
     except ValueError:
         return None
     return db.query(User).filter(User.id == user_id_int).first()
+
+
+def set_user_pro(db: Session, user: User, preapproval_id: str | None = None):
+    user.plan = "pro"
+    user.proposal_limit = 999999
+    user.delete_credits = 999999
+    user.plan_updated_at = datetime.utcnow()
+    if preapproval_id:
+        user.mp_last_preapproval_id = preapproval_id
+    db.add(user)
+    db.commit()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -84,22 +90,24 @@ def home(request: Request, db: Session = Depends(get_db)):
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
+
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request, "error": None})
+
 
 @app.post("/login")
 def login(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     user = db.query(User).filter(User.email == email.strip().lower()).first()
     if (not user) or (not pbkdf2_sha256.verify(password, user.password_hash)):
         return templates.TemplateResponse(
             "login.html",
-            {"request": request, "error": "Email ou senha inválidos."}
+            {"request": request, "error": "Email ou senha inválidos."},
         )
 
     resp = RedirectResponse("/dashboard", status_code=302)
@@ -112,20 +120,21 @@ def register(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     email = email.strip().lower()
     if db.query(User).filter(User.email == email).first():
         return templates.TemplateResponse(
             "register.html",
-            {"request": request, "error": "Esse email já existe. Faça login."}
+            {"request": request, "error": "Esse email já existe. Faça login."},
         )
 
     user = User(
         email=email,
         password_hash=pbkdf2_sha256.hash(password),
         proposal_limit=5,
-        plan="free"
+        plan="free",
+        delete_credits=1,
     )
 
     db.add(user)
@@ -164,7 +173,6 @@ def dashboard(request: Request, status: str = "all", db: Session = Depends(get_d
         Proposal.owner_id == user.id,
         Proposal.accepted_at.isnot(None)
     ).count()
-
     rate = round((accepted / total) * 100) if total else 0
 
     return templates.TemplateResponse("dashboard.html", {
@@ -175,47 +183,6 @@ def dashboard(request: Request, status: str = "all", db: Session = Depends(get_d
         "accepted": accepted,
         "rate": rate,
         "status": status,
-        # ajuda o template a saber se mostra o aviso do 1 delete
-        "free_delete_available": (user.plan == "free")
-    })
-
-
-@app.post("/p/{public_id}/accept", response_class=HTMLResponse)
-def accept_proposal(
-    public_id: str,
-    request: Request,
-    name: str = Form(...),
-    email: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
-    if not p:
-        return HTMLResponse("Proposta não encontrada.", status_code=404)
-
-    if p.accepted_at is not None:
-        owner = db.query(User).filter(User.id == p.owner_id).first()
-        base_url = str(request.base_url).rstrip("/")
-        return templates.TemplateResponse("accepted.html", {
-            "request": request,
-            "p": p,
-            "owner": owner,
-            "base_url": base_url
-        })
-
-    p.accepted_at = datetime.utcnow()
-    p.accepted_name = name.strip()
-    p.accepted_email = email.strip()
-    db.commit()
-    db.refresh(p)
-
-    owner = db.query(User).filter(User.id == p.owner_id).first()
-    base_url = str(request.base_url).rstrip("/")
-
-    return templates.TemplateResponse("accepted.html", {
-        "request": request,
-        "p": p,
-        "owner": owner,
-        "base_url": base_url
     })
 
 
@@ -224,7 +191,6 @@ def new_proposal_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
-
     return templates.TemplateResponse("new_proposal.html", {"request": request, "error": None})
 
 
@@ -236,7 +202,7 @@ def create_proposal(
     description: str = Form(...),
     price: str = Form(...),
     deadline: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     user = get_current_user(request, db)
     if not user:
@@ -268,7 +234,6 @@ def create_proposal(
             "status": "all",
             "error": f"Você atingiu o limite do plano gratuito ({user.proposal_limit or 5} propostas).",
             "show_upgrade": True,
-            "free_delete_available": (user.plan == "free")
         })
 
     p = Proposal(
@@ -277,13 +242,132 @@ def create_proposal(
         description=description.strip(),
         price=price.strip(),
         deadline=deadline.strip(),
-        owner_id=user.id
+        owner_id=user.id,
     )
     db.add(p)
     db.commit()
     db.refresh(p)
 
     return RedirectResponse(f"/proposals/{p.id}/pdf", status_code=302)
+
+
+@app.post("/proposals/{proposal_id}/delete")
+def delete_proposal(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    p = db.query(Proposal).filter(
+        Proposal.id == proposal_id,
+        Proposal.owner_id == user.id
+    ).first()
+
+    if not p:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # Free: só 1 exclusão via delete_credits
+    if user.plan == "free":
+        credits = user.delete_credits or 0
+        if credits <= 0:
+            proposals = (
+                db.query(Proposal)
+                .filter(Proposal.owner_id == user.id)
+                .order_by(Proposal.created_at.desc())
+                .all()
+            )
+            total = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+            accepted = db.query(Proposal).filter(
+                Proposal.owner_id == user.id,
+                Proposal.accepted_at.isnot(None)
+            ).count()
+            rate = round((accepted / total) * 100) if total else 0
+
+            return templates.TemplateResponse("dashboard.html", {
+                "request": request,
+                "user": user,
+                "proposals": proposals,
+                "total": total,
+                "accepted": accepted,
+                "rate": rate,
+                "status": "all",
+                "error": "No plano gratuito você só pode excluir 1 proposta. Faça upgrade para excluir ilimitado.",
+                "show_upgrade": True,
+            })
+
+        user.delete_credits = credits - 1
+        db.add(user)
+
+    db.delete(p)
+    db.commit()
+
+    return RedirectResponse("/dashboard", status_code=302)
+
+
+@app.get("/proposals/{proposal_id}/duplicate")
+def duplicate_proposal(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    original = db.query(Proposal).filter(
+        Proposal.id == proposal_id,
+        Proposal.owner_id == user.id
+    ).first()
+
+    if not original:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    new_p = Proposal(
+        client_name=original.client_name,
+        project_name=original.project_name,
+        description=original.description,
+        price=original.price,
+        deadline=original.deadline,
+        owner_id=user.id
+    )
+
+    db.add(new_p)
+    db.commit()
+
+    return RedirectResponse("/dashboard", status_code=302)
+
+
+@app.post("/p/{public_id}/accept", response_class=HTMLResponse)
+def accept_proposal(
+    public_id: str,
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
+    if not p:
+        return HTMLResponse("Proposta não encontrada.", status_code=404)
+
+    if p.accepted_at is not None:
+        owner = db.query(User).filter(User.id == p.owner_id).first()
+        base_url = str(request.base_url).rstrip("/")
+        return templates.TemplateResponse("accepted.html", {
+            "request": request,
+            "p": p,
+            "owner": owner,
+            "base_url": base_url
+        })
+
+    p.accepted_at = datetime.utcnow()
+    p.accepted_name = name.strip()
+    p.accepted_email = email.strip()
+    db.commit()
+    db.refresh(p)
+
+    owner = db.query(User).filter(User.id == p.owner_id).first()
+    base_url = str(request.base_url).rstrip("/")
+    return templates.TemplateResponse("accepted.html", {
+        "request": request,
+        "p": p,
+        "owner": owner,
+        "base_url": base_url
+    })
 
 
 @app.get("/p/{public_id}/pdf")
@@ -293,7 +377,6 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         return HTMLResponse("Proposta não encontrada.", status_code=404)
 
     user = db.query(User).filter(User.id == p.owner_id).first()
-
     pdf_bytes = generate_proposal_pdf({
         "client_name": p.client_name,
         "project_name": p.project_name,
@@ -334,7 +417,11 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
+    p = db.query(Proposal).filter(
+        Proposal.id == proposal_id,
+        Proposal.owner_id == user.id
+    ).first()
+
     if not p:
         return RedirectResponse("/dashboard", status_code=302)
 
@@ -355,88 +442,6 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
-@app.post("/proposals/{proposal_id}/delete")
-def delete_proposal(proposal_id: int, request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    p = db.query(Proposal).filter(
-        Proposal.id == proposal_id,
-        Proposal.owner_id == user.id
-    ).first()
-
-    if not p:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    # Free: 1 exclusão total -> depois vira free_used_delete
-    if user.plan.startswith("free"):
-        if user.plan == "free_used_delete":
-            proposals = (
-                db.query(Proposal)
-                .filter(Proposal.owner_id == user.id)
-                .order_by(Proposal.created_at.desc())
-                .all()
-            )
-            total = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
-            accepted = db.query(Proposal).filter(
-                Proposal.owner_id == user.id,
-                Proposal.accepted_at.isnot(None)
-            ).count()
-            rate = round((accepted / total) * 100) if total else 0
-
-            return templates.TemplateResponse("dashboard.html", {
-                "request": request,
-                "user": user,
-                "proposals": proposals,
-                "total": total,
-                "accepted": accepted,
-                "rate": rate,
-                "status": "all",
-                "error": "No plano gratuito você só pode excluir 1 proposta. Faça upgrade para excluir ilimitado.",
-                "show_upgrade": True,
-                "free_delete_available": False
-            })
-
-        # primeira exclusão no free
-        user.plan = "free_used_delete"
-
-    db.add(user)
-    db.delete(p)
-    db.commit()
-
-    return RedirectResponse("/dashboard", status_code=302)
-
-
-@app.get("/proposals/{proposal_id}/duplicate")
-def duplicate_proposal(proposal_id: int, request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    original = db.query(Proposal).filter(
-        Proposal.id == proposal_id,
-        Proposal.owner_id == user.id
-    ).first()
-
-    if not original:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    new_p = Proposal(
-        client_name=original.client_name,
-        project_name=original.project_name,
-        description=original.description,
-        price=original.price,
-        deadline=original.deadline,
-        owner_id=user.id
-    )
-
-    db.add(new_p)
-    db.commit()
-
-    return RedirectResponse("/dashboard", status_code=302)
-
-
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -452,7 +457,7 @@ def profile_save(
     display_name: str = Form(""),
     company_name: str = Form(""),
     phone: str = Form(""),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     user = get_current_user(request, db)
     if not user:
@@ -467,190 +472,12 @@ def profile_save(
     return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": True})
 
 
-@app.get("/checkout/pro")
-def checkout_pro(request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    if not MP_ACCESS_TOKEN:
-        return HTMLResponse("MP_ACCESS_TOKEN não configurado no Render (Environment).", status_code=500)
-
-    base_url = str(request.base_url).rstrip("/")
-
-    # Preço do PRO (MVP) - ajuste aqui
-    price_brl = 19.90
-
-    payload = {
-        "items": [
-            {
-                "title": "PropoFlow PRO (mensal)",
-                "quantity": 1,
-                "currency_id": "BRL",
-                "unit_price": price_brl
-            }
-        ],
-        "payer": {"email": user.email},
-        "external_reference": f"user:{user.id}:pro",
-        "back_urls": {
-            "success": f"{base_url}/payment/success",
-            "pending": f"{base_url}/payment/pending",
-            "failure": f"{base_url}/payment/failure"
-        },
-        "auto_return": "approved",
-        "notification_url": f"{base_url}/webhooks/mercadopago"
-    }
-
-    r = requests.post(
-        f"{MP_API}/checkout/preferences",
-        headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"},
-        json=payload,
-        timeout=30
-    )
-
-    if r.status_code not in (200, 201):
-        return HTMLResponse(f"Erro ao criar checkout MP: {r.status_code}<br>{r.text}", status_code=500)
-
-    data = r.json()
-    init_point = data.get("init_point") or data.get("sandbox_init_point")
-
-    if not init_point:
-        return HTMLResponse("Mercado Pago não retornou init_point.", status_code=500)
-
-    return RedirectResponse(init_point, status_code=302)
-
-@app.get("/payment/success", response_class=HTMLResponse)
-def payment_success(request: Request):
-    return templates.TemplateResponse("payment_success.html", {"request": request})
-
-@app.get("/payment/pending", response_class=HTMLResponse)
-def payment_pending(request: Request):
-    return templates.TemplateResponse("payment_pending.html", {"request": request})
-
-@app.get("/payment/failure", response_class=HTMLResponse)
-def payment_failure(request: Request):
-    return templates.TemplateResponse("payment_failure.html", {"request": request})
-
-@app.post("/webhooks/mercadopago")
-async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
-    if not MP_ACCESS_TOKEN:
-        return {"ok": True}
-
-    body = {}
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    # Mercado Pago pode mandar "type":"payment" e "data":{"id":"..."}
-    payment_id = None
-    if isinstance(body, dict):
-        if "data" in body and isinstance(body["data"], dict) and body["data"].get("id"):
-            payment_id = str(body["data"]["id"])
-        elif body.get("id"):
-            payment_id = str(body["id"])
-
-    if not payment_id:
-        return {"ok": True}
-
-    # Busca detalhes do pagamento diretamente na API do MP (mais confiável que o payload)
-    r = requests.get(
-        f"{MP_API}/v1/payments/{payment_id}",
-        headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"},
-        timeout=30
-    )
-
-    if r.status_code != 200:
-        return {"ok": True}
-
-    pay = r.json()
-    status = (pay.get("status") or "").lower()
-    external_ref = pay.get("external_reference") or ""
-
-    # Só libera se aprovado e for do nosso plano PRO
-    if status == "approved" and external_ref.startswith("user:") and ":pro" in external_ref:
-        try:
-            user_id = int(external_ref.split(":")[1])
-        except Exception:
-            return {"ok": True}
-
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return {"ok": True}
-
-        # Idempotência: se já processou esse payment_id, não repete
-        if user.mp_last_payment_id == str(payment_id) and user.plan == "pro":
-            return {"ok": True}
-
-        user.plan = "pro"
-        user.proposal_limit = 999999
-        user.delete_credits = 999999
-        user.plan_updated_at = datetime.utcnow()
-        user.mp_last_payment_id = str(payment_id)
-
-        db.add(user)
-        db.commit()
-
-    return {"ok": True}
-
-import os
-import mercadopago
-
-PRO_PRICE = 19.00  # preço do Pro
-
-@app.post("/mp/create_pro_checkout")
-def mp_create_pro_checkout(request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    access_token = os.getenv("MP_ACCESS_TOKEN")
-    if not access_token:
-        return HTMLResponse("MP_ACCESS_TOKEN não configurado no Render.", status_code=500)
-
-    sdk = mercadopago.SDK(access_token)
-
-    base_url = str(request.base_url).rstrip("/")
-
-    preference_data = {
-        "items": [
-            {
-                "title": "PropoFlow PRO (mensal)",
-                "quantity": 1,
-                "unit_price": float(PRO_PRICE),
-                "currency_id": "BRL",
-            }
-        ],
-        "payer": {
-            "email": user.email
-        },
-        "notification_url": f"{base_url}/webhooks/mercadopago",
-        "external_reference": str(user.id),  # IMPORTANTÍSSIMO: liga o pagamento ao usuário
-        "back_urls": {
-            "success": f"{base_url}/dashboard",
-            "failure": f"{base_url}/pricing",
-            "pending": f"{base_url}/dashboard"
-        },
-        "auto_return": "approved",
-    }
-
-    preference_response = sdk.preference().create(preference_data)
-    pref = preference_response.get("response", {})
-
-    init_point = pref.get("init_point")
-    if not init_point:
-        return HTMLResponse("Não foi possível criar checkout no Mercado Pago.", status_code=500)
-
-    return RedirectResponse(init_point, status_code=302)
-
-
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request):
     return templates.TemplateResponse("pricing.html", {"request": request})
 
-from fastapi import Header
-import json
 
+# ====== UPGRADE PRO (ASSINATURA) ======
 @app.get("/upgrade/pro")
 def upgrade_pro(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -671,15 +498,16 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
             "frequency": 1,
             "frequency_type": "months",
             "transaction_amount": 19.0,
-            "currency_id": "BRL"
-        }
+            "currency_id": "BRL",
+        },
+        "notification_url": f"{base_url}/webhooks/mercadopago",
     }
 
     r = requests.post(
-        "https://api.mercadopago.com/preapproval",
+        f"{MP_API}/preapproval",
         headers=mp_headers(),
         json=payload,
-        timeout=20
+        timeout=30,
     )
 
     if r.status_code not in (200, 201):
@@ -693,71 +521,73 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse(init_point, status_code=302)
 
 
-@app.post("/webhooks/mercadopago")
-async def mp_webhook(request: Request, db: Session = Depends(get_db)):
-    # 1) sempre responder rápido 200 (MP gosta disso)
-    body = await request.json()
-
-    # Exemplo de body no teste: { action, api_version, data:{id}, date_created, id, live_mode, type, user_id }
-    data = body.get("data") or {}
-    mp_id = data.get("id")
-
-    # Sem id, só confirma OK e sai
-    if not mp_id:
-        return {"ok": True}
-
-    event_type = body.get("type")  # "payment" ou "subscription_preapproval" etc
-    action = body.get("action")    # "payment.updated" etc
-
-    # 2) Se for pagamento: não é o que a gente quer (assinatura é preapproval)
-    # 3) O mais importante: subscription_preapproval / preapproval.
-    # Vamos buscar a assinatura no Mercado Pago e validar status = authorized
-    if not MP_ACCESS_TOKEN:
-        return {"ok": True}
-
-    # Quando vem como "payment.updated", às vezes é só evento genérico.
-    # Vamos tentar buscar como preapproval primeiro:
-    preapproval = None
-
-    # tenta buscar assinatura
-    r = requests.get(
-        f"https://api.mercadopago.com/preapproval/{mp_id}",
-        headers=mp_headers(),
-        timeout=20
-    )
-
-    if r.status_code == 200:
-        preapproval = r.json()
-
-    # Se não achou como preapproval, só encerra (evita quebrar)
-    if not preapproval:
-        return {"ok": True}
-
-    status = preapproval.get("status")  # esperado: "authorized" quando pagou/ativou
-    external_reference = preapproval.get("external_reference")  # "user_123"
-
-    if status == "authorized" and external_reference and external_reference.startswith("user_"):
-        try:
-            user_id = int(external_reference.replace("user_", ""))
-        except ValueError:
-            return {"ok": True}
-
-        user = db.query(User).filter(User.id == user_id).first()
-        if user:
-            set_user_pro(db, user)
-
-    return {"ok": True}
-
 @app.get("/billing/success", response_class=HTMLResponse)
 def billing_success(request: Request):
     return HTMLResponse("""
     <div style="font-family:system-ui; padding:24px;">
       <h2>Pagamento recebido! ✅</h2>
-      <p>Se sua assinatura foi confirmada, seu plano PRO será liberado automaticamente.</p>
+      <p>Se sua assinatura foi confirmada, seu PRO será liberado automaticamente em instantes.</p>
       <p><a href="/dashboard">Voltar ao dashboard</a></p>
     </div>
     """)
 
 
+# ====== WEBHOOK ÚNICO (ASSINATURA) ======
+@app.post("/webhooks/mercadopago")
+async def webhooks_mercadopago(request: Request, db: Session = Depends(get_db)):
+    # MP às vezes manda query params: ?data.id=123&type=payment
+    q_id = request.query_params.get("data.id")
+    q_type = request.query_params.get("type")
 
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
 
+    data = body.get("data") if isinstance(body, dict) else {}
+    b_id = None
+    if isinstance(data, dict):
+        b_id = data.get("id")
+
+    resource_id = str(b_id or q_id or "").strip()
+    event_type = (body.get("type") if isinstance(body, dict) else None) or q_type
+
+    if not resource_id or not MP_ACCESS_TOKEN:
+        return {"ok": True}
+
+    event_type = (event_type or "").lower()
+
+    # Para assinatura, o que importa é "preapproval"/"subscription_preapproval".
+    # Se vier como payment, a gente ignora (não quebra).
+    if "preapproval" not in event_type:
+        return {"ok": True}
+
+    # Busca assinatura
+    r = requests.get(
+        f"{MP_API}/preapproval/{resource_id}",
+        headers=mp_headers(),
+        timeout=30,
+    )
+    if r.status_code != 200:
+        return {"ok": True}
+
+    sub = r.json()
+    status = (sub.get("status") or "").lower()
+    external_reference = sub.get("external_reference") or ""
+
+    # status "authorized" = assinatura ativa
+    if status == "authorized" and external_reference.startswith("user_"):
+        try:
+            user_id = int(external_reference.replace("user_", ""))
+        except Exception:
+            return {"ok": True}
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            # evita reprocessar sem necessidade
+            if user.plan == "pro" and user.mp_last_preapproval_id == resource_id:
+                return {"ok": True}
+            set_user_pro(db, user, preapproval_id=resource_id)
+
+    return {"ok": True}
