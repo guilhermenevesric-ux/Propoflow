@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>PropoFlow • Login</title>
+  <title>PropoFlow • Criar conta</title>
   <link rel="stylesheet" href="/static/style.css">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
@@ -13,40 +13,40 @@
         <div class="logo"></div>
         <div>
           <h1>PropoFlow</h1>
-          <p>Propostas profissionais em minutos</p>
+          <p>Crie sua conta em 30 segundos</p>
         </div>
       </div>
 
       <div class="actions">
-        <a class="btn btn-ghost" href="/register">Criar conta</a>
+        <a class="btn btn-ghost" href="/login">Voltar</a>
       </div>
     </div>
 
     <div class="card" style="max-width:520px; margin:0 auto;">
-      <h2 class="h2">Entrar</h2>
-      <p class="small">Acesse sua conta para criar propostas e baixar PDFs.</p>
+      <h2 class="h2">Criar conta</h2>
+      <p class="small">Preencha seus dados para começar a gerar propostas.</p>
 
       {% if error %}
         <div class="error">{{ error }}</div>
       {% endif %}
 
-      <form method="post" action="/login">
+      <form method="post" action="/register">
         <label>Email</label>
         <input name="email" type="email" placeholder="seuemail@exemplo.com" required>
 
         <div style="height:12px;"></div>
 
         <label>Senha</label>
-        <input name="password" type="password" placeholder="Sua senha" required>
+        <input name="password" type="password" placeholder="Crie uma senha segura" required>
 
         <div style="height:16px;"></div>
 
-        <button class="btn" type="submit" style="width:100%;">Entrar</button>
+        <button class="btn" type="submit" style="width:100%;">Criar conta</button>
 
         <div style="height:12px;"></div>
 
         <p class="small" style="margin:0; text-align:center;">
-          Novo por aqui? <a href="/register">Criar conta</a>
+          Já tem conta? <a href="/login">Entrar</a>
         </p>
       </form>
     </div>

@@ -63,6 +63,9 @@ def home(request: Request, db: Session = Depends(get_db)):
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request, "error": None})
 
 @app.post("/login")
 def login(
@@ -93,7 +96,7 @@ def register(
     email = email.strip().lower()
     if db.query(User).filter(User.email == email).first():
         return templates.TemplateResponse(
-            "login.html",
+            "register.html",
             {"request": request, "error": "Esse email já existe. Faça login."}
         )
 
