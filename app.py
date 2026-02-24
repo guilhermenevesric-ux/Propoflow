@@ -138,6 +138,8 @@ def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
 
+
+
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request, "error": None})
@@ -256,6 +258,65 @@ def create_proposal(
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
+
+    @app.post("/webhooks/asaas")
+    async def webhooks_asaas(request: Request, db: Session = Depends(get_db)):
+        # valida token do Asaas (se você configurou)
+        if ASAAS_WEBHOOK_TOKEN:
+            token = request.headers.get("asaas-access-token") or request.headers.get("Asaas-Access-Token")
+            if token != ASAAS_WEBHOOK_TOKEN:
+                return HTMLResponse("unauthorized", status_code=401)
+
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        event = (body.get("event") or "").upper()
+        payment = body.get("payment") or {}
+        subscription = body.get("subscription") or {}
+
+        # tenta pegar externalReference
+        external_ref = ""
+        if isinstance(payment, dict):
+            external_ref = payment.get("externalReference") or ""
+
+        if not external_ref and isinstance(subscription, dict):
+            external_ref = subscription.get("externalReference") or ""
+
+        # fallback: se vier subscription no payment, buscar subscription no Asaas
+        if not external_ref and isinstance(payment, dict) and payment.get("subscription"):
+            sub_id = payment.get("subscription")
+            try:
+                rs = requests.get(
+                    f"{asaas_api_base()}/subscriptions/{sub_id}",
+                    headers=asaas_headers(),
+                    timeout=30,
+                )
+                if rs.status_code == 200:
+                    sj = rs.json()
+                    external_ref = sj.get("externalReference") or ""
+            except Exception:
+                pass
+
+        if not external_ref.startswith("user_"):
+            return {"ok": True}
+
+        try:
+            user_id = int(external_ref.replace("user_", ""))
+        except Exception:
+            return {"ok": True}
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return {"ok": True}
+
+        # eventos que liberam PRO
+        if event in ("PAYMENT_CONFIRMED", "PAYMENT_RECEIVED", "PAYMENT_APPROVED"):
+            set_user_pro(db, user, preapproval_id=None)
+            return {"ok": True}
+
+        return {"ok
 
     # se for PRO ativo, ignora limite
     if not is_pro_active(user):
