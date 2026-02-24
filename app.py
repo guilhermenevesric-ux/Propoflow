@@ -618,4 +618,7 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
         "billingType": "CREDIT_CARD",
         "value": 19.90,
         "nextDueDate": next_due,
-        "cycle":
+        "cycle": "MONTHLY",
+        "description": "PropoFlow Pro (assinatura mensal)",
+        "externalReference": f"user_{user.id}",
+    }
