@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
-from datetime import datetime
+from datetime import datetime, timedelta, date
 import os
 import requests
 import subprocess
@@ -38,15 +38,25 @@ def get_db():
 
 COOKIE_NAME = "user_id"
 
-MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "").strip()
 APP_BASE_URL = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
-MP_API = "https://api.mercadopago.com"
 
+# ====== ASAAS CONFIG ======
+ASAAS_API_KEY = os.getenv("ASAAS_API_KEY", "").strip()
+ASAAS_ENV = os.getenv("ASAAS_ENV", "sandbox").strip().lower()  # sandbox | prod
+ASAAS_WEBHOOK_TOKEN = os.getenv("ASAAS_WEBHOOK_TOKEN", "").strip()
 
-def mp_headers():
+def asaas_api_base() -> str:
+    # Asaas usa api-sandbox no sandbox e api.asaas.com em prod
+    if ASAAS_ENV == "prod":
+        return "https://api.asaas.com/v3"
+    return "https://api-sandbox.asaas.com/v3"
+
+def asaas_headers():
+    # Asaas autentica com header access_token (não é Bearer)
     return {
-        "Authorization": f"Bearer {MP_ACCESS_TOKEN}",
+        "access_token": ASAAS_API_KEY,
         "Content-Type": "application/json",
+        "Accept": "application/json",
     }
 
 
@@ -61,17 +71,53 @@ def get_current_user(request: Request, db: Session):
     return db.query(User).filter(User.id == user_id_int).first()
 
 
-def set_user_pro(db: Session, user: User, preapproval_id: str | None = None):
+def is_pro_active(user: User) -> bool:
+    if user.plan == "pro":
+        # pro "flag" pode existir, mas a validade é no paid_until
+        if user.paid_until and user.paid_until >= datetime.utcnow():
+            return True
+        # Se plan=pro e paid_until vazio (caso antigo), considera ativo
+        if not user.paid_until:
+            return True
+        return False
+    # caso plan não pro, ainda pode estar pago (se você quiser usar só paid_until)
+    if user.paid_until and user.paid_until >= datetime.utcnow():
+        return True
+    return False
+
+
+def set_user_pro_month(db: Session, user: User, paid_until: datetime, subscription_id: str | None = None, customer_id: str | None = None):
     user.plan = "pro"
     user.proposal_limit = 999999
     user.delete_credits = 999999
     user.plan_updated_at = datetime.utcnow()
-    if preapproval_id:
-        user.mp_last_preapproval_id = preapproval_id
+    user.paid_until = paid_until
+    if subscription_id:
+        user.asaas_subscription_id = subscription_id
+    if customer_id:
+        user.asaas_customer_id = customer_id
     db.add(user)
     db.commit()
 
 
+def set_user_free(db: Session, user: User):
+    user.plan = "free"
+    user.proposal_limit = 5
+    user.delete_credits = user.delete_credits if (user.delete_credits is not None) else 1
+    user.plan_updated_at = datetime.utcnow()
+    db.add(user)
+    db.commit()
+
+
+def parse_asaas_date(d: str) -> datetime | None:
+    # Asaas normalmente usa YYYY-MM-DD
+    try:
+        return datetime.strptime(d, "%Y-%m-%d")
+    except Exception:
+        return None
+
+
+# ====== HOME ======
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     user_id = request.cookies.get(COOKIE_NAME)
@@ -86,6 +132,7 @@ def home(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/dashboard", status_code=302)
 
 
+# ====== AUTH ======
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
@@ -153,6 +200,7 @@ def logout():
     return resp
 
 
+# ====== DASHBOARD ======
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, status: str = "all", db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -186,6 +234,7 @@ def dashboard(request: Request, status: str = "all", db: Session = Depends(get_d
     })
 
 
+# ====== PROPOSALS ======
 @app.get("/proposals/new", response_class=HTMLResponse)
 def new_proposal_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -208,33 +257,35 @@ def create_proposal(
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
-    if count >= (user.proposal_limit or 5):
-        proposals = (
-            db.query(Proposal)
-            .filter(Proposal.owner_id == user.id)
-            .order_by(Proposal.created_at.desc())
-            .all()
-        )
+    # se for PRO ativo, ignora limite
+    if not is_pro_active(user):
+        count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+        if count >= (user.proposal_limit or 5):
+            proposals = (
+                db.query(Proposal)
+                .filter(Proposal.owner_id == user.id)
+                .order_by(Proposal.created_at.desc())
+                .all()
+            )
 
-        total = count
-        accepted = db.query(Proposal).filter(
-            Proposal.owner_id == user.id,
-            Proposal.accepted_at.isnot(None)
-        ).count()
-        rate = round((accepted / total) * 100) if total else 0
+            total = count
+            accepted = db.query(Proposal).filter(
+                Proposal.owner_id == user.id,
+                Proposal.accepted_at.isnot(None)
+            ).count()
+            rate = round((accepted / total) * 100) if total else 0
 
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request,
-            "user": user,
-            "proposals": proposals,
-            "total": total,
-            "accepted": accepted,
-            "rate": rate,
-            "status": "all",
-            "error": f"Você atingiu o limite do plano gratuito ({user.proposal_limit or 5} propostas).",
-            "show_upgrade": True,
-        })
+            return templates.TemplateResponse("dashboard.html", {
+                "request": request,
+                "user": user,
+                "proposals": proposals,
+                "total": total,
+                "accepted": accepted,
+                "rate": rate,
+                "status": "all",
+                "error": f"Você atingiu o limite do plano gratuito ({user.proposal_limit or 5} propostas).",
+                "show_upgrade": True,
+            })
 
     p = Proposal(
         client_name=client_name.strip(),
@@ -265,8 +316,8 @@ def delete_proposal(proposal_id: int, request: Request, db: Session = Depends(ge
     if not p:
         return RedirectResponse("/dashboard", status_code=302)
 
-    # Free: só 1 exclusão via delete_credits
-    if user.plan == "free":
+    # Free: só 1 exclusão via delete_credits (PRO ativo ignora)
+    if not is_pro_active(user) and user.plan == "free":
         credits = user.delete_credits or 0
         if credits <= 0:
             proposals = (
@@ -332,6 +383,7 @@ def duplicate_proposal(proposal_id: int, request: Request, db: Session = Depends
     return RedirectResponse("/dashboard", status_code=302)
 
 
+# ====== PUBLIC PROPOSAL ======
 @app.post("/p/{public_id}/accept", response_class=HTMLResponse)
 def accept_proposal(
     public_id: str,
@@ -387,10 +439,10 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         "author_name": user.display_name if user and user.display_name else "",
         "company_name": user.company_name if user and user.company_name else "",
         "phone": user.phone if user and user.phone else "",
-        "is_pro": (user is not None and user.plan == "pro"),
+        "is_pro": (user is not None and is_pro_active(user)),
     })
 
-    filename = f"proposta_{p.client_name.replace(' ', '_')}_{p.public_id}.pdf"
+    filename = f"proposta_{p.client_name.replace(' ', '')}{p.public_id}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
@@ -436,21 +488,22 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
         "author_name": user.display_name if user and user.display_name else "",
         "company_name": user.company_name if user and user.company_name else "",
         "phone": user.phone if user and user.phone else "",
-        "is_pro": (user is not None and user.plan == "pro"),
+        "is_pro": (user is not None and is_pro_active(user)),
     })
 
-    filename = f"proposta_{p.client_name.replace(' ', '_')}_{p.id}.pdf"
+    filename = f"proposta_{p.client_name.replace(' ', '')}{p.id}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
+# ====== PROFILE ======
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": False})
+    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": False, "error": None})
 
 
 @app.post("/profile")
@@ -459,6 +512,7 @@ def profile_save(
     display_name: str = Form(""),
     company_name: str = Form(""),
     phone: str = Form(""),
+    cpf_cnpj: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = get_current_user(request, db)
@@ -468,155 +522,100 @@ def profile_save(
     user.display_name = display_name.strip() or None
     user.company_name = company_name.strip() or None
     user.phone = phone.strip() or None
+    user.cpf_cnpj = cpf_cnpj.strip() or None
     db.add(user)
     db.commit()
 
-    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": True})
+    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": True, "error": None})
 
 
+# ====== BILLING & PRICING ======
 @app.get("/billing", response_class=HTMLResponse)
 def billing(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
+
     return templates.TemplateResponse("billing.html", {"request": request, "user": user})
+
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing(request: Request, db: Session = Depends(get_db)):
-
     user = get_current_user(request, db)
+    return templates.TemplateResponse("pricing.html", {"request": request, "user": user})
 
-    return templates.TemplateResponse(
-        "pricing.html",
-        {
-            "request": request,
-            "user": user
-        }
+
+# ====== ASAAS: CREATE/GET CUSTOMER ======
+def ensure_asaas_customer(db: Session, user: User) -> str:
+    if user.asaas_customer_id:
+        return user.asaas_customer_id
+
+    if not ASAAS_API_KEY:
+        raise RuntimeError("ASAAS_API_KEY não configurado no Render.")
+
+    # Asaas geralmente precisa de name/email e (muitas vezes) cpfCnpj
+    name = user.display_name or user.company_name or user.email.split("@")[0]
+    payload = {
+        "name": name,
+        "email": user.email,
+    }
+    if user.cpf_cnpj:
+        payload["cpfCnpj"] = user.cpf_cnpj
+
+    r = requests.post(
+        f"{asaas_api_base()}/customers",
+        headers=asaas_headers(),
+        json=payload,
+        timeout=30,
     )
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"Erro Asaas ao criar customer: {r.status_code} - {r.text}")
 
-# ====== UPGRADE PRO (ASSINATURA) ======
+    data = r.json()
+    customer_id = data.get("id")
+    if not customer_id:
+        raise RuntimeError(f"Asaas não retornou customer id: {data}")
+
+    user.asaas_customer_id = customer_id
+    db.add(user)
+    db.commit()
+
+    return customer_id
+
+
+# ====== UPGRADE PRO (ASSINATURA ASAAS) ======
 @app.get("/upgrade/pro")
 def upgrade_pro(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    if not MP_ACCESS_TOKEN:
-        return HTMLResponse("MP_ACCESS_TOKEN não configurado no Render.", status_code=500)
+    if not ASAAS_API_KEY:
+        return HTMLResponse("ASAAS_API_KEY não configurado no Render.", status_code=500)
 
-    base_url = APP_BASE_URL or str(request.base_url).rstrip("/")
+    # Se já está ativo, manda pro billing
+    if is_pro_active(user):
+        return RedirectResponse("/billing", status_code=302)
 
-    payload = {
-        "reason": "PropoFlow Pro (assinatura mensal)",
-        "external_reference": f"user_{user.id}",
-        "payer_email": user.email,
-        "back_url": f"{base_url}/billing/success",
-        "auto_recurring": {
-            "frequency": 1,
-            "frequency_type": "months",
-            "transaction_amount": 19.0,
-            "currency_id": "BRL",
-        },
-        "notification_url": f"{base_url}/webhooks/mercadopago",
-    }
+    # CPF/CNPJ recomendado/necessário para cobrança
+    if not user.cpf_cnpj:
+        return templates.TemplateResponse("profile.html", {
+            "request": request,
+            "user": user,
+            "saved": False,
+            "error": "Para assinar o PRO, preencha seu CPF/CNPJ (necessário para cobrança) e salve.",
+        })
 
-    r = requests.post(
-        f"{MP_API}/preapproval",
-        headers=mp_headers(),
-        json=payload,
-        timeout=30,
-    )
-
-    if r.status_code not in (200, 201):
-        return HTMLResponse(f"Erro Mercado Pago: {r.status_code}<br><pre>{r.text}</pre>", status_code=500)
-
-    data = r.json()
-    init_point = data.get("init_point")
-    if not init_point:
-        return HTMLResponse(f"Mercado Pago não retornou init_point.<br><pre>{data}</pre>", status_code=500)
-
-    return RedirectResponse(init_point, status_code=302)
-
-
-@app.get("/billing/success", response_class=HTMLResponse)
-def billing_success(request: Request):
-    return HTMLResponse("""
-    <div style="font-family:system-ui; padding:24px;">
-      <h2>Pagamento recebido! ✅</h2>
-      <p>Se sua assinatura foi confirmada, seu PRO será liberado automaticamente em instantes.</p>
-      <p><a href="/dashboard">Voltar ao dashboard</a></p>
-    </div>
-    """)
-
-
-# ====== WEBHOOK ÚNICO (ASSINATURA) ======
-@app.post("/webhooks/mercadopago")
-async def webhooks_mercadopago(request: Request, db: Session = Depends(get_db)):
-    # MP às vezes manda query params: ?data.id=123&type=payment
-    q_id = request.query_params.get("data.id")
-    q_type = request.query_params.get("type")
-
-    body = {}
     try:
-        body = await request.json()
-    except Exception:
-        body = {}
+        customer_id = ensure_asaas_customer(db, user)
+    except Exception as e:
+        return HTMLResponse(f"Erro ao criar cliente no Asaas: <pre>{str(e)}</pre>", status_code=500)
 
-    data = body.get("data") if isinstance(body, dict) else {}
-    b_id = None
-    if isinstance(data, dict):
-        b_id = data.get("id")
-
-    resource_id = str(b_id or q_id or "").strip()
-    event_type = (body.get("type") if isinstance(body, dict) else None) or q_type
-
-    if not resource_id or not MP_ACCESS_TOKEN:
-        return {"ok": True}
-
-    event_type = (event_type or "").lower()
-
-    # Para assinatura, o que importa é "preapproval"/"subscription_preapproval".
-    # Se vier como payment, a gente ignora (não quebra).
-    if "preapproval" not in event_type:
-        return {"ok": True}
-
-    # Busca assinatura
-    r = requests.get(
-        f"{MP_API}/preapproval/{resource_id}",
-        headers=mp_headers(),
-        timeout=30,
-    )
-    if r.status_code != 200:
-        return {"ok": True}
-
-    sub = r.json()
-    status = (sub.get("status") or "").lower()
-    external_reference = sub.get("external_reference") or ""
-
-    # status "authorized" = assinatura ativa
-    if status == "authorized" and external_reference.startswith("user_"):
-        try:
-            user_id = int(external_reference.replace("user_", ""))
-        except Exception:
-            return {"ok": True}
-
-        user = db.query(User).filter(User.id == user_id).first()
-        if user:
-            # evita reprocessar sem necessidade
-            if user.plan == "pro" and user.mp_last_preapproval_id == resource_id:
-                return {"ok": True}
-            set_user_pro(db, user, preapproval_id=resource_id)
-
-    return {"ok": True}
-
-@app.get("/terms", response_class=HTMLResponse)
-def terms(request: Request):
-    return templates.TemplateResponse("terms.html", {"request": request})
-
-@app.get("/privacy", response_class=HTMLResponse)
-def privacy(request: Request):
-    return templates.TemplateResponse("privacy.html", {"request": request})
-
-@app.get("/support", response_class=HTMLResponse)
-def support(request: Request):
-    return templates.TemplateResponse("support.html", {"request": request})
+    # cria assinatura mensal
+    next_due = date.today().strftime("%Y-%m-%d")
+    payload = {
+        "customer": customer_id,
+        "billingType": "CREDIT_CARD",
+        "value": 19.90,
+        "nextDueDate": next_due,
+        "cycle":

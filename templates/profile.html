@@ -32,6 +32,10 @@
         </div>
       {% endif %}
 
+      {% if error %}
+        <div class="error">{{ error }}</div>
+      {% endif %}
+
       <form method="post" action="/profile">
         <label>Seu nome (responsável)</label>
         <input name="display_name" placeholder="Ex: João Silva" value="{{ user.display_name or '' }}">
@@ -45,6 +49,11 @@
 
         <label>Telefone / WhatsApp</label>
         <input name="phone" placeholder="Ex: (11) 99999-9999" value="{{ user.phone or '' }}">
+
+        <br><br>
+
+        <label>CPF ou CNPJ (para cobrança da assinatura)</label>
+        <input name="cpf_cnpj" placeholder="Ex: 123.456.789-09" value="{{ user.cpf_cnpj or '' }}">
 
         <br><br>
 
