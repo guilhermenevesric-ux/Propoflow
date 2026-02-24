@@ -316,7 +316,7 @@ def create_proposal(
             set_user_pro(db, user, preapproval_id=None)
             return {"ok": True}
 
-        return {"ok
+        return {"ok"}
 
     # se for PRO ativo, ignora limite
     if not is_pro_active(user):
