@@ -593,25 +593,26 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
     if not ASAAS_API_KEY:
         return HTMLResponse("ASAAS_API_KEY não configurado no Render.", status_code=500)
 
-    # Se já está ativo, manda pro billing
+    # Se já é PRO e está ativo, manda pro billing
     if is_pro_active(user):
         return RedirectResponse("/billing", status_code=302)
 
-    # CPF/CNPJ recomendado/necessário para cobrança
-    if not user.cpf_cnpj:
+    # Precisa CPF/CNPJ (produção)
+    if not getattr(user, "cpf_cnpj", None):
         return templates.TemplateResponse("profile.html", {
             "request": request,
             "user": user,
             "saved": False,
-            "error": "Para assinar o PRO, preencha seu CPF/CNPJ (necessário para cobrança) e salve.",
+            "error": "Para assinar o PRO, preencha seu CPF/CNPJ no perfil e salve.",
         })
 
+    # 1) garante customer
     try:
         customer_id = ensure_asaas_customer(db, user)
     except Exception as e:
-        return HTMLResponse(f"Erro ao criar cliente no Asaas: <pre>{str(e)}</pre>", status_code=500)
+        return HTMLResponse(f"Erro ao criar/obter customer no Asaas:<br><pre>{str(e)}</pre>", status_code=500)
 
-    # cria assinatura mensal
+    # 2) cria assinatura
     next_due = date.today().strftime("%Y-%m-%d")
     payload = {
         "customer": customer_id,
@@ -622,3 +623,48 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
         "description": "PropoFlow Pro (assinatura mensal)",
         "externalReference": f"user_{user.id}",
     }
+
+    try:
+        r = requests.post(
+            f"{asaas_api_base()}/subscriptions",
+            headers=asaas_headers(),
+            json=payload,
+            timeout=30,
+        )
+    except Exception as e:
+        return HTMLResponse(f"Erro de conexão ao Asaas:<br><pre>{str(e)}</pre>", status_code=500)
+
+    if r.status_code not in (200, 201):
+        return HTMLResponse(f"Erro Asaas ao criar assinatura: {r.status_code}<br><pre>{r.text}</pre>", status_code=500)
+
+    sub = r.json()
+    sub_id = sub.get("id")
+    if not sub_id:
+        return HTMLResponse(f"Asaas não retornou subscription id.<br><pre>{sub}</pre>", status_code=500)
+
+    # salva subscription no user
+    user.asaas_subscription_id = sub_id
+    db.add(user)
+    db.commit()
+
+    # 3) pega o primeiro payment da assinatura e redireciona pro invoiceUrl
+    rp = requests.get(
+        f"{asaas_api_base()}/subscriptions/{sub_id}/payments",
+        headers=asaas_headers(),
+        timeout=30,
+    )
+
+    if rp.status_code != 200:
+        return HTMLResponse(f"Assinatura criada, mas não consegui listar cobranças: {rp.status_code}<br><pre>{rp.text}</pre>", status_code=500)
+
+    payments = rp.json()
+    data_list = payments.get("data") if isinstance(payments, dict) else None
+    if not data_list:
+        return HTMLResponse(f"Assinatura criada, mas ainda não veio payment.<br><pre>{payments}</pre>", status_code=500)
+
+    first = data_list[0]
+    invoice_url = first.get("invoiceUrl")
+    if not invoice_url:
+        return HTMLResponse(f"Não encontrei invoiceUrl no payment.<br><pre>{first}</pre>", status_code=500)
+
+    return RedirectResponse(invoice_url, status_code=302)
