@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from db import Base
 import uuid
-
+from sqlalchemy import Boolean
 
 class User(Base):
     __tablename__ = "users"
@@ -50,6 +50,23 @@ class UserSession(Base):
     user = relationship("User", back_populates="sessions")
 
 
+class Client(Base):
+    __tablename__ = "clients"
+
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    name = Column(String(255), nullable=False)
+    whatsapp = Column(String(30), nullable=True)
+
+    archived = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True)
+
+    owner = relationship("User")
+    proposals = relationship("Proposal", back_populates="client")
+
 class Service(Base):
     """
     Catálogo pessoal do usuário (universal).
@@ -79,6 +96,9 @@ class Proposal(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     public_id = Column(String(16), unique=True, index=True, nullable=False, default=lambda: uuid.uuid4().hex[:12])
+
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)
+    client = relationship("Client", back_populates="proposals")
 
     client_name = Column(String(255), nullable=False)
     client_whatsapp = Column(String(30), nullable=True)

@@ -17,14 +17,15 @@ import json
 
 from db import SessionLocal, engine, Base
 from models import (
-    User, Proposal, UserSession,
-    ProposalItem, ProposalVersion,
-    PaymentStage,
-    Service
+    User, UserSession,
+    Service, Client,
+    Proposal, ProposalItem, ProposalVersion,
+    PaymentStage
 )
 from pdf_gen import generate_proposal_pdf
 
 
+# ====== migração leve ======
 try:
     subprocess.run([sys.executable, "migrate.py"], check=False)
 except Exception:
@@ -45,6 +46,9 @@ def get_db():
         db.close()
 
 
+# ==========================
+# CONFIG
+# ==========================
 SESSION_COOKIE = "session_token"
 
 APP_BASE_URL = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
@@ -67,6 +71,9 @@ def asaas_headers():
     }
 
 
+# ==========================
+# AUTH / SESSIONS
+# ==========================
 def _sha256_hex(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
@@ -110,7 +117,13 @@ def is_pro_active(user: User) -> bool:
     return False
 
 
-def set_user_pro_month(db: Session, user: User, paid_until: datetime, subscription_id: str | None = None, customer_id: str | None = None):
+def set_user_pro_month(
+    db: Session,
+    user: User,
+    paid_until: datetime,
+    subscription_id: str | None = None,
+    customer_id: str | None = None
+):
     user.plan = "pro"
     user.proposal_limit = 999999
     user.delete_credits = 999999
@@ -124,6 +137,9 @@ def set_user_pro_month(db: Session, user: User, paid_until: datetime, subscripti
     db.commit()
 
 
+# ==========================
+# HELPERS
+# ==========================
 def base_url_from_request(request: Request) -> str:
     if APP_BASE_URL:
         return APP_BASE_URL
@@ -163,6 +179,14 @@ def status_label(s: str) -> str:
 
 
 def brl_to_cents(v: str) -> int:
+    """
+    Aceita:
+      "250" -> 25000
+      "250,50" -> 25050
+      "1.500,00" -> 150000
+      "5.0" -> 500
+      "5.00" -> 500
+    """
     if not v:
         return 0
     s = str(v).strip()
@@ -199,7 +223,7 @@ def normalize_deadline(deadline: str) -> str:
     return s
 
 
-def compute_total(items: list[ProposalItem], overhead_percent: int, margin_percent: int) -> int:
+def compute_total(items: list[ProposalItem], overhead_percent: int = 0, margin_percent: int = 0) -> int:
     base = sum(int(it.line_total_cents or 0) for it in items)
     overhead_percent = max(0, int(overhead_percent or 0))
     margin_percent = max(0, int(margin_percent or 0))
@@ -226,7 +250,16 @@ def rebuild_items_from_form(descs: list[str], qtys: list[str], units: list[str],
         u = (units[i] or "").strip() or "un"
         up_cents = brl_to_cents(unit_prices[i] or "0")
         line = int(round(q * up_cents))
-        items.append(ProposalItem(sort=i, description=d, qty=q, unit=u, unit_price_cents=up_cents, line_total_cents=line))
+        items.append(
+            ProposalItem(
+                sort=i,
+                description=d,
+                qty=q,
+                unit=u,
+                unit_price_cents=up_cents,
+                line_total_cents=line,
+            )
+        )
     return items
 
 
@@ -286,8 +319,74 @@ def service_prefill(s: Service) -> dict:
         "deadline": s.default_deadline or "",
         "description": s.default_description or "",
         "price": cents_to_brl(s.default_price_cents) if (s.default_price_cents or 0) > 0 else "",
-        "payment_plan": s.default_payment_plan or "avista",
+        "payment_plan": (s.default_payment_plan or "avista").strip() or "avista",
     }
+
+
+def normalize_whatsapp_key(phone: str) -> str | None:
+    if not phone:
+        return None
+    digits = re.sub(r"\D", "", phone)
+    return digits or None
+
+
+def upsert_client_for_user(db: Session, owner_id: int, name: str, whatsapp: str | None) -> Client:
+    n = (name or "").strip()
+    w = (whatsapp or "").strip() or None
+    wkey = normalize_whatsapp_key(w or "")
+
+    q = db.query(Client).filter(Client.owner_id == owner_id, Client.archived.is_(False))
+
+    found: Client | None = None
+    if wkey:
+        # tenta bater por whatsapp
+        candidates = q.filter(Client.whatsapp.isnot(None)).all()
+        for c in candidates:
+            if normalize_whatsapp_key(c.whatsapp or "") == wkey:
+                found = c
+                break
+    if not found:
+        # tenta bater por nome
+        found = q.filter(Client.name.ilike(n)).first()
+
+    if found:
+        # atualiza whatsapp se vier e se não tinha
+        if w and (not found.whatsapp):
+            found.whatsapp = w
+            found.updated_at = _now()
+            db.add(found)
+            db.commit()
+        # atualiza nome se estava diferente (mantém simples)
+        if n and found.name != n:
+            found.name = n
+            found.updated_at = _now()
+            db.add(found)
+            db.commit()
+        return found
+
+    c = Client(owner_id=owner_id, name=n, whatsapp=w, archived=False, created_at=_now(), updated_at=_now())
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    return c
+
+
+def payment_plan_from_stages(stages: list[PaymentStage]) -> str:
+    if not stages:
+        return "avista"
+    if len(stages) == 1 and int(stages[0].percent or 0) == 100:
+        return "avista"
+    if len(stages) == 2:
+        p1, p2 = int(stages[0].percent or 0), int(stages[1].percent or 0)
+        if p1 == 30 and p2 == 70:
+            return "entrada_final_30"
+        if p1 == 50 and p2 == 50:
+            return "entrada_final_50"
+    if len(stages) == 3:
+        p = [int(s.percent or 0) for s in stages[:3]]
+        if p == [30, 40, 30]:
+            return "3x_30_40_30"
+    return "avista"
 
 
 # ==========================
@@ -301,6 +400,7 @@ def home(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/dashboard", status_code=302)
 
 
+# ===== AUTH =====
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
@@ -361,13 +461,21 @@ def logout(request: Request, db: Session = Depends(get_db)):
     return resp
 
 
+# ===== DASHBOARD =====
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request, db: Session = Depends(get_db)):
+def dashboard(request: Request, status: str = "all", db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    proposals = db.query(Proposal).filter(Proposal.owner_id == user.id).order_by(Proposal.created_at.desc()).all()
+    q = db.query(Proposal).filter(Proposal.owner_id == user.id)
+    if status == "accepted":
+        q = q.filter(Proposal.accepted_at.isnot(None))
+    elif status == "pending":
+        q = q.filter(Proposal.accepted_at.is_(None))
+
+    proposals = q.order_by(Proposal.created_at.desc()).all()
+
     total = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
     accepted = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.accepted_at.isnot(None)).count()
     rate = round((accepted / total) * 100) if total else 0
@@ -380,7 +488,10 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         "total": total,
         "accepted": accepted,
         "rate": rate,
+        "status": status,
         "status_label": status_label,
+        "error": None,
+        "show_upgrade": False,
     })
 
 
@@ -473,28 +584,109 @@ def services_delete(service_id: int, request: Request, db: Session = Depends(get
     return RedirectResponse("/services", status_code=302)
 
 
+# ===== CLIENTS =====
+@app.get("/clients", response_class=HTMLResponse)
+def clients_page(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.name.asc()).all()
+    return templates.TemplateResponse("clients.html", {
+        "request": request,
+        "clients": clients,
+        "error": None
+    })
+
+
+@app.post("/clients/new")
+def clients_new(
+    request: Request,
+    name: str = Form(...),
+    whatsapp: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    upsert_client_for_user(db, user.id, name, whatsapp or None)
+    return RedirectResponse("/clients", status_code=302)
+
+
+@app.post("/clients/{client_id}/update")
+def clients_update(
+    client_id: int,
+    request: Request,
+    name: str = Form(...),
+    whatsapp: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    c = db.query(Client).filter(Client.id == client_id, Client.owner_id == user.id, Client.archived.is_(False)).first()
+    if not c:
+        return RedirectResponse("/clients", status_code=302)
+
+    c.name = (name or "").strip()
+    c.whatsapp = (whatsapp or "").strip() or None
+    c.updated_at = _now()
+    db.add(c)
+    db.commit()
+    return RedirectResponse("/clients", status_code=302)
+
+
+@app.post("/clients/{client_id}/delete")
+def clients_delete(client_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    c = db.query(Client).filter(Client.id == client_id, Client.owner_id == user.id).first()
+    if c:
+        c.archived = True
+        c.updated_at = _now()
+        db.add(c)
+        db.commit()
+    return RedirectResponse("/clients", status_code=302)
+
+
 # ===== NEW PROPOSAL =====
 @app.get("/proposals/new", response_class=HTMLResponse)
-def new_proposal_page(request: Request, service_id: int = 0, db: Session = Depends(get_db)):
+def new_proposal_page(request: Request, service_id: int = 0, client_id: int = 0, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
     services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.title.asc()).all()
-    prefill = {"project_name": "", "deadline": "", "description": "", "price": "", "payment_plan": "avista"}
+    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.name.asc()).all()
 
-    selected = None
+    prefill = {"project_name": "", "deadline": "", "description": "", "price": "", "payment_plan": "avista"}
+    prefill_client = {"name": "", "whatsapp": ""}
+
+    selected_service = None
     if service_id:
-        selected = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id, Service.archived.is_(False)).first()
-        if selected:
-            prefill = service_prefill(selected)
+        selected_service = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id, Service.archived.is_(False)).first()
+        if selected_service:
+            prefill = service_prefill(selected_service)
+
+    selected_client = None
+    if client_id:
+        selected_client = db.query(Client).filter(Client.id == client_id, Client.owner_id == user.id, Client.archived.is_(False)).first()
+        if selected_client:
+            prefill_client = {"name": selected_client.name, "whatsapp": selected_client.whatsapp or ""}
 
     return templates.TemplateResponse("new_proposal.html", {
         "request": request,
         "error": None,
         "services": services,
-        "selected_service_id": selected.id if selected else 0,
-        "prefill": prefill
+        "clients": clients,
+        "selected_service_id": selected_service.id if selected_service else 0,
+        "selected_client_id": selected_client.id if selected_client else 0,
+        "prefill": prefill,
+        "prefill_client": prefill_client,
     })
 
 
@@ -502,6 +694,7 @@ def new_proposal_page(request: Request, service_id: int = 0, db: Session = Depen
 def create_proposal(
     request: Request,
     service_id: int = Form(0),
+    client_id: int = Form(0),
     client_name: str = Form(...),
     client_whatsapp: str = Form(""),
     project_name: str = Form(...),
@@ -520,12 +713,13 @@ def create_proposal(
     if not user:
         return RedirectResponse("/login", status_code=302)
 
+    # limite free
     if not is_pro_active(user):
         count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
         if count >= (user.proposal_limit or 5):
             return RedirectResponse("/pricing", status_code=302)
 
-    # se escolheu um serviço, pode preencher defaults
+    # Prefill por serviço (se escolhido)
     if service_id:
         s = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id, Service.archived.is_(False)).first()
         if s:
@@ -540,13 +734,33 @@ def create_proposal(
             if (payment_plan in ("", "avista")) and s.default_payment_plan:
                 payment_plan = s.default_payment_plan
 
+    # Prefill por cliente (se escolhido)
+    selected_client: Client | None = None
+    if client_id:
+        selected_client = db.query(Client).filter(Client.id == client_id, Client.owner_id == user.id, Client.archived.is_(False)).first()
+        if selected_client:
+            if not client_name.strip():
+                client_name = selected_client.name
+            if not client_whatsapp.strip() and selected_client.whatsapp:
+                client_whatsapp = selected_client.whatsapp
+
+    # Auto-salvar/atualizar cliente (se não veio client_id)
+    final_client_id: int | None = None
+    if selected_client:
+        final_client_id = selected_client.id
+    else:
+        if (client_name or "").strip():
+            c = upsert_client_for_user(db, user.id, client_name, client_whatsapp or None)
+            final_client_id = c.id
+
     valid_until = _now() + timedelta(days=max(1, min(int(validity_days or 7), 30)))
 
     p = Proposal(
-        client_name=client_name.strip(),
-        client_whatsapp=client_whatsapp.strip() or None,
-        project_name=project_name.strip(),
-        description=description.strip(),
+        client_id=final_client_id,
+        client_name=(client_name or "").strip(),
+        client_whatsapp=(client_whatsapp or "").strip() or None,
+        project_name=(project_name or "").strip(),
+        description=(description or "").strip(),
         deadline=normalize_deadline(deadline),
         owner_id=user.id,
         status="created",
@@ -579,6 +793,275 @@ def create_proposal(
 
     upsert_payment_stages(db, p, plan_to_percents(payment_plan))
 
+    return RedirectResponse("/dashboard", status_code=302)
+
+
+@app.get("/proposals/{proposal_id}/send_whatsapp")
+def send_whatsapp(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
+    if not p:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    phone = normalize_phone_br(p.client_whatsapp or "")
+    if not phone:
+        return RedirectResponse(f"/proposals/{p.id}/edit", status_code=302)
+
+    link = proposal_public_link(request, p)
+    text = build_send_message(user, p, link)
+
+    if p.status != "accepted":
+        p.status = "sent"
+    p.last_activity_at = _now()
+    db.add(p)
+    db.commit()
+
+    return RedirectResponse(whatsapp_url(phone, text), status_code=302)
+
+
+# ===== EDIT / VERSION =====
+@app.get("/proposals/{proposal_id}/edit", response_class=HTMLResponse)
+def edit_proposal_page(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
+    if not p:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    stages = db.query(PaymentStage).filter(PaymentStage.proposal_id == p.id).order_by(PaymentStage.id.asc()).all()
+    current_plan = payment_plan_from_stages(stages)
+
+    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.name.asc()).all()
+    services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.title.asc()).all()
+
+    return templates.TemplateResponse("edit_proposal.html", {
+        "request": request,
+        "p": p,
+        "clients": clients,
+        "services": services,
+        "payment_plan": current_plan,
+    })
+
+
+@app.post("/proposals/{proposal_id}/edit")
+def edit_proposal_save(
+    proposal_id: int,
+    request: Request,
+    client_id: int = Form(0),
+    service_id: int = Form(0),
+    client_name: str = Form(...),
+    client_whatsapp: str = Form(""),
+    project_name: str = Form(...),
+    description: str = Form(...),
+    deadline: str = Form(...),
+    price: str = Form(""),
+    payment_plan: str = Form("avista"),
+    item_desc: list[str] = Form([]),
+    item_qty: list[str] = Form([]),
+    item_unit: list[str] = Form([]),
+    item_unit_price: list[str] = Form([]),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
+    if not p:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # snapshot antes
+    snapshot = {
+        "revision": p.revision,
+        "client_id": p.client_id,
+        "client_name": p.client_name,
+        "client_whatsapp": p.client_whatsapp,
+        "project_name": p.project_name,
+        "description": p.description,
+        "deadline": p.deadline,
+        "price": p.price,
+        "total_cents": p.total_cents,
+        "items": [
+            {"description": it.description, "qty": it.qty, "unit": it.unit, "unit_price_cents": it.unit_price_cents, "line_total_cents": it.line_total_cents}
+            for it in p.items
+        ],
+        "payment_stages": [
+            {"title": st.title, "percent": st.percent, "amount_cents": st.amount_cents, "status": st.status}
+            for st in p.payment_stages
+        ]
+    }
+    db.add(ProposalVersion(proposal_id=p.id, revision=p.revision, snapshot_json=json.dumps(snapshot, ensure_ascii=False)))
+    db.commit()
+
+    # aplicar defaults de serviço no edit (se escolheu e deixou campos vazios)
+    if service_id:
+        s = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id, Service.archived.is_(False)).first()
+        if s:
+            if not project_name.strip():
+                project_name = s.title
+            if not description.strip() and s.default_description:
+                description = s.default_description
+            if not deadline.strip() and s.default_deadline:
+                deadline = s.default_deadline
+            if (not price.strip()) and (s.default_price_cents or 0) > 0:
+                price = cents_to_brl(s.default_price_cents)
+            if (payment_plan in ("", "avista")) and s.default_payment_plan:
+                payment_plan = s.default_payment_plan
+
+    # cliente: se veio client_id válido, usa. Senão, upsert
+    selected_client = None
+    if client_id:
+        selected_client = db.query(Client).filter(Client.id == client_id, Client.owner_id == user.id, Client.archived.is_(False)).first()
+
+    if selected_client:
+        p.client_id = selected_client.id
+        if not client_name.strip():
+            client_name = selected_client.name
+        if not client_whatsapp.strip() and selected_client.whatsapp:
+            client_whatsapp = selected_client.whatsapp
+    else:
+        if (client_name or "").strip():
+            c = upsert_client_for_user(db, user.id, client_name, client_whatsapp or None)
+            p.client_id = c.id
+
+    p.revision = int(p.revision or 1) + 1
+    p.updated_at = _now()
+    p.last_activity_at = _now()
+
+    p.client_name = (client_name or "").strip()
+    p.client_whatsapp = (client_whatsapp or "").strip() or None
+    p.project_name = (project_name or "").strip()
+    p.description = (description or "").strip()
+    p.deadline = normalize_deadline(deadline)
+
+    # recria itens
+    for it in list(p.items):
+        db.delete(it)
+    db.commit()
+
+    items = rebuild_items_from_form(item_desc, item_qty, item_unit, item_unit_price)
+    for it in items:
+        it.proposal_id = p.id
+        db.add(it)
+    db.commit()
+
+    saved_items = db.query(ProposalItem).filter(ProposalItem.proposal_id == p.id).order_by(ProposalItem.sort.asc()).all()
+    total_cents = compute_total(saved_items, 0, 0)
+
+    override = brl_to_cents((price or "").strip())
+    if override > 0:
+        total_cents = override
+
+    p.total_cents = total_cents
+    p.price = cents_to_brl(total_cents)
+    db.add(p)
+    db.commit()
+
+    upsert_payment_stages(db, p, plan_to_percents(payment_plan))
+
+    return RedirectResponse("/dashboard", status_code=302)
+
+
+@app.get("/proposals/{proposal_id}/duplicate")
+def duplicate_proposal(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    original = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
+    if not original:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # limite free
+    if not is_pro_active(user):
+        count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+        if count >= (user.proposal_limit or 5):
+            return RedirectResponse("/pricing", status_code=302)
+
+    new_p = Proposal(
+        client_id=original.client_id,
+        client_name=original.client_name,
+        client_whatsapp=original.client_whatsapp,
+        project_name=original.project_name,
+        description=original.description,
+        price=original.price,
+        deadline=original.deadline,
+        owner_id=user.id,
+        status="created",
+        valid_until=_now() + timedelta(days=7),
+        last_activity_at=_now(),
+        revision=1,
+        updated_at=_now(),
+        total_cents=int(original.total_cents or 0),
+    )
+    db.add(new_p)
+    db.commit()
+    db.refresh(new_p)
+
+    # dup itens
+    for it in original.items:
+        db.add(ProposalItem(
+            proposal_id=new_p.id,
+            sort=it.sort,
+            description=it.description,
+            unit=it.unit,
+            qty=it.qty,
+            unit_price_cents=it.unit_price_cents,
+            line_total_cents=it.line_total_cents,
+        ))
+    db.commit()
+
+    # dup payment plan (aprox)
+    stages = db.query(PaymentStage).filter(PaymentStage.proposal_id == original.id).order_by(PaymentStage.id.asc()).all()
+    plan = [(s.title, int(s.percent or 0)) for s in stages] if stages else [("À vista", 100)]
+    upsert_payment_stages(db, new_p, plan)
+
+    return RedirectResponse("/dashboard", status_code=302)
+
+
+@app.post("/proposals/{proposal_id}/delete")
+def delete_proposal(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
+    if not p:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # free: só 1 exclusão
+    if not is_pro_active(user) and user.plan == "free":
+        credits = user.delete_credits or 0
+        if credits <= 0:
+            # tenta renderizar dashboard com erro (se template suportar)
+            proposals = db.query(Proposal).filter(Proposal.owner_id == user.id).order_by(Proposal.created_at.desc()).all()
+            total = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+            accepted = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.accepted_at.isnot(None)).count()
+            rate = round((accepted / total) * 100) if total else 0
+            return templates.TemplateResponse("dashboard.html", {
+                "request": request,
+                "user": user,
+                "owner": user,
+                "proposals": proposals,
+                "total": total,
+                "accepted": accepted,
+                "rate": rate,
+                "status": "all",
+                "status_label": status_label,
+                "error": "No plano gratuito você só pode excluir 1 orçamento. Faça upgrade para excluir ilimitado.",
+                "show_upgrade": True,
+            })
+        user.delete_credits = credits - 1
+        db.add(user)
+
+    # apaga tudo
+    db.delete(p)
+    db.commit()
     return RedirectResponse("/dashboard", status_code=302)
 
 
@@ -617,7 +1100,7 @@ def save_proposal_as_service(proposal_id: int, request: Request, db: Session = D
     return RedirectResponse("/services?saved=1", status_code=302)
 
 
-# ===== PUBLIC =====
+# ===== PUBLIC (TRACK + ACCEPT) =====
 @app.get("/p/{public_id}", response_class=HTMLResponse)
 def public_proposal(public_id: str, request: Request, db: Session = Depends(get_db)):
     p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
@@ -627,9 +1110,9 @@ def public_proposal(public_id: str, request: Request, db: Session = Depends(get_
     owner = db.query(User).filter(User.id == p.owner_id).first()
     base_url = base_url_from_request(request)
 
-    # tracking leve
     view_cookie = f"pv_{public_id}"
     last_seen = request.cookies.get(view_cookie)
+
     should_count = True
     if last_seen:
         try:
@@ -683,6 +1166,7 @@ def accept_proposal(public_id: str, request: Request, name: str = Form(...), ema
     return templates.TemplateResponse("accepted.html", {"request": request, "p": p, "owner": owner, "base_url": base_url})
 
 
+# ===== PDF =====
 @app.get("/p/{public_id}/pdf")
 def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
     p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
@@ -766,7 +1250,7 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
-# ===== PROFILE / PRICING / BILLING / SUPPORT =====
+# ===== PROFILE / BILLING / PRICING / STATIC =====
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -799,7 +1283,6 @@ def profile_save(
 
     db.add(user)
     db.commit()
-
     return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": True, "error": None})
 
 
@@ -832,6 +1315,7 @@ def support(request: Request):
     return templates.TemplateResponse("support.html", {"request": request})
 
 
+# ===== ASAAS =====
 def ensure_asaas_customer(db: Session, user: User) -> str:
     if user.asaas_customer_id:
         return user.asaas_customer_id
@@ -907,6 +1391,114 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
         return HTMLResponse("Assinatura criada, mas não achei invoiceUrl.", status_code=500)
     return RedirectResponse(invoice_url, status_code=302)
 
+
+@app.get("/wizard", response_class=HTMLResponse)
+def wizard(request: Request, step: int = 1,
+           client_id: int = 0, service_id: int = 0,
+           client_name: str = "", client_whatsapp: str = "",
+           project_name: str = "", deadline: str = "",
+           price: str = "", validity_days: int = 7,
+           description: str = "", payment_plan: str = "avista",
+           db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.title.asc()).all()
+    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.name.asc()).all()
+
+    # Prefill do cliente salvo
+    if step >= 2 and client_id:
+        c = db.query(Client).filter(Client.id == client_id, Client.owner_id == user.id, Client.archived.is_(False)).first()
+        if c:
+            if not client_name:
+                client_name = c.name
+            if not client_whatsapp and c.whatsapp:
+                client_whatsapp = c.whatsapp
+
+    # Prefill do serviço salvo
+    if step >= 3 and service_id:
+        s = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id, Service.archived.is_(False)).first()
+        if s:
+            if not project_name:
+                project_name = s.title
+            if not deadline and s.default_deadline:
+                deadline = s.default_deadline
+            if not description and s.default_description:
+                description = s.default_description
+            if not price and (s.default_price_cents or 0) > 0:
+                price = cents_to_brl(s.default_price_cents)
+            if payment_plan in ("", "avista") and s.default_payment_plan:
+                payment_plan = s.default_payment_plan
+
+    # Validações simples
+    error = None
+    step = max(1, min(int(step or 1), 3))
+    if step == 2 and not (client_id or client_name.strip()):
+        error = "Escolha um cliente ou digite o nome."
+    if step == 3 and not (service_id or project_name.strip()):
+        error = "Escolha um serviço ou digite o nome do serviço."
+    if step == 3 and not description.strip():
+        error = "Escreva em 1 linha o que será feito."
+
+    return templates.TemplateResponse("wizard.html", {
+        "request": request,
+        "step": step,
+        "error": error,
+        "services": services,
+        "clients": clients,
+
+        "client_id": client_id,
+        "service_id": service_id,
+
+        "client_name": client_name,
+        "client_whatsapp": client_whatsapp,
+
+        "project_name": project_name,
+        "deadline": deadline,
+        "price": price,
+        "validity_days": validity_days,
+        "description": description,
+        "payment_plan": payment_plan,
+    })
+
+
+@app.post("/wizard/create")
+def wizard_create(
+    request: Request,
+    service_id: int = Form(0),
+    client_id: int = Form(0),
+    client_name: str = Form(...),
+    client_whatsapp: str = Form(""),
+    project_name: str = Form(...),
+    deadline: str = Form(...),
+    price: str = Form(""),
+    validity_days: int = Form(7),
+    description: str = Form(...),
+    payment_plan: str = Form("avista"),
+    db: Session = Depends(get_db),
+):
+    # Reaproveita a lógica do seu /proposals/new: redireciona fazendo POST interno simples
+    # Aqui a solução direta é chamar a mesma função create_proposal() se estiver no mesmo módulo.
+
+    return create_proposal(
+        request=request,
+        service_id=service_id,
+        client_id=client_id,
+        client_name=client_name,
+        client_whatsapp=client_whatsapp,
+        project_name=project_name,
+        description=description,
+        price=price,
+        deadline=deadline,
+        validity_days=validity_days,
+        payment_plan=payment_plan,
+        item_desc=[],
+        item_qty=[],
+        item_unit=[],
+        item_unit_price=[],
+        db=db
+    )
 
 @app.post("/webhooks/asaas")
 async def webhooks_asaas(request: Request, db: Session = Depends(get_db)):

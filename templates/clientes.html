@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Clientes</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Clientes (agenda)</p>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
+      <a class="btn" href="/proposals/new">+ Novo orçamento</a>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h2 class="h2">Adicionar cliente</h2>
+      <p class="small">Salve o cliente uma vez. Depois é 1 clique pra criar orçamento.</p>
+
+      {% if error %}
+        <div class="error">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/clients/new">
+        <label>Nome</label>
+        <input name="name" required placeholder="Ex: Maria Silva">
+
+        <div style="height:12px;"></div>
+
+        <label>WhatsApp (opcional)</label>
+        <input name="whatsapp" placeholder="Ex: (11) 99999-9999">
+
+        <div style="height:14px;"></div>
+        <button class="btn" type="submit">Salvar cliente</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="h2">Minha lista</h2>
+      <p class="small">Use “Orçar” pra abrir novo orçamento com o cliente já preenchido.</p>
+
+      {% if clients|length == 0 %}
+        <p class="small">Você ainda não cadastrou nenhum cliente.</p>
+      {% else %}
+        <div style="display:grid; gap:10px;">
+          {% for c in clients %}
+            <div class="card" style="padding:14px;">
+              <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                <div>
+                  <div style="font-weight:900; font-size:16px;">{{ c.name }}</div>
+                  <div class="small" style="margin-top:6px; opacity:.85;">
+                    {% if c.whatsapp %}{{ c.whatsapp }}{% else %}(sem WhatsApp){% endif %}
+                  </div>
+                </div>
+                <div class="actions">
+                  <a class="btn" href="/proposals/new?client_id={{ c.id }}">Orçar</a>
+
+                  <details>
+                    <summary class="btn btn-ghost" style="cursor:pointer;">Editar</summary>
+                    <div style="margin-top:10px;">
+                      <form method="post" action="/clients/{{ c.id }}/update">
+                        <label>Nome</label>
+                        <input name="name" value="{{ c.name }}" required>
+
+                        <div style="height:10px;"></div>
+
+                        <label>WhatsApp</label>
+                        <input name="whatsapp" value="{{ c.whatsapp or '' }}">
+
+                        <div style="height:12px;"></div>
+                        <button class="btn" type="submit">Salvar</button>
+                      </form>
+
+                      <form method="post" action="/clients/{{ c.id }}/delete" style="margin-top:10px;"
+                        onsubmit="return confirm('Remover este cliente da lista?');">
+                        <button class="btn btn-ghost" type="submit">Remover</button>
+                      </form>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</body>
+</html>

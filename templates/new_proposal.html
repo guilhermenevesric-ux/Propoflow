@@ -40,7 +40,24 @@
       </select>
 
       <div style="height:12px;"></div>
+<label>Cliente salvo (opcional)</label>
+<select name="client_id" id="clientSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+  <option value="0">Escolher...</option>
+  {% for c in clients %}
+    <option value="{{ c.id }}" {% if selected_client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+  {% endfor %}
+</select>
+<div style="height:12px;"></div>
 
+<script>
+document.getElementById('clientSelect').addEventListener('change', function(){
+  const id = this.value;
+  const url = new URL(window.location.href);
+  if(id && id !== "0") url.searchParams.set('client_id', id);
+  else url.searchParams.delete('client_id');
+  window.location.href = url.toString();
+});
+</script>
       <div class="row">
         <div>
           <label>Nome do cliente</label>

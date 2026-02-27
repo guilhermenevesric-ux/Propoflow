@@ -68,4 +68,11 @@ with engine.begin() as conn:
                    "ALTER TABLE proposals ADD COLUMN total_cents INTEGER DEFAULT 0",
                    "ALTER TABLE proposals ADD COLUMN IF NOT EXISTS total_cents INTEGER DEFAULT 0")
 
+# PROPOSALS: client_id
+    if not column_exists(conn, "proposals", "client_id"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN IF NOT EXISTS client_id INTEGER NULL"))
+        else:
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN client_id INTEGER"))
+
 print("✅ migrate.py OK")
