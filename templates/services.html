@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Meus serviços</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Meus serviços (catálogo pessoal)</p>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
+      <a class="btn" href="/proposals/new">+ Novo orçamento</a>
+    </div>
+  </div>
+
+  {% if saved %}
+    <div class="card" style="margin-bottom:14px;">
+      <div class="small">✅ Serviço salvo com sucesso.</div>
+    </div>
+  {% endif %}
+
+  <div class="grid-2">
+    <div class="card">
+      <h2 class="h2">Adicionar serviço</h2>
+      <p class="small">Cadastre uma vez. Depois é só escolher e o orçamento sai pronto.</p>
+
+      {% if error %}
+        <div class="error">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/services/new">
+        <label>Nome do serviço</label>
+        <input name="title" required placeholder="Ex: Faxina 2 quartos / Limpeza de sofá 3 lugares">
+
+        <div style="height:12px;"></div>
+
+        <div class="row">
+          <div>
+            <label>Preço sugerido (opcional)</label>
+            <input name="default_price" placeholder="Ex: 250">
+          </div>
+          <div>
+            <label>Prazo sugerido (opcional)</label>
+            <input name="default_deadline" placeholder="Ex: 1 dia / 2 dias">
+          </div>
+        </div>
+
+        <div style="height:12px;"></div>
+
+        <label>O que será feito (opcional)</label>
+        <textarea name="default_description" placeholder="Ex: Vou fazer a limpeza completa, incluindo..."></textarea>
+
+        <div style="height:12px;"></div>
+
+        <label>Como pagar (opcional)</label>
+        <select name="default_payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+          <option value="avista" selected>À vista</option>
+          <option value="entrada_final_30">Entrada + na entrega (30/70)</option>
+          <option value="entrada_final_50">Entrada + na entrega (50/50)</option>
+          <option value="3x_30_40_30">Entrada + durante + na entrega (30/40/30)</option>
+        </select>
+
+        <div style="height:14px;"></div>
+        <button class="btn" type="submit">Salvar serviço</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="h2">Minha lista</h2>
+      <p class="small">Clique em “Usar” para criar orçamento já preenchido.</p>
+
+      {% if services|length == 0 %}
+        <p class="small">Você ainda não cadastrou nenhum serviço.</p>
+      {% else %}
+        <div style="display:grid; gap:10px;">
+          {% for s in services %}
+            <div class="card" style="padding:14px;">
+              <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                <div>
+                  <div style="font-weight:900; font-size:16px;">{{ s.title }}</div>
+                  <div class="small" style="margin-top:6px;">
+                    {% if s.default_price_cents and s.default_price_cents > 0 %}
+                      Preço: <b>R$ {{ ('%.2f'|format(s.default_price_cents/100)).replace('.', ',') }}</b>
+                    {% else %}
+                      Preço: <span style="opacity:.7;">(não definido)</span>
+                    {% endif %}
+                    {% if s.default_deadline %} • Prazo: <b>{{ s.default_deadline }}</b>{% endif %}
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <a class="btn" href="/proposals/new?service_id={{ s.id }}">Usar</a>
+
+                  <details>
+                    <summary class="btn btn-ghost" style="cursor:pointer;">Editar</summary>
+                    <div style="margin-top:10px;">
+                      <form method="post" action="/services/{{ s.id }}/update">
+                        <label>Nome</label>
+                        <input name="title" value="{{ s.title }}" required>
+
+                        <div style="height:10px;"></div>
+
+                        <div class="row">
+                          <div>
+                            <label>Preço sugerido</label>
+                            <input name="default_price" value="{{ (s.default_price_cents or 0)/100 }}">
+                          </div>
+                          <div>
+                            <label>Prazo sugerido</label>
+                            <input name="default_deadline" value="{{ s.default_deadline or '' }}">
+                          </div>
+                        </div>
+
+                        <div style="height:10px;"></div>
+
+                        <label>O que será feito</label>
+                        <textarea name="default_description">{{ s.default_description or '' }}</textarea>
+
+                        <div style="height:10px;"></div>
+
+                        <label>Como pagar</label>
+                        <select name="default_payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+                          <option value="avista" {% if s.default_payment_plan=='avista' %}selected{% endif %}>À vista</option>
+                          <option value="entrada_final_30" {% if s.default_payment_plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+                          <option value="entrada_final_50" {% if s.default_payment_plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+                          <option value="3x_30_40_30" {% if s.default_payment_plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+                        </select>
+
+                        <div style="height:12px;"></div>
+                        <button class="btn" type="submit">Salvar</button>
+                      </form>
+
+                      <form method="post" action="/services/{{ s.id }}/delete" style="margin-top:10px;"
+                        onsubmit="return confirm('Remover este serviço da lista?');">
+                        <button class="btn btn-ghost" type="submit">Remover</button>
+                      </form>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</body>
+</html>

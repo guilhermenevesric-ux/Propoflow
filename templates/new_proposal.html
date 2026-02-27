@@ -13,49 +13,41 @@
       <div class="logo"></div>
       <div>
         <h1>PropoFlow</h1>
-        <p>Novo orçamento (simples e rápido)</p>
+        <p>Novo orçamento (simples)</p>
       </div>
     </div>
     <div class="actions">
       <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
+      <a class="btn btn-ghost" href="/services">Meus serviços</a>
     </div>
   </div>
 
   <div class="card">
     <h2 class="h2">Criar orçamento</h2>
-    <p class="small">Preencha o básico. O sistema calcula total e já deixa pronto pra enviar no WhatsApp.</p>
+    <p class="small">Se você escolher um serviço salvo, o orçamento já vem preenchido.</p>
 
     {% if error %}
       <div class="error">{{ error }}</div>
     {% endif %}
 
-
-    <label>Modelo de serviço (opcional)</label>
-<select name="tpl" id="tplSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
-  <option value="">Escolher modelo...</option>
-  {% for t in template_list %}
-    <option value="{{ t.key }}" {% if tpl == t.key %}selected{% endif %}>{{ t.label }}</option>
-  {% endfor %}
-</select>
-<div style="height:12px;"></div>
-
-<script>
-  document.getElementById('tplSelect').addEventListener('change', function(){
-    const v = this.value;
-    if(!v) return;
-    window.location.href = '/proposals/new?tpl=' + encodeURIComponent(v);
-  });
-</script>
-
-
     <form method="post" action="/proposals/new" id="formOrc">
+      <label>Serviço salvo (opcional)</label>
+      <select name="service_id" id="serviceSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+        <option value="0">Escolher...</option>
+        {% for s in services %}
+          <option value="{{ s.id }}" {% if selected_service_id == s.id %}selected{% endif %}>{{ s.title }}</option>
+        {% endfor %}
+      </select>
+
+      <div style="height:12px;"></div>
+
       <div class="row">
         <div>
           <label>Nome do cliente</label>
           <input name="client_name" required placeholder="Ex: Maria Silva">
         </div>
         <div>
-          <label>WhatsApp do cliente (pra enviar)</label>
+          <label>WhatsApp do cliente (opcional)</label>
           <input name="client_whatsapp" placeholder="Ex: (11) 99999-9999">
         </div>
       </div>
@@ -65,11 +57,11 @@
       <div class="row">
         <div>
           <label>Serviço / Projeto</label>
-          <input name="project_name" required placeholder="Ex: Troca de tomada / Pintura do quarto">
+          <input name="project_name" required value="{{ prefill.project_name or '' }}" placeholder="Ex: Limpeza de sofá">
         </div>
         <div>
           <label>Prazo</label>
-          <input name="deadline" required placeholder="Ex: 1 dia / 7 dias úteis">
+          <input name="deadline" required value="{{ prefill.deadline or '' }}" placeholder="Ex: 1 dia / 2 dias">
         </div>
       </div>
 
@@ -81,23 +73,20 @@
           <input name="validity_days" type="number" min="1" max="30" value="7" required>
         </div>
         <div>
-          <label>Total final (se você já sabe) — opcional</label>
-          <input name="price" placeholder="Ex: R$ 250,00">
+          <label>Valor total (opcional — se já sabe)</label>
+          <input name="price" value="{{ prefill.price or '' }}" placeholder="Ex: R$ 250,00">
         </div>
       </div>
 
       <br>
 
       <label>O que será feito</label>
-      <textarea name="description" required placeholder="Escreva do jeito que você falaria:
-Ex: Vou trocar a tomada, testar e deixar funcionando."></textarea>
+      <textarea name="description" required placeholder="Escreva do jeito que você falaria.">{{ prefill.description or '' }}</textarea>
 
       <br><br>
 
       <h3 class="h2" style="font-size:15px;">Itens (opcional)</h3>
-      <p class="small" style="margin-top:0;">
-        Se quiser, preencha itens. Se não quiser, pode deixar vazio e colocar só o “Total final”.
-      </p>
+      <p class="small" style="margin-top:0;">Se não quiser itens, deixe vazio e use só “Valor total”.</p>
 
       <div class="table-wrap">
         <table class="table" id="itemsTable" style="min-width: 680px;">
@@ -110,12 +99,10 @@ Ex: Vou trocar a tomada, testar e deixar funcionando."></textarea>
 
           {% for i in range(0,5) %}
           <tr>
-            <td><input name="item_desc" placeholder="Ex: Tomada / Mão de obra" /></td>
+            <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
             <td><input name="item_qty" placeholder="1" /></td>
-            <td><input name="item_unit_price" placeholder="25" /></td>
+            <td><input name="item_unit_price" placeholder="100" /></td>
             <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
-
-            <!-- campo escondido pra manter compatibilidade do backend -->
             <input type="hidden" name="item_unit" value="un">
           </tr>
           {% endfor %}
@@ -129,59 +116,15 @@ Ex: Vou trocar a tomada, testar e deixar funcionando."></textarea>
 
       <br>
 
-      <h3 class="h2" style="font-size:15px;">Como será o pagamento</h3>
-      <p class="small" style="margin-top:0;">Escolha um modelo simples. (Você pode mudar depois.)</p>
-
-      <label>Forma de pagamento</label>
-      <select name="payment_plan" id="paymentPlan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color: #e8eefc;">
-        <option value="avista">À vista (100%)</option>
-        <option value="entrada_final_30" selected>Entrada + na entrega (30% / 70%)</option>
-        <option value="entrada_final_50">Entrada + na entrega (50% / 50%)</option>
-        <option value="3x_30_40_30">Entrada + durante + na entrega (30% / 40% / 30%)</option>
-        <option value="personalizado">Personalizado (avançado)</option>
+      <h3 class="h2" style="font-size:15px;">Como pagar (opcional)</h3>
+      <select name="payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+        <option value="avista" {% if prefill.payment_plan=='avista' %}selected{% endif %}>À vista</option>
+        <option value="entrada_final_30" {% if prefill.payment_plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+        <option value="entrada_final_50" {% if prefill.payment_plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+        <option value="3x_30_40_30" {% if prefill.payment_plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
       </select>
 
-      <div id="customPay" style="display:none; margin-top:12px;">
-        <div class="row">
-          <div>
-            <label>Entrada (%)</label>
-            <input name="p1_percent" type="number" min="0" max="100" value="30">
-          </div>
-          <div>
-            <label>Durante o serviço (%)</label>
-            <input name="p2_percent" type="number" min="0" max="100" value="40">
-          </div>
-        </div>
-        <br>
-        <div class="row">
-          <div>
-            <label>Na entrega (%)</label>
-            <input name="p3_percent" type="number" min="0" max="100" value="30">
-          </div>
-          <div></div>
-        </div>
-      </div>
-
-      <details style="margin-top:14px;">
-        <summary class="small" style="cursor:pointer;">Opções avançadas (opcional)</summary>
-        <div style="margin-top:10px;">
-          <div class="row">
-            <div>
-              <label>Reserva (opcional) — % para cobrir gastos que aparecem</label>
-              <input name="reserve_percent" type="number" min="0" max="50" value="0" placeholder="Ex: 10">
-              <p class="small" style="margin:8px 0 0; opacity:.8;">Se você costuma ter “coisinhas a mais”, coloque 5% ou 10%.</p>
-            </div>
-            <div>
-              <label>Lucro extra (opcional) — % além do valor dos itens</label>
-              <input name="profit_percent" type="number" min="0" max="80" value="0" placeholder="Ex: 20">
-              <p class="small" style="margin:8px 0 0; opacity:.8;">Se você quer ganhar acima do custo, coloque aqui.</p>
-            </div>
-          </div>
-        </div>
-      </details>
-
-      <br><br>
-
+      <div style="height:16px;"></div>
       <button class="btn" type="submit">Criar orçamento</button>
     </form>
   </div>
@@ -194,41 +137,30 @@ Ex: Vou trocar a tomada, testar e deixar funcionando."></textarea>
       return 'R$ ' + v;
     }catch(e){ return 'R$ 0,00'; }
   }
-
   function parseNum(v){
     if(!v) return 0;
     v = (''+v).replace(/\./g,'').replace(',', '.');
     const n = parseFloat(v);
     return isNaN(n) ? 0 : n;
   }
-
   function recalc(){
     const rows = document.querySelectorAll('#itemsTable tr');
     let total = 0;
-
     rows.forEach((tr, idx) => {
-      if(idx === 0) return; // header
+      if(idx === 0) return;
       const inputs = tr.querySelectorAll('input');
       if(inputs.length < 3) return;
-
       const desc = inputs[0].value.trim();
       const qty = parseNum(inputs[1].value) || 0;
       const unit = parseNum(inputs[2].value) || 0;
-
       let line = 0;
-      if(desc && qty > 0 && unit > 0){
-        line = qty * unit;
-      }
-
+      if(desc && qty > 0 && unit > 0) line = qty * unit;
       const td = tr.querySelector('.lineTotal');
       if(td) td.textContent = brl(line);
-
       total += line;
     });
-
     document.getElementById('totalEstimado').textContent = brl(total);
   }
-
   function addRow(){
     const table = document.getElementById("itemsTable");
     const tr = document.createElement("tr");
@@ -248,10 +180,12 @@ Ex: Vou trocar a tomada, testar e deixar funcionando."></textarea>
     }
   });
 
-  const plan = document.getElementById('paymentPlan');
-  const custom = document.getElementById('customPay');
-  plan.addEventListener('change', () => {
-    custom.style.display = (plan.value === 'personalizado') ? 'block' : 'none';
+  document.getElementById('serviceSelect').addEventListener('change', function(){
+    const id = this.value;
+    const url = new URL(window.location.href);
+    if(id && id !== "0") url.searchParams.set('service_id', id);
+    else url.searchParams.delete('service_id');
+    window.location.href = url.toString();
   });
 
   recalc();

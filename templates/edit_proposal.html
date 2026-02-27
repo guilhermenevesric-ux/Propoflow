@@ -21,7 +21,9 @@
       <a class="btn btn-ghost" href="/p/{{ p.public_id }}">Abrir link</a>
     </div>
   </div>
-
+<form method="post" action="/proposals/{{ p.id }}/save_service" style="display:inline;">
+  <button class="btn btn-ghost" type="submit">Salvar como serviço</button>
+</form>
   <div class="card">
     <h2 class="h2">Editar orçamento</h2>
     <p class="small">Ao salvar, o sistema cria uma nova versão (v{{ p.revision + 1 }}).</p>

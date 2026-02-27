@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db import Base
@@ -34,6 +34,7 @@ class User(Base):
 
     proposals = relationship("Proposal", back_populates="owner")
     sessions = relationship("UserSession", back_populates="user")
+    services = relationship("Service", back_populates="owner", cascade="all, delete-orphan")
 
 
 class UserSession(Base):
@@ -49,6 +50,30 @@ class UserSession(Base):
     user = relationship("User", back_populates="sessions")
 
 
+class Service(Base):
+    """
+    Catálogo pessoal do usuário (universal).
+    Ex.: "Faxina 2 quartos", "Limpeza de sofá 3 lugares", "Troca de tomada", etc.
+    """
+    __tablename__ = "services"
+
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    title = Column(String(160), nullable=False)                # nome do serviço
+    default_description = Column(Text, nullable=True)          # "o que será feito"
+    default_price_cents = Column(Integer, default=0)           # preço sugerido
+    default_deadline = Column(String(100), nullable=True)      # prazo sugerido
+    default_payment_plan = Column(String(40), default="avista")  # avista/entrada_final_30/etc (opcional)
+
+    archived = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True)
+
+    owner = relationship("User", back_populates="services")
+
+
 class Proposal(Base):
     __tablename__ = "proposals"
 
@@ -61,32 +86,26 @@ class Proposal(Base):
     project_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
 
-    # Mantém compatibilidade com suas telas atuais:
-    price = Column(String(50), nullable=False, default="")     # agora vira “R$ xxx,xx” calculado
+    price = Column(String(50), nullable=False, default="")
     deadline = Column(String(100), nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Pipeline
-    status = Column(String(20), default="created")         # created | sent | viewed | accepted
+    status = Column(String(20), default="created")  # created | sent | viewed | accepted
     valid_until = Column(DateTime, nullable=True)
 
-    # Tracking
     view_count = Column(Integer, default=0)
     first_viewed_at = Column(DateTime, nullable=True)
     last_viewed_at = Column(DateTime, nullable=True)
     last_activity_at = Column(DateTime, nullable=True)
 
-    # Versão
     revision = Column(Integer, default=1)
     updated_at = Column(DateTime, nullable=True)
 
-    # Regras do orçamento
-    overhead_percent = Column(Integer, default=10)         # imprevistos (%)
-    margin_percent = Column(Integer, default=0)            # margem simples (%)
-    total_cents = Column(Integer, default=0)               # total calculado em centavos
+    overhead_percent = Column(Integer, default=0)
+    margin_percent = Column(Integer, default=0)
+    total_cents = Column(Integer, default=0)
 
-    # Aceite
     accepted_at = Column(DateTime, nullable=True)
     accepted_name = Column(String(255), nullable=True)
     accepted_email = Column(String(255), nullable=True)
@@ -97,7 +116,6 @@ class Proposal(Base):
     items = relationship("ProposalItem", back_populates="proposal", cascade="all, delete-orphan")
     versions = relationship("ProposalVersion", back_populates="proposal", cascade="all, delete-orphan")
     payment_stages = relationship("PaymentStage", back_populates="proposal", cascade="all, delete-orphan")
-    followups = relationship("FollowUpSchedule", back_populates="proposal", cascade="all, delete-orphan")
 
 
 class ProposalItem(Base):
@@ -136,40 +154,11 @@ class PaymentStage(Base):
     id = Column(Integer, primary_key=True, index=True)
     proposal_id = Column(Integer, ForeignKey("proposals.id"), nullable=False, index=True)
 
-    title = Column(String(80), nullable=False)           # Sinal / Etapa 1 / Etapa 2
+    title = Column(String(80), nullable=False)
     percent = Column(Integer, default=0)
     amount_cents = Column(Integer, default=0)
 
-    status = Column(String(20), default="pending")       # pending | paid
+    status = Column(String(20), default="pending")  # pending | paid
     paid_at = Column(DateTime, nullable=True)
 
     proposal = relationship("Proposal", back_populates="payment_stages")
-    reminders = relationship("PaymentReminder", back_populates="stage", cascade="all, delete-orphan")
-
-
-class PaymentReminder(Base):
-    __tablename__ = "payment_reminders"
-
-    id = Column(Integer, primary_key=True, index=True)
-    stage_id = Column(Integer, ForeignKey("payment_stages.id"), nullable=False, index=True)
-
-    due_at = Column(DateTime, nullable=False, index=True)
-    status = Column(String(20), default="pending")       # pending | sent | skipped
-    sent_at = Column(DateTime, nullable=True)
-
-    stage = relationship("PaymentStage", back_populates="reminders")
-
-
-class FollowUpSchedule(Base):
-    __tablename__ = "followup_schedules"
-
-    id = Column(Integer, primary_key=True, index=True)
-    proposal_id = Column(Integer, ForeignKey("proposals.id"), nullable=False, index=True)
-
-    step = Column(Integer, nullable=False)  # 1, 3, 7 (dias)
-    due_at = Column(DateTime, nullable=False, index=True)
-
-    status = Column(String(20), default="pending")  # pending | sent | skipped
-    sent_at = Column(DateTime, nullable=True)
-
-    proposal = relationship("Proposal", back_populates="followups")

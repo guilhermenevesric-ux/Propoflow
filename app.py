@@ -19,13 +19,12 @@ from db import SessionLocal, engine, Base
 from models import (
     User, Proposal, UserSession,
     ProposalItem, ProposalVersion,
-    PaymentStage, PaymentReminder,
-    FollowUpSchedule
+    PaymentStage,
+    Service
 )
 from pdf_gen import generate_proposal_pdf
 
 
-# ====== migração leve ======
 try:
     subprocess.run([sys.executable, "migrate.py"], check=False)
 except Exception:
@@ -46,9 +45,6 @@ def get_db():
         db.close()
 
 
-# ==========================
-# CONFIG
-# ==========================
 SESSION_COOKIE = "session_token"
 
 APP_BASE_URL = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
@@ -71,9 +67,6 @@ def asaas_headers():
     }
 
 
-# ==========================
-# AUTH
-# ==========================
 def _sha256_hex(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
@@ -131,54 +124,6 @@ def set_user_pro_month(db: Session, user: User, paid_until: datetime, subscripti
     db.commit()
 
 
-# ==========================
-# HELPERS
-# ==========================
-
-SERVICE_TEMPLATES = {
-    "troca_tomada": {
-        "label": "Troca de tomada",
-        "project_name": "Troca de tomada",
-        "deadline": "1 dia",
-        "description": "Vou trocar a tomada, testar e deixar funcionando.",
-        "payment_plan": "avista",
-    },
-    "instalar_chuveiro": {
-        "label": "Instalar chuveiro",
-        "project_name": "Instalação de chuveiro",
-        "deadline": "1 dia",
-        "description": "Vou instalar o chuveiro, testar e deixar funcionando.",
-        "payment_plan": "entrada_final_50",
-    },
-    "troca_disjuntor": {
-        "label": "Troca de disjuntor",
-        "project_name": "Troca de disjuntor",
-        "deadline": "1 dia",
-        "description": "Vou trocar o disjuntor, revisar a ligação e testar.",
-        "payment_plan": "avista",
-    },
-    "instalar_luminaria": {
-        "label": "Instalar luminária",
-        "project_name": "Instalação de luminária",
-        "deadline": "1 dia",
-        "description": "Vou instalar a luminária, fixar, ligar e testar.",
-        "payment_plan": "avista",
-    },
-    "ponto_tomada": {
-        "label": "Novo ponto de tomada",
-        "project_name": "Novo ponto de tomada",
-        "deadline": "2 dias",
-        "description": "Vou fazer o novo ponto, passar fiação (se necessário), instalar e testar.",
-        "payment_plan": "3x_30_40_30",
-    },
-}
-
-def get_prefill(tpl_key: str | None) -> dict:
-    if not tpl_key:
-        return {}
-    t = SERVICE_TEMPLATES.get(tpl_key)
-    return t or {}
-
 def base_url_from_request(request: Request) -> str:
     if APP_BASE_URL:
         return APP_BASE_URL
@@ -217,15 +162,6 @@ def status_label(s: str) -> str:
     }.get(s or "", s or "Criado")
 
 
-def normalize_deadline(deadline: str) -> str:
-    s = (deadline or "").strip()
-    if not s:
-        return s
-    if re.fullmatch(r"\d+", s):
-        n = int(s)
-        return f"{n} dia" if n == 1 else f"{n} dias"
-    return s
-
 def brl_to_cents(v: str) -> int:
     if not v:
         return 0
@@ -234,15 +170,10 @@ def brl_to_cents(v: str) -> int:
     if not s:
         return 0
 
-    # Caso BR completo: "1.500,50"
     if "," in s and "." in s:
         tmp = s.replace(".", "").replace(",", ".")
-    # Só vírgula: "25,90"
     elif "," in s:
         tmp = s.replace(",", ".")
-    # Só ponto: "5.0" ou "25.90" -> ponto é decimal
-    elif "." in s:
-        tmp = s
     else:
         tmp = s
 
@@ -256,6 +187,16 @@ def brl_to_cents(v: str) -> int:
 def cents_to_brl(cents: int) -> str:
     n = max(0, int(cents)) / 100.0
     return f"R$ {n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def normalize_deadline(deadline: str) -> str:
+    s = (deadline or "").strip()
+    if not s:
+        return s
+    if re.fullmatch(r"\d+", s):
+        n = int(s)
+        return f"{n} dia" if n == 1 else f"{n} dias"
+    return s
 
 
 def compute_total(items: list[ProposalItem], overhead_percent: int, margin_percent: int) -> int:
@@ -289,18 +230,15 @@ def rebuild_items_from_form(descs: list[str], qtys: list[str], units: list[str],
     return items
 
 
-def plan_to_percents(payment_plan: str, p1: int, p2: int, p3: int) -> list[tuple[str, int]]:
+def plan_to_percents(payment_plan: str) -> list[tuple[str, int]]:
     payment_plan = (payment_plan or "").strip()
-    if payment_plan == "avista":
-        return [("À vista", 100)]
     if payment_plan == "entrada_final_50":
         return [("Entrada", 50), ("Na entrega", 50)]
+    if payment_plan == "entrada_final_30":
+        return [("Entrada", 30), ("Na entrega", 70)]
     if payment_plan == "3x_30_40_30":
         return [("Entrada", 30), ("Durante o serviço", 40), ("Na entrega", 30)]
-    if payment_plan == "personalizado":
-        return [("Entrada", int(p1 or 0)), ("Durante o serviço", int(p2 or 0)), ("Na entrega", int(p3 or 0))]
-    # padrão: entrada_final_30
-    return [("Entrada", 30), ("Na entrega", 70)]
+    return [("À vista", 100)]
 
 
 def upsert_payment_stages(db: Session, p: Proposal, plan: list[tuple[str, int]]):
@@ -311,7 +249,7 @@ def upsert_payment_stages(db: Session, p: Proposal, plan: list[tuple[str, int]])
             cleaned.append((title, percent))
 
     if not cleaned:
-        cleaned = [("Entrada", 30), ("Na entrega", 70)]
+        cleaned = [("À vista", 100)]
 
     total_percent = sum(x[1] for x in cleaned)
     if total_percent != 100:
@@ -330,73 +268,26 @@ def upsert_payment_stages(db: Session, p: Proposal, plan: list[tuple[str, int]])
     db.commit()
 
     for title, percent in cleaned:
-        db.add(PaymentStage(
-            proposal_id=p.id,
-            title=title,
-            percent=percent,
-            amount_cents=amt(percent),
-            status="pending"
-        ))
-    db.commit()
-
-
-def ensure_signal_reminders(db: Session, p: Proposal):
-    first = (
-        db.query(PaymentStage)
-        .filter(PaymentStage.proposal_id == p.id)
-        .order_by(PaymentStage.id.asc())
-        .first()
-    )
-    if not first or first.status == "paid":
-        return
-
-    existing = db.query(PaymentReminder).filter(PaymentReminder.stage_id == first.id).all()
-    if existing:
-        return
-
-    for days in (0, 1, 3):
-        db.add(PaymentReminder(stage_id=first.id, due_at=_now() + timedelta(days=days), status="pending"))
-    db.commit()
-
-
-def ensure_followups(db: Session, p: Proposal):
-    existing = db.query(FollowUpSchedule).filter(FollowUpSchedule.proposal_id == p.id).all()
-    existing_steps = {f.step for f in existing}
-    anchor = p.last_activity_at or p.created_at or _now()
-    for step in (1, 3, 7):
-        if step in existing_steps:
-            continue
-        db.add(FollowUpSchedule(proposal_id=p.id, step=step, due_at=anchor + timedelta(days=step), status="pending"))
+        db.add(PaymentStage(proposal_id=p.id, title=title, percent=percent, amount_cents=amt(percent), status="pending"))
     db.commit()
 
 
 def build_send_message(owner: User, p: Proposal, link: str) -> str:
-    validity = f" (válido até {p.valid_until.strftime('%d/%m')})" if p.valid_until else ""
     return (
-        f"Fala {p.client_name}! Aqui é {owner.display_name or (owner.company_name or 'a gente')}.\n"
-        f"Te enviei o *orçamento* do *{p.project_name}*{validity}.\n\n"
+        f"Oi {p.client_name}! Segue seu orçamento do *{p.project_name}*.\n"
         f"👉 Link: {link}\n\n"
-        f"Se fizer sentido, você consegue *aprovar por lá* em 10s. "
-        f"Se quiser ajustar algo, me fala que eu atualizo rapidinho."
+        f"Se quiser ajustar algo, me avise 😊"
     )
 
 
-def build_followup_message(owner: User, p: Proposal, link: str, step: int) -> str:
-    if step == 1:
-        return f"Oi {p.client_name}! Conseguiu ver o orçamento do *{p.project_name}*?\nLink: {link}\n\nSe quiser, ajusto rapidinho."
-    if step == 3:
-        return f"{p.client_name}, só pra eu organizar minha agenda:\nVocê quer seguir com o *{p.project_name}* essa semana?\n\nLink: {link}"
-    return f"Oi {p.client_name}! Último toque pra eu não te incomodar:\nVou encerrar esse orçamento e liberar agenda.\nSe ainda tiver interesse, me chama que eu reabro.\n\nLink: {link}"
-
-
-def build_pix_message(owner: User, p: Proposal, amount_cents: int, stage_title: str = "Entrada") -> str:
-    pix_line = f"Chave Pix: {owner.pix_key}" if owner.pix_key else "(Pix não configurado)"
-    recebedor = f"Recebedor: {owner.pix_name}\n" if owner.pix_name else ""
-    return (
-        f"{p.client_name}, para confirmar o serviço *{p.project_name}*, o pagamento de *{stage_title}* é *{cents_to_brl(amount_cents)}*.\n\n"
-        f"{recebedor}{pix_line}\n\n"
-        f"Assim que pagar, me mande o comprovante aqui ✅"
-    )
+def service_prefill(s: Service) -> dict:
+    return {
+        "project_name": s.title,
+        "deadline": s.default_deadline or "",
+        "description": s.default_description or "",
+        "price": cents_to_brl(s.default_price_cents) if (s.default_price_cents or 0) > 0 else "",
+        "payment_plan": s.default_payment_plan or "avista",
+    }
 
 
 # ==========================
@@ -410,7 +301,6 @@ def home(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/dashboard", status_code=302)
 
 
-# ===== AUTH =====
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
@@ -432,14 +322,7 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), d
     db.commit()
 
     resp = RedirectResponse("/dashboard", status_code=302)
-    resp.set_cookie(
-        SESSION_COOKIE,
-        token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 30
-    )
+    resp.set_cookie(SESSION_COOKIE, token, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=60 * 60 * 24 * 30)
     return resp
 
 
@@ -459,14 +342,7 @@ def register(request: Request, email: str = Form(...), password: str = Form(...)
     db.commit()
 
     resp = RedirectResponse("/dashboard", status_code=302)
-    resp.set_cookie(
-        SESSION_COOKIE,
-        token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 30
-    )
+    resp.set_cookie(SESSION_COOKIE, token, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=60 * 60 * 24 * 30)
     return resp
 
 
@@ -485,7 +361,6 @@ def logout(request: Request, db: Session = Depends(get_db)):
     return resp
 
 
-# ===== DASHBOARD =====
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -493,40 +368,9 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/login", status_code=302)
 
     proposals = db.query(Proposal).filter(Proposal.owner_id == user.id).order_by(Proposal.created_at.desc()).all()
-
     total = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
     accepted = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.accepted_at.isnot(None)).count()
     rate = round((accepted / total) * 100) if total else 0
-
-    now = _now()
-
-    due_followups = (
-        db.query(FollowUpSchedule)
-        .join(Proposal, Proposal.id == FollowUpSchedule.proposal_id)
-        .filter(
-            Proposal.owner_id == user.id,
-            Proposal.accepted_at.is_(None),
-            FollowUpSchedule.status == "pending",
-            FollowUpSchedule.due_at <= now
-        )
-        .order_by(FollowUpSchedule.due_at.asc())
-        .all()
-    )
-
-    due_payment_reminders = (
-        db.query(PaymentReminder)
-        .join(PaymentStage, PaymentStage.id == PaymentReminder.stage_id)
-        .join(Proposal, Proposal.id == PaymentStage.proposal_id)
-        .filter(
-            Proposal.owner_id == user.id,
-            Proposal.accepted_at.isnot(None),
-            PaymentStage.status == "pending",
-            PaymentReminder.status == "pending",
-            PaymentReminder.due_at <= now
-        )
-        .order_by(PaymentReminder.due_at.asc())
-        .all()
-    )
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
@@ -536,33 +380,128 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         "total": total,
         "accepted": accepted,
         "rate": rate,
-        "due_followups": due_followups,
-        "due_payment_reminders": due_payment_reminders,
         "status_label": status_label,
     })
 
 
-# ===== NEW PROPOSAL =====
-@app.get("/proposals/new", response_class=HTMLResponse)
-def new_proposal_page(request: Request, tpl: str | None = None, db: Session = Depends(get_db)):
+# ===== SERVICES =====
+@app.get("/services", response_class=HTMLResponse)
+def services_page(request: Request, saved: int = 0, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    prefill = get_prefill(tpl)
-    template_list = [{"key": k, "label": v["label"]} for k, v in SERVICE_TEMPLATES.items()]
+    services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.title.asc()).all()
+    return templates.TemplateResponse("services.html", {
+        "request": request,
+        "services": services,
+        "saved": bool(saved),
+        "error": None
+    })
+
+
+@app.post("/services/new")
+def services_new(
+    request: Request,
+    title: str = Form(...),
+    default_price: str = Form(""),
+    default_deadline: str = Form(""),
+    default_description: str = Form(""),
+    default_payment_plan: str = Form("avista"),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    s = Service(
+        owner_id=user.id,
+        title=title.strip(),
+        default_description=(default_description or "").strip() or None,
+        default_price_cents=brl_to_cents(default_price),
+        default_deadline=normalize_deadline(default_deadline) or None,
+        default_payment_plan=(default_payment_plan or "avista").strip() or "avista",
+        updated_at=_now()
+    )
+    db.add(s)
+    db.commit()
+    return RedirectResponse("/services", status_code=302)
+
+
+@app.post("/services/{service_id}/update")
+def services_update(
+    service_id: int,
+    request: Request,
+    title: str = Form(...),
+    default_price: str = Form(""),
+    default_deadline: str = Form(""),
+    default_description: str = Form(""),
+    default_payment_plan: str = Form("avista"),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    s = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id).first()
+    if not s:
+        return RedirectResponse("/services", status_code=302)
+
+    s.title = title.strip()
+    s.default_description = (default_description or "").strip() or None
+    s.default_price_cents = brl_to_cents(default_price)
+    s.default_deadline = normalize_deadline(default_deadline) or None
+    s.default_payment_plan = (default_payment_plan or "avista").strip() or "avista"
+    s.updated_at = _now()
+    db.add(s)
+    db.commit()
+    return RedirectResponse("/services", status_code=302)
+
+
+@app.post("/services/{service_id}/delete")
+def services_delete(service_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    s = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id).first()
+    if s:
+        s.archived = True
+        s.updated_at = _now()
+        db.add(s)
+        db.commit()
+    return RedirectResponse("/services", status_code=302)
+
+
+# ===== NEW PROPOSAL =====
+@app.get("/proposals/new", response_class=HTMLResponse)
+def new_proposal_page(request: Request, service_id: int = 0, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.title.asc()).all()
+    prefill = {"project_name": "", "deadline": "", "description": "", "price": "", "payment_plan": "avista"}
+
+    selected = None
+    if service_id:
+        selected = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id, Service.archived.is_(False)).first()
+        if selected:
+            prefill = service_prefill(selected)
 
     return templates.TemplateResponse("new_proposal.html", {
         "request": request,
         "error": None,
-        "prefill": prefill,
-        "tpl": tpl or "",
-        "template_list": template_list
+        "services": services,
+        "selected_service_id": selected.id if selected else 0,
+        "prefill": prefill
     })
+
 
 @app.post("/proposals/new")
 def create_proposal(
     request: Request,
+    service_id: int = Form(0),
     client_name: str = Form(...),
     client_whatsapp: str = Form(""),
     project_name: str = Form(...),
@@ -570,65 +509,49 @@ def create_proposal(
     price: str = Form(""),
     deadline: str = Form(...),
     validity_days: int = Form(7),
-    tpl: str = Form(""),
-
-
-    # compat (antigo) + simples (novo)
-    overhead_percent: int = Form(10),
-    margin_percent: int = Form(0),
-    reserve_percent: int = Form(0),
-    profit_percent: int = Form(0),
-
-    payment_plan: str = Form("entrada_final_30"),
-    p1_percent: int = Form(30),
-    p2_percent: int = Form(40),
-    p3_percent: int = Form(30),
-
+    payment_plan: str = Form("avista"),
     item_desc: list[str] = Form([]),
     item_qty: list[str] = Form([]),
     item_unit: list[str] = Form([]),
     item_unit_price: list[str] = Form([]),
-
     db: Session = Depends(get_db),
 ):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    prefill = get_prefill(tpl)
-
-    project_name = project_name.strip() or prefill.get("project_name", "")
-    deadline = normalize_deadline(deadline.strip() or prefill.get("deadline", ""))
-    if not description.strip():
-        description = prefill.get("description", "")
-    else:
-        description = description.strip()
-
-        if payment_plan == "entrada_final_30" and prefill.get("payment_plan"):
-            payment_plan = prefill["payment_plan"]
-
     if not is_pro_active(user):
         count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
         if count >= (user.proposal_limit or 5):
             return RedirectResponse("/pricing", status_code=302)
 
-    valid_until = _now() + timedelta(days=max(1, min(int(validity_days or 7), 30)))
+    # se escolheu um serviço, pode preencher defaults
+    if service_id:
+        s = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id, Service.archived.is_(False)).first()
+        if s:
+            if not project_name.strip():
+                project_name = s.title
+            if not description.strip() and s.default_description:
+                description = s.default_description
+            if not deadline.strip() and s.default_deadline:
+                deadline = s.default_deadline
+            if (not price.strip()) and (s.default_price_cents or 0) > 0:
+                price = cents_to_brl(s.default_price_cents)
+            if (payment_plan in ("", "avista")) and s.default_payment_plan:
+                payment_plan = s.default_payment_plan
 
-    final_overhead = int(reserve_percent or overhead_percent or 0)
-    final_margin = int(profit_percent or margin_percent or 0)
+    valid_until = _now() + timedelta(days=max(1, min(int(validity_days or 7), 30)))
 
     p = Proposal(
         client_name=client_name.strip(),
         client_whatsapp=client_whatsapp.strip() or None,
         project_name=project_name.strip(),
         description=description.strip(),
-        deadline=deadline.strip(),
+        deadline=normalize_deadline(deadline),
         owner_id=user.id,
         status="created",
         valid_until=valid_until,
         last_activity_at=_now(),
-        overhead_percent=final_overhead,
-        margin_percent=final_margin,
         revision=1,
         updated_at=_now(),
     )
@@ -643,7 +566,7 @@ def create_proposal(
     db.commit()
 
     saved_items = db.query(ProposalItem).filter(ProposalItem.proposal_id == p.id).order_by(ProposalItem.sort.asc()).all()
-    total_cents = compute_total(saved_items, p.overhead_percent, p.margin_percent)
+    total_cents = compute_total(saved_items, 0, 0)
 
     override = brl_to_cents((price or "").strip())
     if override > 0:
@@ -651,19 +574,16 @@ def create_proposal(
 
     p.total_cents = total_cents
     p.price = cents_to_brl(total_cents)
-    p.deadline = normalize_deadline(deadline)
     db.add(p)
     db.commit()
 
-    plan = plan_to_percents(payment_plan, p1_percent, p2_percent, p3_percent)
-    upsert_payment_stages(db, p, plan)
+    upsert_payment_stages(db, p, plan_to_percents(payment_plan))
 
     return RedirectResponse("/dashboard", status_code=302)
 
 
-# ===== EDIT PROPOSAL (VERSION) =====
-@app.get("/proposals/{proposal_id}/edit", response_class=HTMLResponse)
-def edit_proposal_page(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+@app.post("/proposals/{proposal_id}/save_service")
+def save_proposal_as_service(proposal_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -672,187 +592,32 @@ def edit_proposal_page(proposal_id: int, request: Request, db: Session = Depends
     if not p:
         return RedirectResponse("/dashboard", status_code=302)
 
-    stages = db.query(PaymentStage).filter(PaymentStage.proposal_id == p.id).order_by(PaymentStage.id.asc()).all()
-    p1 = stages[0].percent if len(stages) > 0 else 30
-    p2 = stages[1].percent if len(stages) > 1 else 40
-    p3 = stages[2].percent if len(stages) > 2 else 30
+    title = (p.project_name or "").strip() or "Meu serviço"
 
-    return templates.TemplateResponse("edit_proposal.html", {
-        "request": request,
-        "p": p,
-        "p1": p1,
-        "p2": p2,
-        "p3": p3
-    })
+    existing = db.query(Service).filter(Service.owner_id == user.id, Service.title == title, Service.archived.is_(False)).first()
+    if existing:
+        existing.default_description = p.description
+        existing.default_deadline = p.deadline
+        existing.default_price_cents = int(p.total_cents or 0)
+        existing.updated_at = _now()
+        db.add(existing)
+    else:
+        s = Service(
+            owner_id=user.id,
+            title=title,
+            default_description=p.description,
+            default_price_cents=int(p.total_cents or 0),
+            default_deadline=p.deadline,
+            default_payment_plan="avista",
+            updated_at=_now()
+        )
+        db.add(s)
 
-
-@app.post("/proposals/{proposal_id}/edit")
-def edit_proposal_save(
-    proposal_id: int,
-    request: Request,
-    client_name: str = Form(...),
-    client_whatsapp: str = Form(""),
-    project_name: str = Form(...),
-    description: str = Form(...),
-    deadline: str = Form(...),
-    price: str = Form(""),
-
-    overhead_percent: int = Form(10),
-    margin_percent: int = Form(0),
-    reserve_percent: int = Form(0),
-    profit_percent: int = Form(0),
-
-    payment_plan: str = Form("entrada_final_30"),
-    p1_percent: int = Form(30),
-    p2_percent: int = Form(40),
-    p3_percent: int = Form(30),
-
-    item_desc: list[str] = Form([]),
-    item_qty: list[str] = Form([]),
-    item_unit: list[str] = Form([]),
-    item_unit_price: list[str] = Form([]),
-
-    db: Session = Depends(get_db),
-):
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
-    if not p:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    # snapshot antes
-    snapshot = {
-        "revision": p.revision,
-        "client_name": p.client_name,
-        "client_whatsapp": p.client_whatsapp,
-        "project_name": p.project_name,
-        "description": p.description,
-        "deadline": p.deadline,
-        "overhead_percent": p.overhead_percent,
-        "margin_percent": p.margin_percent,
-        "price": p.price,
-        "total_cents": p.total_cents,
-        "items": [
-            {"description": it.description, "qty": it.qty, "unit": it.unit, "unit_price_cents": it.unit_price_cents, "line_total_cents": it.line_total_cents}
-            for it in p.items
-        ],
-        "payment_stages": [
-            {"title": st.title, "percent": st.percent, "amount_cents": st.amount_cents, "status": st.status}
-            for st in p.payment_stages
-        ]
-    }
-    db.add(ProposalVersion(proposal_id=p.id, revision=p.revision, snapshot_json=json.dumps(snapshot, ensure_ascii=False)))
     db.commit()
-
-    p.revision = int(p.revision or 1) + 1
-    p.updated_at = _now()
-
-    p.client_name = client_name.strip()
-    p.client_whatsapp = client_whatsapp.strip() or None
-    p.project_name = project_name.strip()
-    p.description = description.strip()
-    p.deadline = normalize_deadline(deadline)
-
-    final_overhead = int(reserve_percent or overhead_percent or 0)
-    final_margin = int(profit_percent or margin_percent or 0)
-    p.overhead_percent = final_overhead
-    p.margin_percent = final_margin
-
-    # recria itens
-    for it in list(p.items):
-        db.delete(it)
-    db.commit()
-
-    items = rebuild_items_from_form(item_desc, item_qty, item_unit, item_unit_price)
-    for it in items:
-        it.proposal_id = p.id
-        db.add(it)
-    db.commit()
-
-    saved_items = db.query(ProposalItem).filter(ProposalItem.proposal_id == p.id).order_by(ProposalItem.sort.asc()).all()
-    total_cents = compute_total(saved_items, p.overhead_percent, p.margin_percent)
-
-    override = brl_to_cents((price or "").strip())
-    if override > 0:
-        total_cents = override
-
-    p.total_cents = total_cents
-    p.price = cents_to_brl(total_cents)
-    p.last_activity_at = _now()
-    db.add(p)
-    db.commit()
-
-    plan = plan_to_percents(payment_plan, p1_percent, p2_percent, p3_percent)
-    upsert_payment_stages(db, p, plan)
-
-    return RedirectResponse("/dashboard", status_code=302)
+    return RedirectResponse("/services?saved=1", status_code=302)
 
 
-# ===== SEND / FOLLOWUP =====
-@app.get("/proposals/{proposal_id}/send_whatsapp")
-def send_whatsapp(proposal_id: int, request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
-    if not p:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    phone = normalize_phone_br(p.client_whatsapp or "")
-    if not phone:
-        return RedirectResponse(f"/proposals/{p.id}/edit", status_code=302)
-
-    link = proposal_public_link(request, p)
-    text = build_send_message(user, p, link)
-
-    if p.status != "accepted":
-        p.status = "sent"
-    p.last_activity_at = _now()
-    db.add(p)
-    db.commit()
-
-    ensure_followups(db, p)
-
-    return RedirectResponse(whatsapp_url(phone, text), status_code=302)
-
-
-@app.get("/proposals/{proposal_id}/followup/{step}")
-def send_followup(proposal_id: int, step: int, request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
-    if not p or p.accepted_at is not None:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    phone = normalize_phone_br(p.client_whatsapp or "")
-    if not phone:
-        return RedirectResponse(f"/proposals/{p.id}/edit", status_code=302)
-
-    ensure_followups(db, p)
-    f = db.query(FollowUpSchedule).filter(
-        FollowUpSchedule.proposal_id == p.id,
-        FollowUpSchedule.step == step,
-        FollowUpSchedule.status == "pending"
-    ).first()
-
-    link = proposal_public_link(request, p)
-    text = build_followup_message(user, p, link, step)
-
-    if f:
-        f.status = "sent"
-        f.sent_at = _now()
-        db.add(f)
-        db.commit()
-
-    return RedirectResponse(whatsapp_url(phone, text), status_code=302)
-
-
-# ===== PUBLIC (TRACK + ACCEPT) =====
+# ===== PUBLIC =====
 @app.get("/p/{public_id}", response_class=HTMLResponse)
 def public_proposal(public_id: str, request: Request, db: Session = Depends(get_db)):
     p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
@@ -862,9 +627,9 @@ def public_proposal(public_id: str, request: Request, db: Session = Depends(get_
     owner = db.query(User).filter(User.id == p.owner_id).first()
     base_url = base_url_from_request(request)
 
+    # tracking leve
     view_cookie = f"pv_{public_id}"
     last_seen = request.cookies.get(view_cookie)
-
     should_count = True
     if last_seen:
         try:
@@ -915,12 +680,9 @@ def accept_proposal(public_id: str, request: Request, name: str = Form(...), ema
         db.commit()
         db.refresh(p)
 
-        ensure_signal_reminders(db, p)
-
     return templates.TemplateResponse("accepted.html", {"request": request, "p": p, "owner": owner, "base_url": base_url})
 
 
-# ===== PDF =====
 @app.get("/p/{public_id}/pdf")
 def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
     p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
@@ -1004,67 +766,7 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
-# ===== PAYMENTS =====
-@app.get("/payments/reminders/{reminder_id}/send_whatsapp")
-def send_payment_reminder(reminder_id: int, request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    r = db.query(PaymentReminder).filter(PaymentReminder.id == reminder_id).first()
-    if not r:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    st = db.query(PaymentStage).filter(PaymentStage.id == r.stage_id).first()
-    if not st:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    p = db.query(Proposal).filter(Proposal.id == st.proposal_id, Proposal.owner_id == user.id).first()
-    if not p:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    phone = normalize_phone_br(p.client_whatsapp or "")
-    if not phone:
-        return RedirectResponse(f"/proposals/{p.id}/edit", status_code=302)
-
-    text = build_pix_message(user, p, st.amount_cents, st.title)
-
-    r.status = "sent"
-    r.sent_at = _now()
-    db.add(r)
-    db.commit()
-
-    return RedirectResponse(whatsapp_url(phone, text), status_code=302)
-
-
-@app.post("/payments/stages/{stage_id}/mark_paid")
-def mark_stage_paid(stage_id: int, request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-
-    st = db.query(PaymentStage).filter(PaymentStage.id == stage_id).first()
-    if not st:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    p = db.query(Proposal).filter(Proposal.id == st.proposal_id, Proposal.owner_id == user.id).first()
-    if not p:
-        return RedirectResponse("/dashboard", status_code=302)
-
-    st.status = "paid"
-    st.paid_at = _now()
-    db.add(st)
-
-    for rr in st.reminders:
-        if rr.status == "pending":
-            rr.status = "skipped"
-            db.add(rr)
-
-    db.commit()
-    return RedirectResponse("/dashboard", status_code=302)
-
-
-# ===== PROFILE / STATIC =====
+# ===== PROFILE / PRICING / BILLING / SUPPORT =====
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -1130,7 +832,6 @@ def support(request: Request):
     return templates.TemplateResponse("support.html", {"request": request})
 
 
-# ===== ASAAS =====
 def ensure_asaas_customer(db: Session, user: User) -> str:
     if user.asaas_customer_id:
         return user.asaas_customer_id
