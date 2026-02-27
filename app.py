@@ -134,6 +134,51 @@ def set_user_pro_month(db: Session, user: User, paid_until: datetime, subscripti
 # ==========================
 # HELPERS
 # ==========================
+
+SERVICE_TEMPLATES = {
+    "troca_tomada": {
+        "label": "Troca de tomada",
+        "project_name": "Troca de tomada",
+        "deadline": "1 dia",
+        "description": "Vou trocar a tomada, testar e deixar funcionando.",
+        "payment_plan": "avista",
+    },
+    "instalar_chuveiro": {
+        "label": "Instalar chuveiro",
+        "project_name": "Instalação de chuveiro",
+        "deadline": "1 dia",
+        "description": "Vou instalar o chuveiro, testar e deixar funcionando.",
+        "payment_plan": "entrada_final_50",
+    },
+    "troca_disjuntor": {
+        "label": "Troca de disjuntor",
+        "project_name": "Troca de disjuntor",
+        "deadline": "1 dia",
+        "description": "Vou trocar o disjuntor, revisar a ligação e testar.",
+        "payment_plan": "avista",
+    },
+    "instalar_luminaria": {
+        "label": "Instalar luminária",
+        "project_name": "Instalação de luminária",
+        "deadline": "1 dia",
+        "description": "Vou instalar a luminária, fixar, ligar e testar.",
+        "payment_plan": "avista",
+    },
+    "ponto_tomada": {
+        "label": "Novo ponto de tomada",
+        "project_name": "Novo ponto de tomada",
+        "deadline": "2 dias",
+        "description": "Vou fazer o novo ponto, passar fiação (se necessário), instalar e testar.",
+        "payment_plan": "3x_30_40_30",
+    },
+}
+
+def get_prefill(tpl_key: str | None) -> dict:
+    if not tpl_key:
+        return {}
+    t = SERVICE_TEMPLATES.get(tpl_key)
+    return t or {}
+
 def base_url_from_request(request: Request) -> str:
     if APP_BASE_URL:
         return APP_BASE_URL
@@ -172,6 +217,15 @@ def status_label(s: str) -> str:
     }.get(s or "", s or "Criado")
 
 
+def normalize_deadline(deadline: str) -> str:
+    s = (deadline or "").strip()
+    if not s:
+        return s
+    if re.fullmatch(r"\d+", s):
+        n = int(s)
+        return f"{n} dia" if n == 1 else f"{n} dias"
+    return s
+
 def brl_to_cents(v: str) -> int:
     if not v:
         return 0
@@ -179,7 +233,19 @@ def brl_to_cents(v: str) -> int:
     s = re.sub(r"[^\d,\.]", "", s)
     if not s:
         return 0
-    tmp = s.replace(".", "").replace(",", ".")
+
+    # Caso BR completo: "1.500,50"
+    if "," in s and "." in s:
+        tmp = s.replace(".", "").replace(",", ".")
+    # Só vírgula: "25,90"
+    elif "," in s:
+        tmp = s.replace(",", ".")
+    # Só ponto: "5.0" ou "25.90" -> ponto é decimal
+    elif "." in s:
+        tmp = s
+    else:
+        tmp = s
+
     try:
         n = float(tmp)
         return int(round(n * 100))
@@ -478,12 +544,21 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 
 # ===== NEW PROPOSAL =====
 @app.get("/proposals/new", response_class=HTMLResponse)
-def new_proposal_page(request: Request, db: Session = Depends(get_db)):
+def new_proposal_page(request: Request, tpl: str | None = None, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse("new_proposal.html", {"request": request, "error": None})
 
+    prefill = get_prefill(tpl)
+    template_list = [{"key": k, "label": v["label"]} for k, v in SERVICE_TEMPLATES.items()]
+
+    return templates.TemplateResponse("new_proposal.html", {
+        "request": request,
+        "error": None,
+        "prefill": prefill,
+        "tpl": tpl or "",
+        "template_list": template_list
+    })
 
 @app.post("/proposals/new")
 def create_proposal(
@@ -495,6 +570,8 @@ def create_proposal(
     price: str = Form(""),
     deadline: str = Form(...),
     validity_days: int = Form(7),
+    tpl: str = Form(""),
+
 
     # compat (antigo) + simples (novo)
     overhead_percent: int = Form(10),
@@ -517,6 +594,18 @@ def create_proposal(
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
+
+    prefill = get_prefill(tpl)
+
+    project_name = project_name.strip() or prefill.get("project_name", "")
+    deadline = normalize_deadline(deadline.strip() or prefill.get("deadline", ""))
+    if not description.strip():
+        description = prefill.get("description", "")
+    else:
+        description = description.strip()
+
+        if payment_plan == "entrada_final_30" and prefill.get("payment_plan"):
+            payment_plan = prefill["payment_plan"]
 
     if not is_pro_active(user):
         count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
@@ -562,6 +651,7 @@ def create_proposal(
 
     p.total_cents = total_cents
     p.price = cents_to_brl(total_cents)
+    p.deadline = normalize_deadline(deadline)
     db.add(p)
     db.commit()
 
@@ -663,7 +753,7 @@ def edit_proposal_save(
     p.client_whatsapp = client_whatsapp.strip() or None
     p.project_name = project_name.strip()
     p.description = description.strip()
-    p.deadline = deadline.strip()
+    p.deadline = normalize_deadline(deadline)
 
     final_overhead = int(reserve_percent or overhead_percent or 0)
     final_margin = int(profit_percent or margin_percent or 0)

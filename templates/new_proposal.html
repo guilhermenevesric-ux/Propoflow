@@ -29,6 +29,25 @@
       <div class="error">{{ error }}</div>
     {% endif %}
 
+
+    <label>Modelo de serviço (opcional)</label>
+<select name="tpl" id="tplSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+  <option value="">Escolher modelo...</option>
+  {% for t in template_list %}
+    <option value="{{ t.key }}" {% if tpl == t.key %}selected{% endif %}>{{ t.label }}</option>
+  {% endfor %}
+</select>
+<div style="height:12px;"></div>
+
+<script>
+  document.getElementById('tplSelect').addEventListener('change', function(){
+    const v = this.value;
+    if(!v) return;
+    window.location.href = '/proposals/new?tpl=' + encodeURIComponent(v);
+  });
+</script>
+
+
     <form method="post" action="/proposals/new" id="formOrc">
       <div class="row">
         <div>
