@@ -13,7 +13,7 @@
       <div class="logo"></div>
       <div>
         <h1>PropoFlow</h1>
-        <p>Editar orçamento (gera versão)</p>
+        <p>Editar orçamento (gera versão nova)</p>
       </div>
     </div>
     <div class="actions">
@@ -24,11 +24,7 @@
 
   <div class="card">
     <h2 class="h2">Editar orçamento</h2>
-    <p class="small">Ao salvar, o sistema cria um histórico (versão {{ p.revision + 1 }}).</p>
-
-    {% if error %}
-      <div class="error">{{ error }}</div>
-    {% endif %}
+    <p class="small">Ao salvar, cria histórico e incrementa versão (v{{ p.revision + 1 }}).</p>
 
     <form method="post" action="/proposals/{{ p.id }}/edit">
       <div class="row">
@@ -75,8 +71,8 @@
 
       <br>
 
-      <label>Preço final (opcional — se vazio, calcula pelos itens)</label>
-      <input name="price" value="{{ p.price or '' }}" placeholder="Ex: R$ 7.500">
+      <label>Preço final (opcional)</label>
+      <input name="price" value="{{ p.price or '' }}" placeholder="Ex: R$ 250,00">
 
       <br><br>
 
@@ -90,14 +86,16 @@
             <th>Un</th>
             <th>Valor unit (R$)</th>
           </tr>
+
           {% for it in p.items %}
           <tr>
             <td><input name="item_desc" value="{{ it.description }}" /></td>
             <td><input name="item_qty" value="{{ it.qty }}" /></td>
             <td><input name="item_unit" value="{{ it.unit or '' }}" /></td>
-            <td><input name="item_unit_price" value="{{ (it.unit_price_cents or 0) / 100 }}" /></td>
+            <td><input name="item_unit_price" value="{{ (it.unit_price_cents or 0)/100 }}" /></td>
           </tr>
           {% endfor %}
+
           {% if p.items|length == 0 %}
             {% for i in range(0,5) %}
             <tr>
@@ -118,7 +116,7 @@
       <br><br>
 
       <h3 class="h2" style="font-size:15px;">Etapas de pagamento</h3>
-      <p class="small" style="margin-top:0;">Ao salvar, recalcula valores das etapas.</p>
+      <p class="small" style="margin-top:0;">Padrão: 30/40/30.</p>
 
       <div class="row">
         <div>
@@ -138,10 +136,7 @@
           <label>Etapa 2 (%)</label>
           <input name="p3_percent" type="number" min="0" max="100" value="{{ p3 }}">
         </div>
-        <div>
-          <label>Observação das etapas (opcional)</label>
-          <input name="payment_note" value="{{ payment_note or '' }}" placeholder="Ex: sinal reserva agenda...">
-        </div>
+        <div></div>
       </div>
 
       <br><br>
@@ -157,9 +152,9 @@ function addRow(){
   const tr = document.createElement("tr");
   tr.innerHTML = `
     <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
-    <td><input name="item_qty" placeholder="Ex: 1" /></td>
+    <td><input name="item_qty" placeholder="1" /></td>
     <td><input name="item_unit" placeholder="un" /></td>
-    <td><input name="item_unit_price" placeholder="Ex: 100" /></td>
+    <td><input name="item_unit_price" placeholder="100" /></td>
   `;
   table.appendChild(tr);
 }

@@ -36,7 +36,7 @@ def add_column(conn, ddl_sqlite: str, ddl_pg: str):
         conn.execute(text(ddl_sqlite))
 
 with engine.begin() as conn:
-    # USERS extras
+    # USERS: PIX (se não existir)
     if not column_exists(conn, "users", "pix_key"):
         add_column(conn,
                    "ALTER TABLE users ADD COLUMN pix_key VARCHAR(120)",
@@ -45,12 +45,8 @@ with engine.begin() as conn:
         add_column(conn,
                    "ALTER TABLE users ADD COLUMN pix_name VARCHAR(120)",
                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS pix_name VARCHAR(120)")
-    if not column_exists(conn, "users", "pix_city"):
-        add_column(conn,
-                   "ALTER TABLE users ADD COLUMN pix_city VARCHAR(60)",
-                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS pix_city VARCHAR(60)")
 
-    # PROPOSALS: orçamento
+    # PROPOSALS: orçamento (campos novos)
     if not column_exists(conn, "proposals", "revision"):
         add_column(conn,
                    "ALTER TABLE proposals ADD COLUMN revision INTEGER DEFAULT 1",

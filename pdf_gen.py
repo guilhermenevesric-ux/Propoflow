@@ -1,4 +1,3 @@
-# pdf_gen.py
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
@@ -8,12 +7,12 @@ from datetime import datetime
 import io
 import re
 
+def _safe(x):
+    return (x or "").strip()
+
 def _brl_from_cents(cents: int) -> str:
-    try:
-        n = max(0, int(cents)) / 100.0
-        return f"R$ {n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    except Exception:
-        return "R$ 0,00"
+    n = max(0, int(cents)) / 100.0
+    return f"R$ {n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 def _brl(value):
     if value is None:
@@ -41,9 +40,6 @@ def _brl(value):
     except Exception:
         return s
 
-def _safe(text):
-    return (text or "").strip()
-
 def _draw_header(c, width, height, brand, tagline, doc_title="ORÇAMENTO"):
     c.setFillColorRGB(0.06, 0.10, 0.18)
     c.rect(0, height - 3.3 * cm, width, 3.3 * cm, fill=1, stroke=0)
@@ -63,11 +59,6 @@ def _draw_header(c, width, height, brand, tagline, doc_title="ORÇAMENTO"):
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 18)
     c.drawRightString(width - 2 * cm, height - 2.05 * cm, doc_title)
-
-def _section_title(c, x, y, text):
-    c.setFont("Helvetica-Bold", 10.8)
-    c.setFillColorRGB(0.06, 0.10, 0.18)
-    c.drawString(x, y, text)
 
 def _wrap_draw(c, text, x, y, max_w, font="Helvetica", size=10, leading=13, color=(0.12, 0.16, 0.26)):
     c.setFont(font, size)
@@ -105,7 +96,6 @@ def generate_proposal_pdf(data: dict) -> bytes:
     width, height = A4
 
     is_pro = bool(data.get("is_pro", False))
-
     if is_pro:
         brand = (_safe(data.get("company_name")) or _safe(data.get("author_name")) or "Orçamento")
         tagline = ""
@@ -130,41 +120,46 @@ def generate_proposal_pdf(data: dict) -> bytes:
     c.setFillColorRGB(0.12, 0.16, 0.26)
     c.drawString(margin_x, y, f"Gerado em: {gen_dt}")
     c.drawRightString(width - margin_x, y, f"Emitente: {emit_line}")
-    y -= 0.6 * cm
+    y -= 0.7 * cm
 
-    _section_title(c, margin_x, y, "DADOS")
+    c.setFont("Helvetica-Bold", 11)
+    c.setFillColorRGB(0.06, 0.10, 0.18)
+    c.drawString(margin_x, y, "DADOS")
     y -= 0.5 * cm
+
     y = _wrap_draw(c, f"Cliente: {_safe(data.get('client_name')) or '-'}", margin_x, y, content_w)
     y = _wrap_draw(c, f"Projeto: {_safe(data.get('project_name')) or '-'}", margin_x, y, content_w)
     y = _wrap_draw(c, f"Prazo: {_safe(data.get('deadline')) or '-'}", margin_x, y, content_w)
     y -= 0.3 * cm
 
-    _section_title(c, margin_x, y, "ESCOPO / OBSERVAÇÕES")
-    y -= 0.5 * cm
+    c.setFont("Helvetica-Bold", 11)
+    c.setFillColorRGB(0.06, 0.10, 0.18)
+    c.drawString(margin_x, y, "ESCOPO / OBSERVAÇÕES")
+    y -= 0.55 * cm
+
     y = _ensure_space(c, y, 2.0 * cm, width, height, brand, tagline)
     y = _wrap_draw(c, _safe(data.get("description")) or "—", margin_x, y, content_w)
-    y -= 0.2 * cm
+    y -= 0.3 * cm
 
-    # ITENS
     items = data.get("items") or []
     if isinstance(items, list) and items:
         y = _ensure_space(c, y, 3.0 * cm, width, height, brand, tagline)
-        _section_title(c, margin_x, y, "ITENS")
-        y -= 0.55 * cm
+        c.setFont("Helvetica-Bold", 11)
+        c.setFillColorRGB(0.06, 0.10, 0.18)
+        c.drawString(margin_x, y, "ITENS")
+        y -= 0.6 * cm
 
-        # cabeçalho simples
         c.setFont("Helvetica-Bold", 9)
         c.setFillColorRGB(0.12, 0.16, 0.26)
         c.drawString(margin_x, y, "Descrição")
         c.drawRightString(width - margin_x, y, "Total")
         y -= 0.35 * cm
-
         c.setStrokeColorRGB(0.86, 0.89, 0.96)
         c.line(margin_x, y, width - margin_x, y)
         y -= 0.35 * cm
 
         c.setFont("Helvetica", 9)
-        for it in items[:18]:
+        for it in items[:22]:
             y = _ensure_space(c, y, 0.8 * cm, width, height, brand, tagline)
             desc = f"{it.get('description','')} ({it.get('qty',1)} {it.get('unit','')}) x {_brl_from_cents(int(it.get('unit_price_cents',0)))}"
             total = _brl_from_cents(int(it.get("line_total_cents", 0)))
@@ -174,29 +169,32 @@ def generate_proposal_pdf(data: dict) -> bytes:
 
         y -= 0.2 * cm
 
-    # TOTAL
     total_cents = int(data.get("total_cents") or 0)
-    total_str = _brl_from_cents(total_cents) if total_cents > 0 else _brl(data.get("price")) or "—"
+    total_str = _brl_from_cents(total_cents) if total_cents > 0 else (_brl(data.get("price")) or "—")
 
-    y = _ensure_space(c, y, 2.2 * cm, width, height, brand, tagline)
-    _section_title(c, margin_x, y, "TOTAL")
+    y = _ensure_space(c, y, 2.0 * cm, width, height, brand, tagline)
+    c.setFont("Helvetica-Bold", 11)
+    c.setFillColorRGB(0.06, 0.10, 0.18)
+    c.drawString(margin_x, y, "TOTAL")
     y -= 0.6 * cm
+
     c.setFillColorRGB(0.06, 0.10, 0.18)
     c.roundRect(margin_x, y - 1.2 * cm, content_w, 1.2 * cm, 0.25 * cm, fill=1, stroke=0)
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 20)
     c.drawString(margin_x + 0.6 * cm, y - 0.85 * cm, total_str)
-    y -= 1.55 * cm
+    y -= 1.6 * cm
 
-    # Pagamento
     stages = data.get("payment_stages") or []
     if isinstance(stages, list) and stages:
         y = _ensure_space(c, y, 2.4 * cm, width, height, brand, tagline)
-        _section_title(c, margin_x, y, "PAGAMENTO (ETAPAS)")
-        y -= 0.55 * cm
+        c.setFont("Helvetica-Bold", 11)
+        c.setFillColorRGB(0.06, 0.10, 0.18)
+        c.drawString(margin_x, y, "PAGAMENTO (ETAPAS)")
+        y -= 0.6 * cm
         c.setFont("Helvetica", 10)
         c.setFillColorRGB(0.12, 0.16, 0.26)
-        for st in stages[:5]:
+        for st in stages[:6]:
             line = f"- {st.get('title','Etapa')}: {_brl_from_cents(int(st.get('amount_cents',0)))} ({int(st.get('percent',0))}%)"
             y = _wrap_draw(c, line, margin_x, y, content_w, size=10)
         y -= 0.2 * cm
@@ -204,7 +202,9 @@ def generate_proposal_pdf(data: dict) -> bytes:
     accept_url = _safe(data.get("accept_url"))
     if accept_url:
         y = _ensure_space(c, y, 1.6 * cm, width, height, brand, tagline)
-        _section_title(c, margin_x, y, "ACEITE")
+        c.setFont("Helvetica-Bold", 11)
+        c.setFillColorRGB(0.06, 0.10, 0.18)
+        c.drawString(margin_x, y, "ACEITE")
         y -= 0.55 * cm
         y = _wrap_draw(c, f"Aceite online: {accept_url}", margin_x, y, content_w, size=9)
 
@@ -215,5 +215,6 @@ def generate_proposal_pdf(data: dict) -> bytes:
 
     c.showPage()
     c.save()
+
     buffer.seek(0)
     return buffer.getvalue()

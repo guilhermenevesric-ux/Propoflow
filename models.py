@@ -20,7 +20,6 @@ class User(Base):
 
     pix_key = Column(String(120), nullable=True)
     pix_name = Column(String(120), nullable=True)
-    pix_city = Column(String(60), nullable=True)
 
     plan = Column(String(20), default="free")          # free | pro
     proposal_limit = Column(Integer, default=5)
@@ -62,32 +61,32 @@ class Proposal(Base):
     project_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
 
-    # legacy (mantém)
-    price = Column(String(50), nullable=False, default="")     # pode ficar vazio agora
+    # Mantém compatibilidade com suas telas atuais:
+    price = Column(String(50), nullable=False, default="")     # agora vira “R$ xxx,xx” calculado
     deadline = Column(String(100), nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # pipeline
+    # Pipeline
     status = Column(String(20), default="created")         # created | sent | viewed | accepted
     valid_until = Column(DateTime, nullable=True)
 
-    # tracking
+    # Tracking
     view_count = Column(Integer, default=0)
     first_viewed_at = Column(DateTime, nullable=True)
     last_viewed_at = Column(DateTime, nullable=True)
     last_activity_at = Column(DateTime, nullable=True)
 
-    # versão
+    # Versão
     revision = Column(Integer, default=1)
     updated_at = Column(DateTime, nullable=True)
 
-    # regras do orçamento
+    # Regras do orçamento
     overhead_percent = Column(Integer, default=10)         # imprevistos (%)
     margin_percent = Column(Integer, default=0)            # margem simples (%)
     total_cents = Column(Integer, default=0)               # total calculado em centavos
 
-    # aceite
+    # Aceite
     accepted_at = Column(DateTime, nullable=True)
     accepted_name = Column(String(255), nullable=True)
     accepted_email = Column(String(255), nullable=True)
@@ -98,6 +97,7 @@ class Proposal(Base):
     items = relationship("ProposalItem", back_populates="proposal", cascade="all, delete-orphan")
     versions = relationship("ProposalVersion", back_populates="proposal", cascade="all, delete-orphan")
     payment_stages = relationship("PaymentStage", back_populates="proposal", cascade="all, delete-orphan")
+    followups = relationship("FollowUpSchedule", back_populates="proposal", cascade="all, delete-orphan")
 
 
 class ProposalItem(Base):
@@ -111,7 +111,6 @@ class ProposalItem(Base):
     unit = Column(String(30), nullable=True)
     qty = Column(Float, default=1.0)
 
-    # valor unitário em centavos
     unit_price_cents = Column(Integer, default=0)
     line_total_cents = Column(Integer, default=0)
 
@@ -138,14 +137,13 @@ class PaymentStage(Base):
     proposal_id = Column(Integer, ForeignKey("proposals.id"), nullable=False, index=True)
 
     title = Column(String(80), nullable=False)           # Sinal / Etapa 1 / Etapa 2
-    percent = Column(Integer, default=0)                 # % do total
-    amount_cents = Column(Integer, default=0)            # calculado
-    due_at = Column(DateTime, nullable=True)             # só usamos p/ sinal no MVP
+    percent = Column(Integer, default=0)
+    amount_cents = Column(Integer, default=0)
+
     status = Column(String(20), default="pending")       # pending | paid
     paid_at = Column(DateTime, nullable=True)
 
     proposal = relationship("Proposal", back_populates="payment_stages")
-
     reminders = relationship("PaymentReminder", back_populates="stage", cascade="all, delete-orphan")
 
 
@@ -160,3 +158,18 @@ class PaymentReminder(Base):
     sent_at = Column(DateTime, nullable=True)
 
     stage = relationship("PaymentStage", back_populates="reminders")
+
+
+class FollowUpSchedule(Base):
+    __tablename__ = "followup_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    proposal_id = Column(Integer, ForeignKey("proposals.id"), nullable=False, index=True)
+
+    step = Column(Integer, nullable=False)  # 1, 3, 7 (dias)
+    due_at = Column(DateTime, nullable=False, index=True)
+
+    status = Column(String(20), default="pending")  # pending | sent | skipped
+    sent_at = Column(DateTime, nullable=True)
+
+    proposal = relationship("Proposal", back_populates="followups")

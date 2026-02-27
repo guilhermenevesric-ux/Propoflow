@@ -24,7 +24,7 @@
 
     <div class="card">
       <h2 class="h2">Criar orçamento</h2>
-      <p class="small">Crie com itens e o sistema calcula total + sinal + etapas. Depois envia no WhatsApp com 1 clique.</p>
+      <p class="small">Agora você pode colocar itens e o sistema calcula total + sinal/etapas.</p>
 
       {% if error %}
         <div class="error">{{ error }}</div>
@@ -37,7 +37,7 @@
             <input name="client_name" required placeholder="Ex: João Silva">
           </div>
           <div>
-            <label>WhatsApp do cliente (pra envio e cobrança)</label>
+            <label>WhatsApp do cliente</label>
             <input name="client_whatsapp" placeholder="Ex: (11) 99999-9999">
           </div>
         </div>
@@ -47,7 +47,7 @@
         <div class="row">
           <div>
             <label>Nome do projeto</label>
-            <input name="project_name" required placeholder="Ex: Reforma do banheiro">
+            <input name="project_name" required placeholder="Ex: Troca de tomada / Reforma do banheiro">
           </div>
           <div>
             <label>Validade (dias)</label>
@@ -58,14 +58,14 @@
         <br>
 
         <label>Descrição / Observações</label>
-        <textarea name="description" required placeholder="Detalhes, condições, o que está incluso e não incluso."></textarea>
+        <textarea name="description" required placeholder="O que será feito, o que não está incluso, condições, etc."></textarea>
 
         <br><br>
 
         <div class="row">
           <div>
             <label>Prazo</label>
-            <input name="deadline" required placeholder="Ex: 10 dias úteis">
+            <input name="deadline" required placeholder="Ex: 7 dias úteis">
           </div>
           <div>
             <label>Imprevistos (%)</label>
@@ -77,22 +77,22 @@
 
         <div class="row">
           <div>
-            <label>Margem (%) (simples)</label>
+            <label>Margem (%)</label>
             <input name="margin_percent" type="number" min="0" max="80" value="0">
           </div>
           <div>
-            <label>Preço final (opcional — se deixar vazio, calcula pelos itens)</label>
-            <input name="price" placeholder="Ex: R$ 7.500">
+            <label>Preço final (opcional — se preencher, substitui o cálculo)</label>
+            <input name="price" placeholder="Ex: R$ 250,00">
           </div>
         </div>
 
         <br><br>
 
         <h3 class="h2" style="font-size:15px;">Itens</h3>
-        <p class="small" style="margin-top:0;">Preencha os itens. O total é calculado no servidor.</p>
+        <p class="small" style="margin-top:0;">Se não quiser usar itens, pode deixar vazio e preencher só o preço final.</p>
 
         <div class="table-wrap">
-          <table class="table">
+          <table class="table" id="itemsTable">
             <tr>
               <th>Descrição</th>
               <th>Qtd</th>
@@ -101,10 +101,10 @@
             </tr>
             {% for i in range(0,5) %}
             <tr>
-              <td><input name="item_desc" placeholder="Ex: Assentamento de piso" /></td>
-              <td><input name="item_qty" placeholder="Ex: 10" /></td>
-              <td><input name="item_unit" placeholder="m²" /></td>
-              <td><input name="item_unit_price" placeholder="Ex: 120" /></td>
+              <td><input name="item_desc" placeholder="Ex: Troca de tomada" /></td>
+              <td><input name="item_qty" placeholder="1" /></td>
+              <td><input name="item_unit" placeholder="un" /></td>
+              <td><input name="item_unit_price" placeholder="25" /></td>
             </tr>
             {% endfor %}
           </table>
@@ -117,7 +117,7 @@
         <br><br>
 
         <h3 class="h2" style="font-size:15px;">Etapas de pagamento</h3>
-        <p class="small" style="margin-top:0;">Sugestão padrão: 30/40/30.</p>
+        <p class="small" style="margin-top:0;">Padrão recomendado: 30/40/30.</p>
 
         <div class="row">
           <div>
@@ -137,10 +137,7 @@
             <label>Etapa 2 (%)</label>
             <input name="p3_percent" type="number" min="0" max="100" value="30">
           </div>
-          <div>
-            <label>(Opcional) Observação das etapas</label>
-            <input name="payment_note" placeholder="Ex: sinal reserva agenda; etapas conforme andamento">
-          </div>
+          <div></div>
         </div>
 
         <br><br>
@@ -152,13 +149,13 @@
 
   <script>
     function addRow(){
-      const table = document.querySelector(".table");
+      const table = document.getElementById("itemsTable");
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
-        <td><input name="item_qty" placeholder="Ex: 1" /></td>
+        <td><input name="item_qty" placeholder="1" /></td>
         <td><input name="item_unit" placeholder="un" /></td>
-        <td><input name="item_unit_price" placeholder="Ex: 100" /></td>
+        <td><input name="item_unit_price" placeholder="100" /></td>
       `;
       table.appendChild(tr);
     }

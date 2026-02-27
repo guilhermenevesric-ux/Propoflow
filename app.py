@@ -25,7 +25,6 @@ from models import (
 from pdf_gen import generate_proposal_pdf
 
 
-# ====== migração leve ======
 try:
     subprocess.run([sys.executable, "migrate.py"], check=False)
 except Exception:
@@ -213,7 +212,6 @@ def rebuild_items_from_form(descs: list[str], qtys: list[str], units: list[str],
 
 
 def upsert_payment_stages(db: Session, p: Proposal, p1: int, p2: int, p3: int):
-    # normaliza percentuais
     p1 = max(0, min(100, int(p1 or 0)))
     p2 = max(0, min(100, int(p2 or 0)))
     p3 = max(0, min(100, int(p3 or 0)))
@@ -222,7 +220,6 @@ def upsert_payment_stages(db: Session, p: Proposal, p1: int, p2: int, p3: int):
     if total_percent == 0:
         p1, p2, p3 = 30, 40, 30
     elif total_percent != 100:
-        # ajusta proporcionalmente, simples
         factor = 100 / total_percent
         p1 = int(round(p1 * factor))
         p2 = int(round(p2 * factor))
@@ -233,16 +230,15 @@ def upsert_payment_stages(db: Session, p: Proposal, p1: int, p2: int, p3: int):
     def amt(percent: int) -> int:
         return int(round(total * (percent / 100.0)))
 
-    existing = db.query(PaymentStage).filter(PaymentStage.proposal_id == p.id).order_by(PaymentStage.id.asc()).all()
-    # remove e recria (MVP simples)
+    existing = db.query(PaymentStage).filter(PaymentStage.proposal_id == p.id).all()
     for e in existing:
         db.delete(e)
     db.commit()
 
     stages = [
-        PaymentStage(proposal_id=p.id, title="Sinal", percent=p1, amount_cents=amt(p1), due_at=_now(), status="pending"),
-        PaymentStage(proposal_id=p.id, title="Etapa 1", percent=p2, amount_cents=amt(p2), due_at=None, status="pending"),
-        PaymentStage(proposal_id=p.id, title="Etapa 2", percent=p3, amount_cents=amt(p3), due_at=None, status="pending"),
+        PaymentStage(proposal_id=p.id, title="Sinal", percent=p1, amount_cents=amt(p1), status="pending"),
+        PaymentStage(proposal_id=p.id, title="Etapa 1", percent=p2, amount_cents=amt(p2), status="pending"),
+        PaymentStage(proposal_id=p.id, title="Etapa 2", percent=p3, amount_cents=amt(p3), status="pending"),
     ]
     for st in stages:
         db.add(st)
@@ -250,12 +246,7 @@ def upsert_payment_stages(db: Session, p: Proposal, p1: int, p2: int, p3: int):
 
 
 def ensure_signal_reminders(db: Session, p: Proposal):
-    # cria lembretes só para o sinal (stage[0])
-    signal = (
-        db.query(PaymentStage)
-        .filter(PaymentStage.proposal_id == p.id, PaymentStage.title == "Sinal")
-        .first()
-    )
+    signal = db.query(PaymentStage).filter(PaymentStage.proposal_id == p.id, PaymentStage.title == "Sinal").first()
     if not signal or signal.status == "paid":
         return
 
@@ -263,7 +254,6 @@ def ensure_signal_reminders(db: Session, p: Proposal):
     if existing:
         return
 
-    # D0, D+1, D+3
     for days in (0, 1, 3):
         db.add(PaymentReminder(stage_id=signal.id, due_at=_now() + timedelta(days=days), status="pending"))
     db.commit()
@@ -286,7 +276,7 @@ def build_send_message(owner: User, p: Proposal, link: str) -> str:
         f"Fala {p.client_name}! Aqui é {owner.display_name or (owner.company_name or 'a gente')}.\n"
         f"Te enviei o *orçamento* do *{p.project_name}*{validity}.\n\n"
         f"👉 Link: {link}\n\n"
-        f"Se fizer sentido, você consegue *aprovar por lá* em 10 segundos. "
+        f"Se fizer sentido, você consegue *aprovar por lá* em 10s. "
         f"Se quiser ajustar algo, me fala que eu atualizo rapidinho."
     )
 
@@ -309,7 +299,6 @@ def build_pix_message(owner: User, p: Proposal, amount_cents: int) -> str:
     )
 
 
-# ====== HOME ======
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -318,7 +307,6 @@ def home(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/dashboard", status_code=302)
 
 
-# ====== AUTH ======
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
@@ -378,20 +366,13 @@ def logout(request: Request, db: Session = Depends(get_db)):
     return resp
 
 
-# ====== DASHBOARD ======
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request, status: str = "all", db: Session = Depends(get_db)):
+def dashboard(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    q = db.query(Proposal).filter(Proposal.owner_id == user.id)
-    if status == "accepted":
-        q = q.filter(Proposal.accepted_at.isnot(None))
-    elif status == "pending":
-        q = q.filter(Proposal.accepted_at.is_(None))
-
-    proposals = q.order_by(Proposal.created_at.desc()).all()
+    proposals = db.query(Proposal).filter(Proposal.owner_id == user.id).order_by(Proposal.created_at.desc()).all()
 
     total = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
     accepted = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.accepted_at.isnot(None)).count()
@@ -429,20 +410,18 @@ def dashboard(request: Request, status: str = "all", db: Session = Depends(get_d
         "total": total,
         "accepted": accepted,
         "rate": rate,
-        "status": status,
         "due_followups": due_followups,
         "due_payment_reminders": due_payment_reminders,
         "status_label": status_label,
     })
 
 
-# ====== NEW PROPOSAL ======
 @app.get("/proposals/new", response_class=HTMLResponse)
 def new_proposal_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse("new_proposal.html", {"request": request, "error": None, "user": user})
+    return templates.TemplateResponse("new_proposal.html", {"request": request, "error": None})
 
 
 @app.post("/proposals/new")
@@ -460,7 +439,6 @@ def create_proposal(
     p1_percent: int = Form(30),
     p2_percent: int = Form(40),
     p3_percent: int = Form(30),
-    payment_note: str = Form(""),
     item_desc: list[str] = Form([]),
     item_qty: list[str] = Form([]),
     item_unit: list[str] = Form([]),
@@ -483,7 +461,6 @@ def create_proposal(
         client_whatsapp=client_whatsapp.strip() or None,
         project_name=project_name.strip(),
         description=description.strip(),
-        price=(price or "").strip(),
         deadline=deadline.strip(),
         owner_id=user.id,
         status="created",
@@ -504,19 +481,15 @@ def create_proposal(
         db.add(it)
     db.commit()
 
-    # total calculado
-    db.refresh(p)
-    db.refresh(p)  # garante id
     saved_items = db.query(ProposalItem).filter(ProposalItem.proposal_id == p.id).order_by(ProposalItem.sort.asc()).all()
     total_cents = compute_total(saved_items, p.overhead_percent, p.margin_percent)
 
-    # se usuário digitou preço, usa como override
-    if p.price:
-        override = brl_to_cents(p.price)
-        if override > 0:
-            total_cents = override
+    override = brl_to_cents((price or "").strip())
+    if override > 0:
+        total_cents = override
 
     p.total_cents = total_cents
+    p.price = cents_to_brl(total_cents)  # mantém telas antigas bonitas
     db.add(p)
     db.commit()
 
@@ -525,7 +498,6 @@ def create_proposal(
     return RedirectResponse("/dashboard", status_code=302)
 
 
-# ====== EDIT PROPOSAL (VERSÃO) ======
 @app.get("/proposals/{proposal_id}/edit", response_class=HTMLResponse)
 def edit_proposal_page(proposal_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -536,20 +508,12 @@ def edit_proposal_page(proposal_id: int, request: Request, db: Session = Depends
     if not p:
         return RedirectResponse("/dashboard", status_code=302)
 
-    # percent atuais (se não existir, padrão)
     stages = db.query(PaymentStage).filter(PaymentStage.proposal_id == p.id).order_by(PaymentStage.id.asc()).all()
     p1 = stages[0].percent if len(stages) > 0 else 30
     p2 = stages[1].percent if len(stages) > 1 else 40
     p3 = stages[2].percent if len(stages) > 2 else 30
 
-    return templates.TemplateResponse("edit_proposal.html", {
-        "request": request,
-        "p": p,
-        "p1": p1, "p2": p2, "p3": p3,
-        "payment_note": "",
-        "error": None
-    })
-
+    return templates.TemplateResponse("edit_proposal.html", {"request": request, "p": p, "p1": p1, "p2": p2, "p3": p3})
 
 @app.post("/proposals/{proposal_id}/edit")
 def edit_proposal_save(
@@ -566,7 +530,6 @@ def edit_proposal_save(
     p1_percent: int = Form(30),
     p2_percent: int = Form(40),
     p3_percent: int = Form(30),
-    payment_note: str = Form(""),
     item_desc: list[str] = Form([]),
     item_qty: list[str] = Form([]),
     item_unit: list[str] = Form([]),
@@ -581,8 +544,8 @@ def edit_proposal_save(
     if not p:
         return RedirectResponse("/dashboard", status_code=302)
 
-    # salva snapshot antes (histórico)
     snapshot = {
+        "revision": p.revision,
         "client_name": p.client_name,
         "client_whatsapp": p.client_whatsapp,
         "project_name": p.project_name,
@@ -604,7 +567,6 @@ def edit_proposal_save(
     db.add(ProposalVersion(proposal_id=p.id, revision=p.revision, snapshot_json=json.dumps(snapshot, ensure_ascii=False)))
     db.commit()
 
-    # incrementa revision
     p.revision = int(p.revision or 1) + 1
     p.updated_at = _now()
 
@@ -615,9 +577,7 @@ def edit_proposal_save(
     p.deadline = deadline.strip()
     p.overhead_percent = int(overhead_percent or 0)
     p.margin_percent = int(margin_percent or 0)
-    p.price = (price or "").strip()
 
-    # recria itens
     for it in list(p.items):
         db.delete(it)
     db.commit()
@@ -630,26 +590,22 @@ def edit_proposal_save(
 
     saved_items = db.query(ProposalItem).filter(ProposalItem.proposal_id == p.id).order_by(ProposalItem.sort.asc()).all()
     total_cents = compute_total(saved_items, p.overhead_percent, p.margin_percent)
-    if p.price:
-        override = brl_to_cents(p.price)
-        if override > 0:
-            total_cents = override
+
+    override = brl_to_cents((price or "").strip())
+    if override > 0:
+        total_cents = override
 
     p.total_cents = total_cents
+    p.price = cents_to_brl(total_cents)
+    p.last_activity_at = _now()
     db.add(p)
     db.commit()
 
     upsert_payment_stages(db, p, p1_percent, p2_percent, p3_percent)
 
-    # se já foi enviado/visualizado, mantém pipeline, mas atualiza atividade
-    p.last_activity_at = _now()
-    db.add(p)
-    db.commit()
-
     return RedirectResponse("/dashboard", status_code=302)
 
 
-# ====== SEND / FOLLOWUP ======
 @app.get("/proposals/{proposal_id}/send_whatsapp")
 def send_whatsapp(proposal_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -707,7 +663,6 @@ def send_followup(proposal_id: int, step: int, request: Request, db: Session = D
     return RedirectResponse(whatsapp_url(phone, text), status_code=302)
 
 
-# ====== PUBLIC (TRACK + ACCEPT) ======
 @app.get("/p/{public_id}", response_class=HTMLResponse)
 def public_proposal(public_id: str, request: Request, db: Session = Depends(get_db)):
     p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
@@ -770,13 +725,11 @@ def accept_proposal(public_id: str, request: Request, name: str = Form(...), ema
         db.commit()
         db.refresh(p)
 
-        # ao aceitar: cria lembretes do sinal
         ensure_signal_reminders(db, p)
 
     return templates.TemplateResponse("accepted.html", {"request": request, "p": p, "owner": owner, "base_url": base_url})
 
 
-# ====== PDF ======
 @app.get("/p/{public_id}/pdf")
 def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
     p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
@@ -860,7 +813,6 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
-# ====== PAYMENTS: REMINDERS + MARK PAID ======
 @app.get("/payments/reminders/{reminder_id}/send_whatsapp")
 def send_payment_reminder(reminder_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -911,17 +863,15 @@ def mark_stage_paid(stage_id: int, request: Request, db: Session = Depends(get_d
     st.paid_at = _now()
     db.add(st)
 
-    # marca lembretes como skipped
-    for r in st.reminders:
-        if r.status == "pending":
-            r.status = "skipped"
-            db.add(r)
+    for rr in st.reminders:
+        if rr.status == "pending":
+            rr.status = "skipped"
+            db.add(rr)
 
     db.commit()
     return RedirectResponse("/dashboard", status_code=302)
 
 
-# ====== PROFILE / BILLING / STATIC ======
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -939,7 +889,6 @@ def profile_save(
     cpf_cnpj: str = Form(""),
     pix_key: str = Form(""),
     pix_name: str = Form(""),
-    pix_city: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = get_current_user(request, db)
@@ -952,7 +901,6 @@ def profile_save(
     user.cpf_cnpj = cpf_cnpj.strip() or None
     user.pix_key = pix_key.strip() or None
     user.pix_name = pix_name.strip() or None
-    user.pix_city = pix_city.strip() or None
 
     db.add(user)
     db.commit()
@@ -989,23 +937,18 @@ def support(request: Request):
     return templates.TemplateResponse("support.html", {"request": request})
 
 
-# ====== ASAAS (upgrade + webhook) ======
 def ensure_asaas_customer(db: Session, user: User) -> str:
     if user.asaas_customer_id:
         return user.asaas_customer_id
     if not ASAAS_API_KEY:
-        raise RuntimeError("ASAAS_API_KEY não configurado no Render.")
+        raise RuntimeError("ASAAS_API_KEY não configurado.")
     name = user.display_name or user.company_name or user.email.split("@")[0]
     payload = {"name": name, "email": user.email}
     if user.cpf_cnpj:
         payload["cpfCnpj"] = user.cpf_cnpj
     r = requests.post(f"{asaas_api_base()}/customers", headers=asaas_headers(), json=payload, timeout=30)
-    if r.status_code not in (200, 201):
-        raise RuntimeError(f"Erro Asaas ao criar customer: {r.status_code} - {r.text}")
     data = r.json()
     cid = data.get("id")
-    if not cid:
-        raise RuntimeError(f"Asaas não retornou customer id: {data}")
     user.asaas_customer_id = cid
     db.add(user)
     db.commit()
@@ -1017,10 +960,13 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
+
     if not ASAAS_API_KEY:
-        return HTMLResponse("ASAAS_API_KEY não configurado no Render.", status_code=500)
+        return HTMLResponse("ASAAS_API_KEY não configurado.", status_code=500)
+
     if is_pro_active(user):
         return RedirectResponse("/billing", status_code=302)
+
     if not getattr(user, "cpf_cnpj", None):
         return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": False,
             "error": "Para assinar o PRO, preencha seu CPF/CNPJ no perfil e salve."})
@@ -1037,9 +983,6 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
         "externalReference": f"user_{user.id}",
     }
     r = requests.post(f"{asaas_api_base()}/subscriptions", headers=asaas_headers(), json=payload, timeout=30)
-    if r.status_code not in (200, 201):
-        return HTMLResponse(f"Erro Asaas ao criar assinatura: {r.status_code}<br><pre>{r.text}</pre>", status_code=500)
-
     sub = r.json()
     sub_id = sub.get("id")
     user.asaas_subscription_id = sub_id
@@ -1096,3 +1039,4 @@ async def webhooks_asaas(request: Request, db: Session = Depends(get_db)):
         return {"ok": True}
 
     return {"ok": True}
+

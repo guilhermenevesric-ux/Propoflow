@@ -82,7 +82,7 @@
       {% if p.payment_stages and p.payment_stages|length > 0 %}
         <div class="card" style="margin-top:14px; padding:14px;">
           <h3 class="h2" style="font-size:15px; margin-bottom:6px;">💳 Pagamento (etapas)</h3>
-          <div class="small" style="opacity:.9;">
+          <div class="small" style="opacity:.95;">
             {% for st in p.payment_stages %}
               <div style="margin:6px 0;">
                 <b>{{ st.title }}</b> — R$ {{ ('%.2f'|format((st.amount_cents or 0)/100)).replace('.', ',') }} ({{ st.percent }}%)

@@ -23,11 +23,13 @@
     <div class="actions">
       <a class="btn btn-ghost" href="/profile">Perfil</a>
       <a class="btn btn-ghost" href="/billing">Assinatura</a>
+
       {% if user and user.plan == "pro" %}
         <span class="pill">✨ PRO</span>
       {% else %}
         <a class="btn" href="/pricing">Upgrade</a>
       {% endif %}
+
       <a class="btn" href="/proposals/new">+ Novo orçamento</a>
       <a class="btn btn-ghost" href="/logout">Sair</a>
     </div>
@@ -36,7 +38,7 @@
   {% if due_payment_reminders and due_payment_reminders|length > 0 %}
     <div class="card" style="margin-bottom:14px;">
       <h2 class="h2">💰 Cobranças de sinal (hoje)</h2>
-      <p class="small">Clique e mande no WhatsApp (Pix + valor + texto humano). Isso reduz calote/atraso.</p>
+      <p class="small">Clique e mande no WhatsApp (Pix + valor + texto humano).</p>
 
       <div style="display:grid; gap:10px;">
         {% for r in due_payment_reminders %}
@@ -91,7 +93,7 @@
 
   <div class="card">
     <h2 class="h2">Seus orçamentos</h2>
-    <p class="small">Pipeline + itens + etapas + cobrança de sinal.</p>
+    <p class="small">Agora tem itens + total + etapas + cobrança de sinal + versão.</p>
 
     <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0 12px;">
       <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
