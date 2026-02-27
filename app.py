@@ -1599,6 +1599,7 @@ def wizard(request: Request, step: int = 1,
     if step == 3 and not description.strip():
         error = "Escreva em 1 linha o que será feito."
 
+
     return templates.TemplateResponse("wizard.html", {
         "request": request,
         "step": step,
@@ -1618,7 +1619,10 @@ def wizard(request: Request, step: int = 1,
         "validity_days": validity_days,
         "description": description,
         "payment_plan": payment_plan,
+        "default_validity_days": getattr(user, "default_validity_days", 7),
+        "default_payment_plan": getattr(user, "default_payment_plan", "avista"),
     })
+
 
 
 @app.post("/wizard/create")
@@ -1634,11 +1638,14 @@ def wizard_create(
     validity_days: int = Form(7),
     description: str = Form(...),
     payment_plan: str = Form("avista"),
+
+    item_desc: list[str] = Form([]),
+    item_qty: list[str] = Form([]),
+    item_unit: list[str] = Form([]),
+    item_unit_price: list[str] = Form([]),
+
     db: Session = Depends(get_db),
 ):
-    # Reaproveita a lógica do seu /proposals/new: redireciona fazendo POST interno simples
-    # Aqui a solução direta é chamar a mesma função create_proposal() se estiver no mesmo módulo.
-
     return create_proposal(
         request=request,
         service_id=service_id,
@@ -1651,12 +1658,124 @@ def wizard_create(
         deadline=deadline,
         validity_days=validity_days,
         payment_plan=payment_plan,
-        item_desc=[],
-        item_qty=[],
-        item_unit=[],
-        item_unit_price=[],
+        item_desc=item_desc,
+        item_qty=item_qty,
+        item_unit=item_unit,
+        item_unit_price=item_unit_price,
         db=db
     )
+
+@app.post("/wizard/step2", response_class=HTMLResponse)
+def wizard_step2(
+    request: Request,
+    client_id: int = Form(0),
+    client_name: str = Form(""),
+    client_whatsapp: str = Form(""),
+    service_id: int = Form(0),
+
+    project_name: str = Form(""),
+    deadline: str = Form(""),
+    price: str = Form(""),
+    validity_days: int = Form(7),
+    description: str = Form(""),
+    payment_plan: str = Form("avista"),
+
+    item_desc: list[str] = Form([]),
+    item_qty: list[str] = Form([]),
+    item_unit: list[str] = Form([]),
+    item_unit_price: list[str] = Form([]),
+
+    db: Session = Depends(get_db)
+):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.title.asc()).all()
+    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.name.asc()).all()
+
+    # prefill cliente salvo
+    if client_id and not client_name.strip():
+        c = db.query(Client).filter(Client.id == client_id, Client.owner_id == user.id, Client.archived.is_(False)).first()
+        if c:
+            client_name = c.name
+            if not client_whatsapp and c.whatsapp:
+                client_whatsapp = c.whatsapp
+
+    # prefill serviço salvo
+    if service_id:
+        s = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id, Service.archived.is_(False)).first()
+        if s:
+            if not project_name.strip():
+                project_name = s.title
+            if not deadline.strip() and s.default_deadline:
+                deadline = s.default_deadline
+            if not description.strip() and s.default_description:
+                description = s.default_description
+            if not price.strip() and (s.default_price_cents or 0) > 0:
+                price = cents_to_brl(s.default_price_cents)
+            if (payment_plan in ("", "avista")) and s.default_payment_plan:
+                payment_plan = s.default_payment_plan
+
+    # validações simples
+    error = None
+    if not (client_id or client_name.strip()):
+        error = "Escolha um cliente ou digite o nome."
+    elif not (service_id or project_name.strip()):
+        error = "Escolha um serviço ou digite o nome do serviço."
+    elif not (description or "").strip():
+        error = "Escreva em 1 linha a descrição do serviço."
+
+    # montar itens limpos
+    items = []
+    total_cents = 0
+    n = min(len(item_desc), len(item_qty), len(item_unit_price))
+    for i in range(n):
+        d = (item_desc[i] or "").strip()
+        if not d:
+            continue
+        try:
+            q = float(str(item_qty[i] or "1").replace(",", "."))
+            if q <= 0:
+                q = 1.0
+        except Exception:
+            q = 1.0
+        up = brl_to_cents(item_unit_price[i] or "0")
+        line = int(round(q * up))
+        total_cents += line
+        items.append({
+            "desc": d,
+            "qty": str(q).rstrip("0").rstrip(".") if "." in str(q) else str(q),
+            "unit_price": (item_unit_price[i] or "").strip(),
+            "total_brl": cents_to_brl(line),
+        })
+
+    return templates.TemplateResponse("wizard.html", {
+        "request": request,
+        "step": 3,
+        "error": error,
+        "services": services,
+        "clients": clients,
+
+        "client_id": client_id,
+        "service_id": service_id,
+
+        "client_name": client_name,
+        "client_whatsapp": client_whatsapp,
+
+        "project_name": project_name,
+        "deadline": deadline,
+        "price": price,
+        "validity_days": validity_days,
+        "description": description,
+        "payment_plan": payment_plan,
+
+        "items": items,
+        "items_total_brl": cents_to_brl(total_cents),
+
+        "default_validity_days": getattr(user, "default_validity_days", 7),
+        "default_payment_plan": getattr(user, "default_payment_plan", "avista"),
+    })
 
 @app.post("/webhooks/asaas")
 async def webhooks_asaas(request: Request, db: Session = Depends(get_db)):
