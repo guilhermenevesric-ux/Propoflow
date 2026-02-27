@@ -137,6 +137,15 @@ def set_user_pro_month(
     db.commit()
 
 
+def render_message_template(tpl: str, cliente: str, servico: str, link: str) -> str:
+    tpl = (tpl or "").strip()
+    if not tpl:
+        tpl = "Oi {cliente}! Segue seu orçamento do *{servico}*.\n👉 Link: {link}\n\nSe quiser ajustar algo, me avise 😊"
+    return (tpl
+            .replace("{cliente}", cliente or "")
+            .replace("{servico}", servico or "")
+            .replace("{link}", link or ""))
+
 # ==========================
 # HELPERS
 # ==========================
@@ -306,12 +315,12 @@ def upsert_payment_stages(db: Session, p: Proposal, plan: list[tuple[str, int]])
 
 
 def build_send_message(owner: User, p: Proposal, link: str) -> str:
-    return (
-        f"Oi {p.client_name}! Segue seu orçamento do *{p.project_name}*.\n"
-        f"👉 Link: {link}\n\n"
-        f"Se quiser ajustar algo, me avise 😊"
+    return render_message_template(
+        owner.default_message_template if hasattr(owner, "default_message_template") else "",
+        p.client_name,
+        p.project_name,
+        link
     )
-
 
 def service_prefill(s: Service) -> dict:
     return {
@@ -494,6 +503,70 @@ def dashboard(request: Request, status: str = "all", db: Session = Depends(get_d
         "show_upgrade": False,
     })
 
+def terms_to_list(text: str) -> list[str]:
+    # quebra por linha e remove vazios
+    lines = []
+    for ln in (text or "").splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        # remove bullets comuns
+        ln = re.sub(r"^(\-|\•|\*|\d+\)|\d+\.)\s+", "", ln).strip()
+        if ln:
+            lines.append(ln)
+    return lines
+
+
+@app.get("/proposals/{proposal_id}/created", response_class=HTMLResponse)
+def proposal_created(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
+    if not p:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    public_link = proposal_public_link(request, p)
+    msg = build_send_message(user, p, public_link)
+
+    return templates.TemplateResponse("created.html", {
+        "request": request,
+        "user": user,
+        "p": p,
+        "public_link": public_link,
+        "message": msg
+    })
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request, saved: int = 0, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    return templates.TemplateResponse("settings.html", {"request": request, "user": user, "saved": bool(saved)})
+
+
+@app.post("/settings")
+def settings_save(
+    request: Request,
+    default_validity_days: int = Form(7),
+    default_payment_plan: str = Form("avista"),
+    default_message_template: str = Form(""),
+    default_terms: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    user.default_validity_days = max(1, min(int(default_validity_days or 7), 30))
+    user.default_payment_plan = (default_payment_plan or "avista").strip() or "avista"
+    user.default_message_template = (default_message_template or "").strip() or None
+    user.default_terms = (default_terms or "").strip() or None
+
+    db.add(user)
+    db.commit()
+    return RedirectResponse("/settings?saved=1", status_code=302)
 
 # ===== SERVICES =====
 @app.get("/services", response_class=HTMLResponse)
@@ -793,7 +866,7 @@ def create_proposal(
 
     upsert_payment_stages(db, p, plan_to_percents(payment_plan))
 
-    return RedirectResponse("/dashboard", status_code=302)
+    return RedirectResponse(f"/proposals/{p.id}/created", status_code=302)
 
 
 @app.get("/proposals/{proposal_id}/send_whatsapp")
@@ -1200,6 +1273,7 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         "total_cents": p.total_cents,
         "payment_stages": stages,
         "accept_url": accept_url,
+        "payment_terms": terms_to_list(user.default_terms or "")
     })
 
     filename = f"orcamento_{p.client_name.replace(' ', '')}_{p.public_id}.pdf"

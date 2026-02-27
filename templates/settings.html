@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Padrões</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Padrões (pra ficar mais rápido)</p>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="h2">Meus padrões</h2>
+    <p class="small">Isso será usado automaticamente quando você criar um orçamento.</p>
+
+    {% if saved %}
+      <div class="error" style="background: rgba(79,124,255,0.15); border-color: rgba(79,124,255,0.35); color: rgba(232,238,252,0.9);">
+        ✅ Salvo com sucesso
+      </div>
+    {% endif %}
+
+    <form method="post" action="/settings">
+      <div class="row">
+        <div>
+          <label>Validade padrão (dias)</label>
+          <input name="default_validity_days" type="number" min="1" max="30" value="{{ user.default_validity_days or 7 }}">
+        </div>
+        <div>
+          <label>Como pagar (padrão)</label>
+          <select name="default_payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+            <option value="avista" {% if (user.default_payment_plan or 'avista')=='avista' %}selected{% endif %}>À vista</option>
+            <option value="entrada_final_30" {% if user.default_payment_plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+            <option value="entrada_final_50" {% if user.default_payment_plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+            <option value="3x_30_40_30" {% if user.default_payment_plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+          </select>
+        </div>
+      </div>
+
+      <br>
+
+      <label>Mensagem padrão do WhatsApp</label>
+      <textarea name="default_message_template" placeholder="Use {cliente}, {servico}, {link}">{{ user.default_message_template or "Oi {cliente}! Segue seu orçamento do *{servico}*.\n👉 Link: {link}\n\nSe quiser ajustar algo, me avise 😊" }}</textarea>
+      <p class="small" style="margin-top:8px; opacity:.8;">
+        Dica: você pode usar <b>{cliente}</b>, <b>{servico}</b> e <b>{link}</b>.
+      </p>
+
+      <br>
+
+      <label>Condições padrão (aparece no PDF)</label>
+      <textarea name="default_terms" placeholder="Ex:\n• Validade: 7 dias\n• Pagamento: à vista\n• Reagendamento com 24h">{{ user.default_terms or "" }}</textarea>
+
+      <br><br>
+      <button class="btn" type="submit">Salvar padrões</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>

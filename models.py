@@ -36,6 +36,10 @@ class User(Base):
     sessions = relationship("UserSession", back_populates="user")
     services = relationship("Service", back_populates="owner", cascade="all, delete-orphan")
 
+default_validity_days = Column(Integer, default=7)
+default_payment_plan = Column(String(40), default="avista")  # avista/entrada_final_30/...
+default_message_template = Column(Text, nullable=True)       # msg padrão WhatsApp
+default_terms = Column(Text, nullable=True)                  # condições padrão (texto)
 
 class UserSession(Base):
     __tablename__ = "user_sessions"

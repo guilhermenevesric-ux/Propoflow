@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Orçamento criado</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Orçamento criado</p>
+      </div>
+    </div>
+    <div class="right-actions">
+      <span>ID: {{ p.public_id }}</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="h2">✅ Orçamento criado</h2>
+    <p class="small" style="margin-top:0;">
+      Cliente: <b>{{ p.client_name }}</b> • Serviço: <b>{{ p.project_name }}</b>
+    </p>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+      <div class="card" style="padding:14px;">
+        <p class="small" style="margin:0 0 6px;">Valor</p>
+        <div style="font-size:20px; font-weight:900;">{{ p.price }}</div>
+      </div>
+      <div class="card" style="padding:14px;">
+        <p class="small" style="margin:0 0 6px;">Prazo</p>
+        <div style="font-size:20px; font-weight:900;">{{ p.deadline }}</div>
+      </div>
+    </div>
+
+    <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a class="btn" href="/proposals/{{ p.id }}/send_whatsapp">Enviar WhatsApp</a>
+      <a class="btn btn-ghost" href="/p/{{ p.public_id }}">Abrir link</a>
+      <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">Baixar PDF</a>
+      <button class="btn btn-ghost" onclick="copyLink()">Copiar link</button>
+      <a class="btn btn-ghost" href="/wizard">Criar outro</a>
+      <a class="btn btn-ghost" href="/dashboard">Dashboard</a>
+    </div>
+
+    <div class="card" style="margin-top:14px; padding:14px;">
+      <p class="small" style="margin:0 0 6px;">Mensagem pronta (WhatsApp)</p>
+      <div style="white-space:pre-wrap; opacity:.92;" id="msgBox">{{ message }}</div>
+      <div style="margin-top:10px;">
+        <button class="btn btn-ghost" onclick="copyMessage()">Copiar mensagem</button>
+      </div>
+    </div>
+
+    <p class="small" style="margin-top:12px;">
+      Link: <span style="color: rgba(232,238,252,0.85);">{{ public_link }}</span>
+    </p>
+  </div>
+</div>
+
+<script>
+  function copyLink(){
+    navigator.clipboard.writeText("{{ public_link }}");
+    alert("Link copiado!");
+  }
+  function copyMessage(){
+    const txt = document.getElementById("msgBox").innerText;
+    navigator.clipboard.writeText(txt);
+    alert("Mensagem copiada!");
+  }
+</script>
+</body>
+</html>

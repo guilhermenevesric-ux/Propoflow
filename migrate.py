@@ -68,6 +68,32 @@ with engine.begin() as conn:
                    "ALTER TABLE proposals ADD COLUMN total_cents INTEGER DEFAULT 0",
                    "ALTER TABLE proposals ADD COLUMN IF NOT EXISTS total_cents INTEGER DEFAULT 0")
 
+        # USERS: defaults (etapa 7)
+        if not column_exists(conn, "users", "default_validity_days"):
+            if is_postgres():
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_validity_days INTEGER DEFAULT 7"))
+            else:
+                conn.execute(text("ALTER TABLE users ADD COLUMN default_validity_days INTEGER DEFAULT 7"))
+
+        if not column_exists(conn, "users", "default_payment_plan"):
+            if is_postgres():
+                conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS default_payment_plan VARCHAR(40) DEFAULT 'avista'"))
+            else:
+                conn.execute(text("ALTER TABLE users ADD COLUMN default_payment_plan VARCHAR(40) DEFAULT 'avista'"))
+
+        if not column_exists(conn, "users", "default_message_template"):
+            if is_postgres():
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_message_template TEXT"))
+            else:
+                conn.execute(text("ALTER TABLE users ADD COLUMN default_message_template TEXT"))
+
+        if not column_exists(conn, "users", "default_terms"):
+            if is_postgres():
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_terms TEXT"))
+            else:
+                conn.execute(text("ALTER TABLE users ADD COLUMN default_terms TEXT"))
+
 # PROPOSALS: client_id
     if not column_exists(conn, "proposals", "client_id"):
         if is_postgres():
