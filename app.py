@@ -472,18 +472,41 @@ def logout(request: Request, db: Session = Depends(get_db)):
 
 # ===== DASHBOARD =====
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request, status: str = "all", db: Session = Depends(get_db)):
+def dashboard(
+    request: Request,
+    status: str = "all",
+    q: str = "",
+    days: int = 30,
+    db: Session = Depends(get_db)
+):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    q = db.query(Proposal).filter(Proposal.owner_id == user.id)
-    if status == "accepted":
-        q = q.filter(Proposal.accepted_at.isnot(None))
-    elif status == "pending":
-        q = q.filter(Proposal.accepted_at.is_(None))
+    days = int(days or 30)
+    days = 7 if days <= 7 else (30 if days <= 30 else 90)
+    since = _now() - timedelta(days=days)
 
-    proposals = q.order_by(Proposal.created_at.desc()).all()
+    query = db.query(Proposal).filter(
+        Proposal.owner_id == user.id,
+        Proposal.created_at >= since
+    )
+
+    if status == "accepted":
+        query = query.filter(Proposal.accepted_at.isnot(None))
+    elif status == "pending":
+        query = query.filter(Proposal.accepted_at.is_(None))
+
+    term = (q or "").strip()
+    if term:
+        like = f"%{term}%"
+        query = query.filter(
+            (Proposal.client_name.ilike(like)) |
+            (Proposal.project_name.ilike(like)) |
+            (Proposal.public_id.ilike(like))
+        )
+
+    proposals = query.order_by(Proposal.created_at.desc()).all()
 
     total = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
     accepted = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.accepted_at.isnot(None)).count()
@@ -498,10 +521,71 @@ def dashboard(request: Request, status: str = "all", db: Session = Depends(get_d
         "accepted": accepted,
         "rate": rate,
         "status": status,
+        "q": term,
+        "days": days,
         "status_label": status_label,
         "error": None,
         "show_upgrade": False,
     })
+
+@app.get("/proposals/{proposal_id}/again")
+def proposal_again(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    original = db.query(Proposal).filter(
+        Proposal.id == proposal_id,
+        Proposal.owner_id == user.id
+    ).first()
+    if not original:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # limite free
+    if not is_pro_active(user):
+        count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+        if count >= (user.proposal_limit or 5):
+            return RedirectResponse("/pricing", status_code=302)
+
+    new_p = Proposal(
+        client_id=original.client_id,
+        client_name=original.client_name,
+        client_whatsapp=original.client_whatsapp,
+        project_name=original.project_name,
+        description=original.description,
+        deadline=original.deadline,
+        owner_id=user.id,
+        status="created",
+        valid_until=_now() + timedelta(days=int(getattr(user, "default_validity_days", 7) or 7)),
+        last_activity_at=_now(),
+        revision=1,
+        updated_at=_now(),
+        total_cents=int(original.total_cents or 0),
+        price=original.price,
+    )
+    db.add(new_p)
+    db.commit()
+    db.refresh(new_p)
+
+    # dup itens
+    for it in original.items:
+        db.add(ProposalItem(
+            proposal_id=new_p.id,
+            sort=it.sort,
+            description=it.description,
+            unit=it.unit,
+            qty=it.qty,
+            unit_price_cents=it.unit_price_cents,
+            line_total_cents=it.line_total_cents,
+        ))
+    db.commit()
+
+    # dup payment plan
+    stages = db.query(PaymentStage).filter(PaymentStage.proposal_id == original.id).order_by(PaymentStage.id.asc()).all()
+    plan = [(s.title, int(s.percent or 0)) for s in stages] if stages else [("À vista", 100)]
+    upsert_payment_stages(db, new_p, plan)
+
+    return RedirectResponse(f"/proposals/{new_p.id}/created", status_code=302)
 
 def terms_to_list(text: str) -> list[str]:
     # quebra por linha e remove vazios

@@ -7,153 +7,208 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-<div class="container">
-  <div class="nav">
-    <div class="brand">
-      <div class="logo"></div>
-      <div>
-        <h1>{{ owner.company_name or (owner.display_name or "PropoFlow") }}</h1>
-        <p>
-          {% if owner.display_name %}{{ owner.display_name }}{% endif %}
-          {% if owner.phone %} • {{ owner.phone }}{% endif %}
-        </p>
+  <div class="container">
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          {% if owner and owner.company_name %}
+            <h1>{{ owner.company_name }}</h1>
+            <p>
+              {% if owner.display_name %}{{ owner.display_name }}{% endif %}
+              {% if owner.phone %} • {{ owner.phone }}{% endif %}
+            </p>
+          {% else %}
+            <h1>PropoFlow</h1>
+            <p>
+              {% if owner and owner.display_name %}{{ owner.display_name }}{% else %}Orçamentos profissionais{% endif %}
+              {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
+            </p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn btn-ghost" href="/wizard">Assistente</a>
+        <a class="btn btn-ghost" href="/services">Meus serviços</a>
+        <a class="btn btn-ghost" href="/clients">Clientes</a>
+        <a class="btn btn-ghost" href="/settings">Padrões</a>
+
+        <a class="btn btn-ghost" href="/profile">Perfil</a>
+        <a class="btn btn-ghost" href="/billing">Assinatura</a>
+
+        {% if user and user.plan == "pro" %}
+          <span class="pill">✨ PRO</span>
+        {% else %}
+          <a class="btn" href="/pricing">Upgrade</a>
+        {% endif %}
+
+        <a class="btn" href="/wizard">+ Novo orçamento</a>
+        <a class="btn btn-ghost" href="/logout">Sair</a>
       </div>
     </div>
 
-    <div class="actions">
-      <a class="btn btn-ghost" href="/profile">Perfil</a>
-      <a class="btn btn-ghost" href="/billing">Assinatura</a>
-      <a class="btn btn-ghost" href="/services">Meus serviços</a>
+    <div class="card">
+      <h2 class="h2">Seus orçamentos</h2>
+      <p class="small">Crie, envie e acompanhe em link público e PDF.</p>
 
-      {% if user and user.plan == "pro" %}
-        <span class="pill">✨ PRO</span>
-      {% else %}
-        <a class="btn" href="/pricing">Upgrade</a>
+      {% if error %}
+        <div class="error">
+          {{ error }}
+          {% if show_upgrade %}
+            <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="btn" href="/pricing">Upgrade</a>
+              <a class="btn btn-ghost" href="/pricing">Ver planos</a>
+            </div>
+          {% endif %}
+        </div>
       {% endif %}
 
-      <a class="btn" href="/proposals/new">+ Novo orçamento</a>
-      <a class="btn btn-ghost" href="/logout">Sair</a>
-    </div>
-  </div>
+      <!-- KPIs -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0 12px;">
+        <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
+        <span class="pill">✅ Aceitos: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
+        <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
+      </div>
 
-  {% if due_payment_reminders and due_payment_reminders|length > 0 %}
-    <div class="card" style="margin-bottom:14px;">
-      <h2 class="h2">💰 Cobranças de sinal (hoje)</h2>
-      <p class="small">Clique e mande no WhatsApp (Pix + valor + texto humano).</p>
+      <!-- Filtros de status -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 0 0 14px;">
+        <a class="btn btn-ghost" href="/dashboard?status=all&days={{ days or 30 }}"
+           style="{% if status == 'all' %}border-color: rgba(79,124,255,0.8);{% endif %}">
+          Todas
+        </a>
 
-      <div style="display:grid; gap:10px;">
-        {% for r in due_payment_reminders %}
-          <div class="card" style="padding:14px;">
-            <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-              <div>
-                <div style="font-weight:900; font-size:16px;">{{ r.stage.proposal.project_name }}</div>
-                <div class="small" style="margin:6px 0 0;">
-                  Cliente: <b>{{ r.stage.proposal.client_name }}</b>
-                  • {{ r.stage.title }}: <b>R$ {{ ('%.2f'|format((r.stage.amount_cents or 0)/100)).replace('.', ',') }}</b>
-                </div>
-              </div>
+        <a class="btn btn-ghost" href="/dashboard?status=pending&days={{ days or 30 }}"
+           style="{% if status == 'pending' %}border-color: rgba(79,124,255,0.8);{% endif %}">
+          Pendentes
+        </a>
+
+        <a class="btn btn-ghost" href="/dashboard?status=accepted&days={{ days or 30 }}"
+           style="{% if status == 'accepted' %}border-color: rgba(79,124,255,0.8);{% endif %}">
+          Aceitos
+        </a>
+      </div>
+
+      <!-- Busca + período -->
+      <form method="get" action="/dashboard" class="card" style="padding:14px; margin: 0 0 14px;">
+        <div class="row">
+          <div>
+            <label>Buscar</label>
+            <input name="q" value="{{ q or '' }}" placeholder="Cliente, serviço ou ID">
+          </div>
+          <div>
+            <label>Período</label>
+            <select name="days" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+              <option value="7" {% if days==7 %}selected{% endif %}>Últimos 7 dias</option>
+              <option value="30" {% if days==30 or not days %}selected{% endif %}>Últimos 30 dias</option>
+              <option value="90" {% if days==90 %}selected{% endif %}>Últimos 90 dias</option>
+            </select>
+          </div>
+        </div>
+
+        <input type="hidden" name="status" value="{{ status or 'all' }}">
+
+        <div style="height:12px;"></div>
+        <div class="actions">
+          <button class="btn" type="submit">Aplicar</button>
+          {% if q %}
+            <a class="btn btn-ghost" href="/dashboard?status={{ status or 'all' }}&days={{ days or 30 }}">Limpar</a>
+          {% endif %}
+        </div>
+      </form>
+
+      {% if proposals|length == 0 %}
+        <p class="small">
+          Nenhum orçamento encontrado neste filtro.
+          <a href="/wizard">Criar novo</a>.
+        </p>
+      {% else %}
+
+        <!-- Mobile cards -->
+        <div class="mobile-list">
+          {% for p in proposals %}
+            <div class="card proposal-card">
+              <p class="title">{{ p.project_name }}</p>
+              <p class="meta">
+                Cliente: <b>{{ p.client_name }}</b><br>
+                {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}
+              </p>
+
+              <p class="small" style="margin-top:0;">
+                Status:
+                {% if p.accepted_at %}
+                  <span style="color:#22c55e; font-weight:800;">✓ ACEITO</span>
+                  <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m/%Y") }}</span>
+                {% else %}
+                  <span class="small">{{ status_label(p.status) if status_label else 'Pendente' }}</span>
+                {% endif %}
+              </p>
+
               <div class="actions">
-                <a class="btn" href="/payments/reminders/{{ r.id }}/send_whatsapp">Enviar Pix</a>
-                <form method="post" action="/payments/stages/{{ r.stage.id }}/mark_paid" style="display:inline;">
-                  <button class="btn btn-ghost" type="submit">Marcar pago</button>
+                <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/again">Novo igual</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/edit">Editar</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+
+                <form method="post" action="/proposals/{{ p.id }}/delete"
+                      onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
+                  <button class="btn btn-ghost" type="submit">Excluir</button>
                 </form>
-                <a class="btn btn-ghost" href="/p/{{ r.stage.proposal.public_id }}">Abrir link</a>
               </div>
             </div>
-          </div>
-        {% endfor %}
-      </div>
+          {% endfor %}
+        </div>
+
+        <!-- Desktop table -->
+        <div class="table-wrap">
+          <table class="table">
+            <tr>
+              <th>Data</th>
+              <th>Cliente</th>
+              <th>Serviço</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+
+            {% for p in proposals %}
+            <tr>
+              <td>{{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
+              <td>{{ p.client_name }}</td>
+              <td>{{ p.project_name }}</td>
+
+              <td>
+                {% if p.accepted_at %}
+                  <span style="color:#22c55e; font-weight:800;">✓ ACEITO</span>
+                  <div class="small" style="opacity:.85;">{{ p.accepted_at.strftime("%d/%m/%Y") }}</div>
+                {% else %}
+                  <span class="small">{{ status_label(p.status) if status_label else 'Pendente' }}</span>
+                {% endif %}
+              </td>
+
+              <td>
+                <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/again">Novo igual</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/edit">Editar</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+
+                <form method="post" action="/proposals/{{ p.id }}/delete" style="display:inline;"
+                      onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
+                  <button class="btn btn-ghost" type="submit">Excluir</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+
+      {% endif %}
     </div>
-  {% endif %}
 
-  {% if due_followups and due_followups|length > 0 %}
-    <div class="card" style="margin-bottom:14px;">
-      <h2 class="h2">🔥 Follow-ups de hoje</h2>
-      <p class="small">Clique e envie no WhatsApp (mensagem pronta).</p>
-
-      <div style="display:grid; gap:10px;">
-        {% for f in due_followups %}
-          <div class="card" style="padding:14px;">
-            <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-              <div>
-                <div style="font-weight:900; font-size:16px;">{{ f.proposal.project_name }}</div>
-                <div class="small" style="margin:6px 0 0;">
-                  Cliente: <b>{{ f.proposal.client_name }}</b> • D+{{ f.step }} • Visto: {{ f.proposal.view_count or 0 }}x
-                </div>
-              </div>
-              <div class="actions">
-                <a class="btn" href="/proposals/{{ f.proposal.id }}/followup/{{ f.step }}">Enviar follow-up</a>
-                <a class="btn btn-ghost" href="/p/{{ f.proposal.public_id }}">Abrir link</a>
-              </div>
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
-
-  <div class="card">
-    <h2 class="h2">Seus orçamentos</h2>
-    <p class="small">Agora tem itens + total + etapas + cobrança de sinal + versão.</p>
-
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0 12px;">
-      <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
-      <span class="pill">✅ Aceitos: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
-      <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
-      <span class="pill">💰 Cobranças hoje: <b style="color: rgba(232,238,252,0.95);">{{ due_payment_reminders|length }}</b></span>
-      <span class="pill">🔥 Follow-ups hoje: <b style="color: rgba(232,238,252,0.95);">{{ due_followups|length }}</b></span>
-    </div>
-
-    <div class="table-wrap">
-      <table class="table">
-        <tr>
-          <th>Data</th>
-          <th>Cliente</th>
-          <th>Projeto</th>
-          <th>Status</th>
-          <th>Total</th>
-          <th>Ações</th>
-        </tr>
-
-        {% for p in proposals %}
-        <tr>
-          <td>{{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
-          <td>
-            {{ p.client_name }}
-            {% if p.client_whatsapp %}
-              <div class="small" style="opacity:.8;">{{ p.client_whatsapp }}</div>
-            {% endif %}
-          </td>
-          <td>
-            {{ p.project_name }}
-            <div class="small" style="opacity:.8;">v{{ p.revision }}</div>
-          </td>
-          <td>
-            {% if p.accepted_at %}
-              <span style="color:#22c55e; font-weight:800;">✓ Aceito</span>
-            {% else %}
-              <span class="pill" style="padding:6px 10px;">{{ status_label(p.status) }}</span>
-            {% endif %}
-            {% if p.valid_until %}
-              <div class="small" style="opacity:.8;">Válido até {{ p.valid_until.strftime("%d/%m") }}</div>
-            {% endif %}
-          </td>
-          <td>
-            <b>R$ {{ ('%.2f'|format((p.total_cents or 0)/100)).replace('.', ',') }}</b>
-          </td>
-          <td>
-            <a class="btn btn-ghost" href="/p/{{ p.public_id }}">Abrir</a>
-            <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
-            <a class="btn btn-ghost" href="/proposals/{{ p.id }}/edit">Editar</a>
-            {% if not p.accepted_at %}
-              <a class="btn" href="/proposals/{{ p.id }}/send_whatsapp">Enviar WhatsApp</a>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </table>
-    </div>
+    <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+      <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
+    </p>
   </div>
-</div>
 </body>
 </html>
