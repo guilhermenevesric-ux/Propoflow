@@ -115,4 +115,18 @@ with engine.begin() as conn:
         else:
             conn.execute(text("ALTER TABLE proposals ADD COLUMN client_id INTEGER"))
 
+# SERVICES: favorite
+    if not column_exists(conn, "services", "favorite"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE services ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT FALSE"))
+        else:
+            conn.execute(text("ALTER TABLE services ADD COLUMN favorite INTEGER DEFAULT 0"))
+
+    # CLIENTS: favorite
+    if not column_exists(conn, "clients", "favorite"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT FALSE"))
+        else:
+            conn.execute(text("ALTER TABLE clients ADD COLUMN favorite INTEGER DEFAULT 0"))
+
 print("✅ migrate.py OK")
