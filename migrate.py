@@ -1,3 +1,4 @@
+# migrate.py
 from db import engine
 from sqlalchemy import text
 
@@ -29,57 +30,99 @@ def column_exists(conn, table_name: str, column_name: str) -> bool:
         return postgres_column_exists(conn, table_name, column_name)
     return False
 
+def add_column(conn, table: str, ddl_sqlite: str, ddl_pg: str):
+    if is_postgres():
+        conn.execute(text(ddl_pg))
+    else:
+        conn.execute(text(ddl_sqlite))
+
 with engine.begin() as conn:
-    # USERS
+    # ===== USERS =====
     if not column_exists(conn, "users", "plan"):
-        if is_postgres():
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'free'"))
-        else:
-            conn.execute(text("ALTER TABLE users ADD COLUMN plan VARCHAR DEFAULT 'free'"))
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN plan VARCHAR DEFAULT 'free'",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'free'")
 
     if not column_exists(conn, "users", "proposal_limit"):
-        if is_postgres():
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS proposal_limit INTEGER DEFAULT 5"))
-        else:
-            conn.execute(text("ALTER TABLE users ADD COLUMN proposal_limit INTEGER DEFAULT 5"))
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN proposal_limit INTEGER DEFAULT 5",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS proposal_limit INTEGER DEFAULT 5")
 
     if not column_exists(conn, "users", "delete_credits"):
-        if is_postgres():
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS delete_credits INTEGER DEFAULT 1"))
-        else:
-            conn.execute(text("ALTER TABLE users ADD COLUMN delete_credits INTEGER DEFAULT 1"))
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN delete_credits INTEGER DEFAULT 1",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS delete_credits INTEGER DEFAULT 1")
 
     if not column_exists(conn, "users", "plan_updated_at"):
-        if is_postgres():
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_updated_at TIMESTAMP NULL"))
-        else:
-            conn.execute(text("ALTER TABLE users ADD COLUMN plan_updated_at DATETIME"))
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN plan_updated_at DATETIME",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_updated_at TIMESTAMP NULL")
 
-    # NOVO: cpf/cnpj
     if not column_exists(conn, "users", "cpf_cnpj"):
-        if is_postgres():
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS cpf_cnpj VARCHAR(18)"))
-        else:
-            conn.execute(text("ALTER TABLE users ADD COLUMN cpf_cnpj VARCHAR(18)"))
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN cpf_cnpj VARCHAR(18)",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS cpf_cnpj VARCHAR(18)")
 
-    # NOVO: paid_until
     if not column_exists(conn, "users", "paid_until"):
-        if is_postgres():
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS paid_until TIMESTAMP NULL"))
-        else:
-            conn.execute(text("ALTER TABLE users ADD COLUMN paid_until DATETIME"))
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN paid_until DATETIME",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS paid_until TIMESTAMP NULL")
 
-    # NOVO: asaas ids
     if not column_exists(conn, "users", "asaas_customer_id"):
-        if is_postgres():
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS asaas_customer_id VARCHAR(40)"))
-        else:
-            conn.execute(text("ALTER TABLE users ADD COLUMN asaas_customer_id VARCHAR(40)"))
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN asaas_customer_id VARCHAR(40)",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS asaas_customer_id VARCHAR(40)")
 
     if not column_exists(conn, "users", "asaas_subscription_id"):
-        if is_postgres():
-            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS asaas_subscription_id VARCHAR(40)"))
-        else:
-            conn.execute(text("ALTER TABLE users ADD COLUMN asaas_subscription_id VARCHAR(40)"))
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN asaas_subscription_id VARCHAR(40)",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS asaas_subscription_id VARCHAR(40)")
+
+    # NOVO: pix
+    if not column_exists(conn, "users", "pix_key"):
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN pix_key VARCHAR(120)",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS pix_key VARCHAR(120)")
+
+    if not column_exists(conn, "users", "pix_name"):
+        add_column(conn, "users",
+                   "ALTER TABLE users ADD COLUMN pix_name VARCHAR(120)",
+                   "ALTER TABLE users ADD COLUMN IF NOT EXISTS pix_name VARCHAR(120)")
+
+    # ===== PROPOSALS (NOVOS CAMPOS) =====
+    if not column_exists(conn, "proposals", "client_whatsapp"):
+        add_column(conn, "proposals",
+                   "ALTER TABLE proposals ADD COLUMN client_whatsapp VARCHAR(30)",
+                   "ALTER TABLE proposals ADD COLUMN IF NOT EXISTS client_whatsapp VARCHAR(30)")
+
+    if not column_exists(conn, "proposals", "status"):
+        add_column(conn, "proposals",
+                   "ALTER TABLE proposals ADD COLUMN status VARCHAR DEFAULT 'created'",
+                   "ALTER TABLE proposals ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'created'")
+
+    if not column_exists(conn, "proposals", "valid_until"):
+        add_column(conn, "proposals",
+                   "ALTER TABLE proposals ADD COLUMN valid_until DATETIME",
+                   "ALTER TABLE proposals ADD COLUMN IF NOT EXISTS valid_until TIMESTAMP NULL")
+
+    if not column_exists(conn, "proposals", "view_count"):
+        add_column(conn, "proposals",
+                   "ALTER TABLE proposals ADD COLUMN view_count INTEGER DEFAULT 0",
+                   "ALTER TABLE proposals ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0")
+
+    if not column_exists(conn, "proposals", "first_viewed_at"):
+        add_column(conn, "proposals",
+                   "ALTER TABLE proposals ADD COLUMN first_viewed_at DATETIME",
+                   "ALTER TABLE proposals ADD COLUMN IF NOT EXISTS first_viewed_at TIMESTAMP NULL")
+
+    if not column_exists(conn, "proposals", "last_viewed_at"):
+        add_column(conn, "proposals",
+                   "ALTER TABLE proposals ADD COLUMN last_viewed_at DATETIME",
+                   "ALTER TABLE proposals ADD COLUMN IF NOT EXISTS last_viewed_at TIMESTAMP NULL")
+
+    if not column_exists(conn, "proposals", "last_activity_at"):
+        add_column(conn, "proposals",
+                   "ALTER TABLE proposals ADD COLUMN last_activity_at DATETIME",
+                   "ALTER TABLE proposals ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP NULL")
 
 print("✅ migrate.py OK")

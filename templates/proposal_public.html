@@ -14,9 +14,9 @@
         <div>
           <h1>PropoFlow</h1>
           <p>
-  {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Proposta profissional{% endif %}
-  {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
-</p>
+            {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Proposta profissional{% endif %}
+            {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
+          </p>
         </div>
       </div>
       <div class="right-actions">
@@ -26,16 +26,19 @@
 
     <div class="card">
       <h2 class="h2">{{ p.project_name }}</h2>
-      <p class="small">Cliente: <b>{{ p.client_name }}</b> • Criada em {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</p>
-{% if owner %}
-  <p class="small" style="margin-top:-6px;">
-    Emitente:
-    <b>
-      {% if owner.display_name %}{{ owner.display_name }}{% else %}{{ owner.email }}{% endif %}
-    </b>
-    {% if owner.company_name %} • {{ owner.company_name }}{% endif %}
-  </p>
-{% endif %}
+      <p class="small">
+        Cliente: <b>{{ p.client_name }}</b> • Criada em {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}
+        {% if p.valid_until %} • Válida até <b>{{ p.valid_until.strftime("%d/%m") }}</b>{% endif %}
+      </p>
+
+      {% if owner %}
+        <p class="small" style="margin-top:-6px;">
+          Emitente:
+          <b>{% if owner.display_name %}{{ owner.display_name }}{% else %}{{ owner.email }}{% endif %}</b>
+          {% if owner.company_name %} • {{ owner.company_name }}{% endif %}
+        </p>
+      {% endif %}
+
       <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:14px 0;">
 
       <h3 class="h2" style="font-size:15px;">Escopo</h3>
@@ -53,36 +56,56 @@
       </div>
 
       <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
-  <a class="btn" href="/p/{{ p.public_id }}/pdf">Baixar PDF</a>
-  <button class="btn btn-ghost" onclick="copyLink()">Copiar link</button>
-</div>
-
-{% if p.accepted_at %}
-  <div class="card" style="margin-top:14px; padding:14px;">
-    <h3 class="h2" style="font-size:15px; margin-bottom:6px;">✅ Proposta já aceita</h3>
-    <p class="small" style="margin:0;">
-      Aceita por <b>{{ p.accepted_name }}</b> em {{ p.accepted_at.strftime("%d/%m/%Y %H:%M") }}.
-    </p>
-  </div>
-{% else %}
-  <!-- SEU BLOCO DO FORM DE ACEITE AQUI (igual já está) -->
-{% endif %}
-  <form method="post" action="/p/{{ p.public_id }}/accept">
-    <div class="row">
-      <div>
-        <label>Seu nome</label>
-        <input name="name" placeholder="Ex: João Cliente" required>
+        <a class="btn" href="/p/{{ p.public_id }}/pdf">Baixar PDF</a>
+        <button class="btn btn-ghost" onclick="copyLink()">Copiar link</button>
       </div>
-      <div>
-        <label>Seu email</label>
-        <input name="email" placeholder="Ex: cliente@email.com" required>
-      </div>
-    </div>
 
-    <br>
-    <button class="btn" type="submit">Aceitar proposta</button>
-  </form>
-</div>
+      {% if owner and owner.pix_key %}
+        <div class="card" style="margin-top:14px; padding:14px;">
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">💳 Pagamento (Pix)</h3>
+          <p class="small" style="margin:0;">
+            Para confirmar, você pode pagar via Pix:
+            <br>
+            Chave: <b>{{ owner.pix_key }}</b>
+            {% if owner.pix_name %}<br>Recebedor: <b>{{ owner.pix_name }}</b>{% endif %}
+          </p>
+          <p class="small" style="margin:10px 0 0; opacity:.8;">
+            Depois do pagamento, envie o comprovante no WhatsApp do emitente.
+          </p>
+        </div>
+      {% endif %}
+
+      {% if p.accepted_at %}
+        <div class="card" style="margin-top:14px; padding:14px;">
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">✅ Proposta já aceita</h3>
+          <p class="small" style="margin:0;">
+            Aceita por <b>{{ p.accepted_name }}</b> em {{ p.accepted_at.strftime("%d/%m/%Y %H:%M") }}.
+          </p>
+        </div>
+      {% else %}
+        <div class="card" style="margin-top:14px; padding:14px;">
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">Aprovar agora</h3>
+          <p class="small" style="margin-top:0;">
+            Leva 10 segundos. Se precisar ajustar algo, é só pedir no WhatsApp.
+          </p>
+
+          <form method="post" action="/p/{{ p.public_id }}/accept">
+            <div class="row">
+              <div>
+                <label>Seu nome</label>
+                <input name="name" placeholder="Ex: João Cliente" required>
+              </div>
+              <div>
+                <label>Seu email (opcional)</label>
+                <input name="email" placeholder="Ex: cliente@email.com">
+              </div>
+            </div>
+
+            <br>
+            <button class="btn" type="submit">✅ Aceitar proposta</button>
+          </form>
+        </div>
+      {% endif %}
 
       <p class="small" style="margin-top:12px;">
         Link desta proposta: <span style="color: rgba(232,238,252,0.85);">{{ base_url }}/p/{{ p.public_id }}</span>

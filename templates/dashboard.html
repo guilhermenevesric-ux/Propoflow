@@ -13,71 +13,76 @@
         <div class="logo"></div>
         <div>
           {% if owner and owner.plan == "pro" %}
-  <h1>{{ owner.company_name or (owner.display_name or "Proposta") }}</h1>
-  <p>
-    {% if owner.company_name and owner.display_name %}
-      {{ owner.display_name }}
-    {% endif %}
-    {% if owner.phone %} • {{ owner.phone }}{% endif %}
-  </p>
-{% else %}
-  <h1>PropoFlow</h1>
-  <p>
-    {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Proposta profissional{% endif %}
-    {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
-  </p>
-{% endif %}
+            <h1>{{ owner.company_name or (owner.display_name or "Proposta") }}</h1>
+            <p>
+              {% if owner.company_name and owner.display_name %}
+                {{ owner.display_name }}
+              {% endif %}
+              {% if owner.phone %} • {{ owner.phone }}{% endif %}
+            </p>
+          {% else %}
+            <h1>PropoFlow</h1>
+            <p>
+              {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Proposta profissional{% endif %}
+              {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
+            </p>
+          {% endif %}
         </div>
       </div>
 
       <div class="actions">
-  <a class="btn btn-ghost" href="/profile">Perfil</a>
-  <a class="btn btn-ghost" href="/billing">Assinatura</a>
+        <a class="btn btn-ghost" href="/profile">Perfil</a>
+        <a class="btn btn-ghost" href="/billing">Assinatura</a>
 
-  {% if user and user.plan == "pro" %}
-    <span class="pill">✨ PRO</span>
-  {% else %}
-    <a class="btn" href="/pricing">Upgrade</a>
-  {% endif %}
+        {% if user and user.plan == "pro" %}
+          <span class="pill">✨ PRO</span>
+        {% else %}
+          <a class="btn" href="/pricing">Upgrade</a>
+        {% endif %}
 
-  <a class="btn" href="/proposals/new">+ Nova proposta</a>
-  <a class="btn btn-ghost" href="/logout">Sair</a>
-</div>
+        <a class="btn" href="/proposals/new">+ Nova proposta</a>
+        <a class="btn btn-ghost" href="/logout">Sair</a>
+      </div>
     </div>
+
+    <!-- Follow-ups do dia -->
+    {% if due_followups and due_followups|length > 0 %}
+      <div class="card" style="margin-bottom:14px;">
+        <h2 class="h2">🔥 Follow-ups de hoje</h2>
+        <p class="small">Clique e envie no WhatsApp (mensagem pronta). Isso aqui é o que faz o sistema fechar.</p>
+
+        <div style="display:grid; gap:10px;">
+          {% for f in due_followups %}
+            <div class="card" style="padding:14px;">
+              <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                <div>
+                  <div style="font-weight:900; font-size:16px;">{{ f.proposal.project_name }}</div>
+                  <div class="small" style="margin:6px 0 0;">
+                    Cliente: <b>{{ f.proposal.client_name }}</b> • D+{{ f.step }} • Visto: {{ f.proposal.view_count or 0 }}x
+                  </div>
+                </div>
+                <div class="actions">
+                  <a class="btn" href="/proposals/{{ f.proposal.id }}/followup/{{ f.step }}">Enviar follow-up</a>
+                  <a class="btn btn-ghost" href="/p/{{ f.proposal.public_id }}">Abrir link</a>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
 
     <div class="card">
       <h2 class="h2">Suas propostas</h2>
-
-      {% if error %}
-        <div class="error">
-          {{ error }}
-          {% if show_upgrade %}
-            <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-              <a class="btn" href="/pricing">Upgrade para Pro</a>
-              <a class="btn btn-ghost" href="/pricing">Ver planos</a>
-            </div>
-          {% endif %}
-        </div>
-      {% endif %}
-
-      <p class="small">Crie, envie e acompanhe propostas em link público e PDF profissional.</p>
+      <p class="small">Agora você tem pipeline e rastreio: Criada → Enviada → Visualizada → Aceita.</p>
 
       <!-- KPIs -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0 12px;">
         <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
         <span class="pill">✅ Aceitas: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
         <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
+        <span class="pill">🔥 Follow-ups hoje: <b style="color: rgba(232,238,252,0.95);">{{ due_followups|length }}</b></span>
       </div>
-
-      {% if user.plan == 'free' %}
-        <p class="small" style="margin-top:0;">
-          Plano gratuito: você ainda tem <b>1 exclusão</b> disponível.
-        </p>
-      {% elif user.plan == 'free_used_delete' %}
-        <p class="small" style="margin-top:0;">
-          Plano gratuito: exclusão já utilizada. <a href="/pricing">Upgrade</a> para excluir ilimitado.
-        </p>
-      {% endif %}
 
       <!-- Filtros -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 0 0 14px;">
@@ -85,12 +90,10 @@
            style="{% if status == 'all' %}border-color: rgba(79,124,255,0.8);{% endif %}">
           Todas
         </a>
-
         <a class="btn btn-ghost" href="/dashboard?status=pending"
            style="{% if status == 'pending' %}border-color: rgba(79,124,255,0.8);{% endif %}">
           Pendentes
         </a>
-
         <a class="btn btn-ghost" href="/dashboard?status=accepted"
            style="{% if status == 'accepted' %}border-color: rgba(79,124,255,0.8);{% endif %}">
           Aceitas
@@ -115,18 +118,22 @@
               </p>
 
               <p class="small" style="margin-top:0;">
-                Status:
+                Status: <b>{{ status_label(p.status) }}</b>
                 {% if p.accepted_at %}
-                  <span style="color:#22c55e; font-weight:700;">✓ ACEITA</span>
-                  <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m/%Y") }}</span>
-                {% else %}
-                  <span class="small">Pendente</span>
+                  <span style="color:#22c55e; font-weight:700;"> • ✓ ACEITA</span>
                 {% endif %}
+                <br>
+                Visto: <b>{{ p.view_count or 0 }}</b>x
               </p>
 
               <div class="actions">
-                <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
-                <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
+                <a class="btn btn-ghost" href="/p/{{ p.public_id }}">Abrir link</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
+
+                {% if not p.accepted_at %}
+                  <a class="btn" href="/proposals/{{ p.id }}/send_whatsapp">Enviar WhatsApp</a>
+                {% endif %}
+
                 <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
 
                 <form method="post" action="/proposals/{{ p.id }}/delete"
@@ -145,29 +152,49 @@
               <th>Data</th>
               <th>Cliente</th>
               <th>Projeto</th>
-              <th>Status</th>
+              <th>Pipeline</th>
+              <th>Visto</th>
               <th>Ações</th>
             </tr>
 
             {% for p in proposals %}
             <tr>
               <td>{{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
-              <td>{{ p.client_name }}</td>
+              <td>
+                {{ p.client_name }}
+                {% if p.client_whatsapp %}
+                  <div class="small" style="opacity:.8;">{{ p.client_whatsapp }}</div>
+                {% endif %}
+              </td>
               <td>{{ p.project_name }}</td>
 
               <td>
                 {% if p.accepted_at %}
-                  <span style="color:#22c55e; font-weight:700;">✓ ACEITA</span>
+                  <span style="color:#22c55e; font-weight:800;">✓ Aceita</span>
                   <div class="small">{{ p.accepted_name }}</div>
-                  <div class="small" style="opacity:0.8;">{{ p.accepted_at.strftime("%d/%m/%Y") }}</div>
                 {% else %}
-                  <span class="small">Pendente</span>
+                  <span class="pill" style="padding:6px 10px;">{{ status_label(p.status) }}</span>
+                  {% if p.valid_until %}
+                    <div class="small" style="opacity:.8;">Válida até {{ p.valid_until.strftime("%d/%m") }}</div>
+                  {% endif %}
                 {% endif %}
               </td>
 
               <td>
-                <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
-                <a class="btn btn-ghost" href="/p/{{ p.public_id }}/pdf">PDF</a>
+                <b>{{ p.view_count or 0 }}</b>x
+                {% if p.last_viewed_at %}
+                  <div class="small" style="opacity:.8;">{{ p.last_viewed_at.strftime("%d/%m %H:%M") }}</div>
+                {% endif %}
+              </td>
+
+              <td>
+                <a class="btn btn-ghost" href="/p/{{ p.public_id }}">Abrir link</a>
+                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
+
+                {% if not p.accepted_at %}
+                  <a class="btn" href="/proposals/{{ p.id }}/send_whatsapp">Enviar WhatsApp</a>
+                {% endif %}
+
                 <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
 
                 <form method="post" action="/proposals/{{ p.id }}/delete" style="display:inline;"

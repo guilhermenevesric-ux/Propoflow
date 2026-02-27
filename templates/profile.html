@@ -24,7 +24,7 @@
 
     <div class="card">
       <h2 class="h2">Minha marca</h2>
-      <p class="small">Isso vai aparecer nas propostas que você enviar (PDF e link público).</p>
+      <p class="small">Isso aparece nas propostas (PDF e link público).</p>
 
       {% if saved %}
         <div class="error" style="background: rgba(79,124,255,0.15); border-color: rgba(79,124,255,0.35); color: rgba(232,238,252,0.9);">
@@ -43,7 +43,7 @@
         <br><br>
 
         <label>Nome da empresa / marca</label>
-        <input name="company_name" placeholder="Ex: Studio Silva Design" value="{{ user.company_name or '' }}">
+        <input name="company_name" placeholder="Ex: Obra do João" value="{{ user.company_name or '' }}">
 
         <br><br>
 
@@ -54,6 +54,19 @@
 
         <label>CPF ou CNPJ (para cobrança da assinatura)</label>
         <input name="cpf_cnpj" placeholder="Ex: 123.456.789-09" value="{{ user.cpf_cnpj or '' }}">
+
+        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
+
+        <h3 class="h2" style="font-size:15px;">Pix (opcional)</h3>
+        <p class="small">Se você preencher, a proposta vai mostrar a chave Pix para o cliente pagar.</p>
+
+        <label>Chave Pix</label>
+        <input name="pix_key" placeholder="CPF/CNPJ/Email/Telefone/Chave aleatória" value="{{ user.pix_key or '' }}">
+
+        <br><br>
+
+        <label>Nome do recebedor (opcional)</label>
+        <input name="pix_name" placeholder="Ex: João Silva" value="{{ user.pix_name or '' }}">
 
         <br><br>
 
