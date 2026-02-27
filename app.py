@@ -659,7 +659,7 @@ def services_page(request: Request, saved: int = 0, db: Session = Depends(get_db
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.title.asc()).all()
+    services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.favorite.desc(), Service.title.asc()).all()
     return templates.TemplateResponse("services.html", {
         "request": request,
         "services": services,
@@ -748,7 +748,7 @@ def clients_page(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.name.asc()).all()
+    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.favorite.desc(), Client.name.asc()).all()
     return templates.TemplateResponse("clients.html", {
         "request": request,
         "clients": clients,
@@ -809,6 +809,38 @@ def clients_delete(client_id: int, request: Request, db: Session = Depends(get_d
         db.commit()
     return RedirectResponse("/clients", status_code=302)
 
+@app.post("/services/{service_id}/favorite")
+def toggle_service_favorite(service_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    s = db.query(Service).filter(Service.id == service_id, Service.owner_id == user.id, Service.archived.is_(False)).first()
+    if s:
+        s.favorite = not bool(s.favorite)
+        s.updated_at = _now()
+        db.add(s)
+        db.commit()
+
+    back = request.headers.get("referer") or "/services"
+    return RedirectResponse(back, status_code=302)
+
+
+@app.post("/clients/{client_id}/favorite")
+def toggle_client_favorite(client_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    c = db.query(Client).filter(Client.id == client_id, Client.owner_id == user.id, Client.archived.is_(False)).first()
+    if c:
+        c.favorite = not bool(c.favorite)
+        c.updated_at = _now()
+        db.add(c)
+        db.commit()
+
+    back = request.headers.get("referer") or "/clients"
+    return RedirectResponse(back, status_code=302)
 
 # ===== NEW PROPOSAL =====
 @app.get("/proposals/new", response_class=HTMLResponse)
@@ -1563,7 +1595,7 @@ def wizard(request: Request, step: int = 1,
         return RedirectResponse("/login", status_code=302)
 
     services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.title.asc()).all()
-    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.name.asc()).all()
+    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.favorite.desc(), Client.name.asc()).all()
 
     # Prefill do cliente salvo
     if step >= 2 and client_id:
@@ -1692,7 +1724,7 @@ def wizard_step2(
         return RedirectResponse("/login", status_code=302)
 
     services = db.query(Service).filter(Service.owner_id == user.id, Service.archived.is_(False)).order_by(Service.title.asc()).all()
-    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.name.asc()).all()
+    clients = db.query(Client).filter(Client.owner_id == user.id, Client.archived.is_(False)).order_by(Client.favorite.desc(), Client.name.asc()).all()
 
     # prefill cliente salvo
     if client_id and not client_name.strip():
@@ -1817,3 +1849,11 @@ async def webhooks_asaas(request: Request, db: Session = Depends(get_db)):
         return {"ok": True}
 
     return {"ok": True}
+
+@app.head("/")
+def head_root():
+    return Response(status_code=200)
+
+@app.get("/favicon.ico")
+def favicon():
+    return Response(status_code=204)

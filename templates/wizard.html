@@ -38,11 +38,24 @@
       <h2 class="h2">Quem é o cliente?</h2>
       <p class="small">Escolha um cliente salvo ou digite na hora.</p>
 
+      {% set ns = namespace(has=false) %}
+      {% for c in clients %}{% if c.favorite %}{% set ns.has=true %}{% endif %}{% endfor %}
+      {% if ns.has %}
+        <p class="small" style="margin:8px 0 6px;">Favoritos</p>
+        <div class="actions" style="margin-bottom:10px;">
+          {% for c in clients %}
+            {% if c.favorite %}
+              <button class="btn btn-ghost" type="button" onclick="pickClient('{{ c.id }}')">⭐ {{ c.name }}</button>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+
       <form method="get" action="/wizard">
         <input type="hidden" name="step" value="2">
 
         <label>Cliente salvo (opcional)</label>
-        <select name="client_id" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+        <select name="client_id" id="clientSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           <option value="0">Escolher...</option>
           {% for c in clients %}
             <option value="{{ c.id }}">{{ c.name }}</option>
@@ -65,6 +78,15 @@
         <div style="height:14px;"></div>
         <button class="btn" type="submit">Continuar →</button>
       </form>
+
+      <script>
+        function pickClient(id){
+          const sel = document.getElementById("clientSelect");
+          if(!sel) return;
+          sel.value = id;
+          sel.focus();
+        }
+      </script>
     {% endif %}
 
     <!-- PASSO 2: SERVIÇO -->
@@ -72,17 +94,29 @@
       <h2 class="h2">Qual é o serviço?</h2>
       <p class="small">Escolha um serviço salvo (recomendado) ou digite do zero.</p>
 
-      <form method="post" action="/wizard/step2">
-        <!-- carrega o que veio do passo 1 -->
+      <form method="post" action="/wizard/step2" id="step2Form">
         <input type="hidden" name="client_id" value="{{ client_id }}">
         <input type="hidden" name="client_name" value="{{ client_name }}">
         <input type="hidden" name="client_whatsapp" value="{{ client_whatsapp }}">
 
+        {% set ns2 = namespace(has=false) %}
+        {% for s in services %}{% if s.favorite %}{% set ns2.has=true %}{% endif %}{% endfor %}
+        {% if ns2.has %}
+          <p class="small" style="margin:8px 0 6px;">Favoritos</p>
+          <div class="actions" style="margin-bottom:10px;">
+            {% for s in services %}
+              {% if s.favorite %}
+                <button class="btn btn-ghost" type="button" onclick="pickService('{{ s.id }}')">⭐ {{ s.title }}</button>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+
         <label>Serviço salvo (opcional)</label>
-        <select name="service_id" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+        <select name="service_id" id="serviceSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           <option value="0">Escolher...</option>
           {% for s in services %}
-            <option value="{{ s.id }}">{{ s.title }}</option>
+            <option value="{{ s.id }}" {% if service_id == s.id %}selected{% endif %}>{{ s.title }}</option>
           {% endfor %}
         </select>
 
@@ -91,11 +125,11 @@
         <div class="row">
           <div>
             <label>Serviço / Projeto</label>
-            <input name="project_name" placeholder="Ex: Limpeza de sofá">
+            <input name="project_name" value="{{ project_name or '' }}" placeholder="Ex: Limpeza de sofá">
           </div>
           <div>
             <label>Prazo</label>
-            <input name="deadline" placeholder="Ex: 1 dia / 2 dias">
+            <input name="deadline" value="{{ deadline or '' }}" placeholder="Ex: 1 dia / 2 dias">
           </div>
         </div>
 
@@ -104,18 +138,18 @@
         <div class="row">
           <div>
             <label>Valor total (opcional)</label>
-            <input name="price" placeholder="Ex: 250">
+            <input name="price" value="{{ price or '' }}" placeholder="Ex: 250">
           </div>
           <div>
             <label>Validade (dias)</label>
-            <input name="validity_days" type="number" min="1" max="30" value="{{ default_validity_days or 7 }}">
+            <input name="validity_days" type="number" min="1" max="30" value="{{ validity_days or (default_validity_days or 7) }}">
           </div>
         </div>
 
         <div style="height:12px;"></div>
 
         <label>Descrição do serviço</label>
-        <textarea name="description" placeholder="Explique em 1–3 linhas o que será feito. Ex: Vou limpar o sofá, remover sujeira e finalizar com secagem."></textarea>
+        <textarea name="description" placeholder="Explique em 1–3 linhas o que será feito.">{{ description or '' }}</textarea>
 
         <div style="height:12px;"></div>
 
@@ -152,10 +186,10 @@
 
         <label>Como pagar (opcional)</label>
         <select name="payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
-          <option value="avista" {% if (default_payment_plan or 'avista')=='avista' %}selected{% endif %}>À vista</option>
-          <option value="entrada_final_30" {% if default_payment_plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
-          <option value="entrada_final_50" {% if default_payment_plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
-          <option value="3x_30_40_30" {% if default_payment_plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+          <option value="avista" {% if (payment_plan or default_payment_plan or 'avista')=='avista' %}selected{% endif %}>À vista</option>
+          <option value="entrada_final_30" {% if (payment_plan or default_payment_plan)=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+          <option value="entrada_final_50" {% if (payment_plan or default_payment_plan)=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+          <option value="3x_30_40_30" {% if (payment_plan or default_payment_plan)=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
         </select>
 
         <div style="height:14px;"></div>
@@ -166,6 +200,13 @@
       </form>
 
       <script>
+        function pickService(id){
+          const sel = document.getElementById("serviceSelect");
+          if(!sel) return;
+          sel.value = id;
+          sel.focus();
+        }
+
         function brl(n){
           try{
             const v = (Math.round(n*100)/100).toFixed(2).replace('.', ',');

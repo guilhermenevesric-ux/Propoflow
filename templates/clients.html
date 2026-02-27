@@ -18,14 +18,14 @@
     </div>
     <div class="actions">
       <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
-      <a class="btn" href="/proposals/new">+ Novo orçamento</a>
+      <a class="btn" href="/wizard">+ Novo orçamento</a>
     </div>
   </div>
 
   <div class="grid-2">
     <div class="card">
       <h2 class="h2">Adicionar cliente</h2>
-      <p class="small">Salve o cliente uma vez. Depois é 1 clique pra criar orçamento.</p>
+      <p class="small">Salve uma vez. Depois é 1 clique pra orçar.</p>
 
       {% if error %}
         <div class="error">{{ error }}</div>
@@ -47,7 +47,7 @@
 
     <div class="card">
       <h2 class="h2">Minha lista</h2>
-      <p class="small">Use “Orçar” pra abrir novo orçamento com o cliente já preenchido.</p>
+      <p class="small">Use “Orçar” pra abrir o assistente já com o cliente preenchido.</p>
 
       {% if clients|length == 0 %}
         <p class="small">Você ainda não cadastrou nenhum cliente.</p>
@@ -57,13 +57,23 @@
             <div class="card" style="padding:14px;">
               <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
                 <div>
-                  <div style="font-weight:900; font-size:16px;">{{ c.name }}</div>
+                  <div style="font-weight:900; font-size:16px; display:flex; align-items:center; gap:8px;">
+                    {% if c.favorite %}⭐{% endif %}
+                    <span>{{ c.name }}</span>
+                  </div>
                   <div class="small" style="margin-top:6px; opacity:.85;">
                     {% if c.whatsapp %}{{ c.whatsapp }}{% else %}(sem WhatsApp){% endif %}
                   </div>
                 </div>
+
                 <div class="actions">
-                  <a class="btn" href="/proposals/new?client_id={{ c.id }}">Orçar</a>
+                  <a class="btn" href="/wizard?step=2&client_id={{ c.id }}">Orçar</a>
+
+                  <form method="post" action="/clients/{{ c.id }}/favorite" style="display:inline;">
+                    <button class="btn btn-ghost" type="submit" title="Favoritar">
+                      {% if c.favorite %}⭐{% else %}☆{% endif %}
+                    </button>
+                  </form>
 
                   <details>
                     <summary class="btn btn-ghost" style="cursor:pointer;">Editar</summary>
@@ -82,7 +92,7 @@
                       </form>
 
                       <form method="post" action="/clients/{{ c.id }}/delete" style="margin-top:10px;"
-                        onsubmit="return confirm('Remover este cliente da lista?');">
+                            onsubmit="return confirm('Remover este cliente?');">
                         <button class="btn btn-ghost" type="submit">Remover</button>
                       </form>
                     </div>

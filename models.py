@@ -62,7 +62,7 @@ class Client(Base):
 
     name = Column(String(255), nullable=False)
     whatsapp = Column(String(30), nullable=True)
-
+    favorite = Column(Boolean, default=False)
     archived = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -86,7 +86,7 @@ class Service(Base):
     default_price_cents = Column(Integer, default=0)           # preço sugerido
     default_deadline = Column(String(100), nullable=True)      # prazo sugerido
     default_payment_plan = Column(String(40), default="avista")  # avista/entrada_final_30/etc (opcional)
-
+    favorite = Column(Boolean, default=False)
     archived = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -13,12 +13,12 @@
       <div class="logo"></div>
       <div>
         <h1>PropoFlow</h1>
-        <p>Meus serviços (catálogo pessoal)</p>
+        <p>Meus serviços (catálogo)</p>
       </div>
     </div>
     <div class="actions">
       <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
-      <a class="btn" href="/proposals/new">+ Novo orçamento</a>
+      <a class="btn" href="/wizard">+ Novo orçamento</a>
     </div>
   </div>
 
@@ -56,8 +56,8 @@
 
         <div style="height:12px;"></div>
 
-        <label>O que será feito (opcional)</label>
-        <textarea name="default_description" placeholder="Ex: Vou fazer a limpeza completa, incluindo..."></textarea>
+        <label>Descrição do serviço (opcional)</label>
+        <textarea name="default_description" placeholder="Ex: Vou fazer..."></textarea>
 
         <div style="height:12px;"></div>
 
@@ -86,7 +86,11 @@
             <div class="card" style="padding:14px;">
               <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
                 <div>
-                  <div style="font-weight:900; font-size:16px;">{{ s.title }}</div>
+                  <div style="font-weight:900; font-size:16px; display:flex; align-items:center; gap:8px;">
+                    {% if s.favorite %}⭐{% endif %}
+                    <span>{{ s.title }}</span>
+                  </div>
+
                   <div class="small" style="margin-top:6px;">
                     {% if s.default_price_cents and s.default_price_cents > 0 %}
                       Preço: <b>R$ {{ ('%.2f'|format(s.default_price_cents/100)).replace('.', ',') }}</b>
@@ -98,7 +102,13 @@
                 </div>
 
                 <div class="actions">
-                  <a class="btn" href="/proposals/new?service_id={{ s.id }}">Usar</a>
+                  <a class="btn" href="/wizard?step=2&service_id={{ s.id }}">Usar</a>
+
+                  <form method="post" action="/services/{{ s.id }}/favorite" style="display:inline;">
+                    <button class="btn btn-ghost" type="submit" title="Favoritar">
+                      {% if s.favorite %}⭐{% else %}☆{% endif %}
+                    </button>
+                  </form>
 
                   <details>
                     <summary class="btn btn-ghost" style="cursor:pointer;">Editar</summary>
@@ -122,7 +132,7 @@
 
                         <div style="height:10px;"></div>
 
-                        <label>O que será feito</label>
+                        <label>Descrição do serviço</label>
                         <textarea name="default_description">{{ s.default_description or '' }}</textarea>
 
                         <div style="height:10px;"></div>

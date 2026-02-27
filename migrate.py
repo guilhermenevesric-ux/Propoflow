@@ -46,6 +46,20 @@ with engine.begin() as conn:
                    "ALTER TABLE users ADD COLUMN pix_name VARCHAR(120)",
                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS pix_name VARCHAR(120)")
 
+        # SERVICES: favorite
+        if not column_exists(conn, "services", "favorite"):
+            if is_postgres():
+                conn.execute(text("ALTER TABLE services ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT FALSE"))
+            else:
+                conn.execute(text("ALTER TABLE services ADD COLUMN favorite BOOLEAN DEFAULT 0"))
+
+        # CLIENTS: favorite
+        if not column_exists(conn, "clients", "favorite"):
+            if is_postgres():
+                conn.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS favorite BOOLEAN DEFAULT FALSE"))
+            else:
+                conn.execute(text("ALTER TABLE clients ADD COLUMN favorite BOOLEAN DEFAULT 0"))
+
     # PROPOSALS: orçamento (campos novos)
     if not column_exists(conn, "proposals", "revision"):
         add_column(conn,
