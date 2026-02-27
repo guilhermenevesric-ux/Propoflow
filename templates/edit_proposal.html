@@ -1,0 +1,168 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Editar Orçamento</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Editar orçamento (gera versão)</p>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
+      <a class="btn btn-ghost" href="/p/{{ p.public_id }}">Abrir link</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="h2">Editar orçamento</h2>
+    <p class="small">Ao salvar, o sistema cria um histórico (versão {{ p.revision + 1 }}).</p>
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/proposals/{{ p.id }}/edit">
+      <div class="row">
+        <div>
+          <label>Cliente</label>
+          <input name="client_name" value="{{ p.client_name }}" required>
+        </div>
+        <div>
+          <label>WhatsApp do cliente</label>
+          <input name="client_whatsapp" value="{{ p.client_whatsapp or '' }}">
+        </div>
+      </div>
+
+      <br>
+
+      <div class="row">
+        <div>
+          <label>Projeto</label>
+          <input name="project_name" value="{{ p.project_name }}" required>
+        </div>
+        <div>
+          <label>Prazo</label>
+          <input name="deadline" value="{{ p.deadline }}" required>
+        </div>
+      </div>
+
+      <br>
+
+      <label>Descrição</label>
+      <textarea name="description" required>{{ p.description }}</textarea>
+
+      <br><br>
+
+      <div class="row">
+        <div>
+          <label>Imprevistos (%)</label>
+          <input name="overhead_percent" type="number" min="0" max="50" value="{{ p.overhead_percent or 10 }}">
+        </div>
+        <div>
+          <label>Margem (%)</label>
+          <input name="margin_percent" type="number" min="0" max="80" value="{{ p.margin_percent or 0 }}">
+        </div>
+      </div>
+
+      <br>
+
+      <label>Preço final (opcional — se vazio, calcula pelos itens)</label>
+      <input name="price" value="{{ p.price or '' }}" placeholder="Ex: R$ 7.500">
+
+      <br><br>
+
+      <h3 class="h2" style="font-size:15px;">Itens</h3>
+
+      <div class="table-wrap">
+        <table class="table" id="itemsTable">
+          <tr>
+            <th>Descrição</th>
+            <th>Qtd</th>
+            <th>Un</th>
+            <th>Valor unit (R$)</th>
+          </tr>
+          {% for it in p.items %}
+          <tr>
+            <td><input name="item_desc" value="{{ it.description }}" /></td>
+            <td><input name="item_qty" value="{{ it.qty }}" /></td>
+            <td><input name="item_unit" value="{{ it.unit or '' }}" /></td>
+            <td><input name="item_unit_price" value="{{ (it.unit_price_cents or 0) / 100 }}" /></td>
+          </tr>
+          {% endfor %}
+          {% if p.items|length == 0 %}
+            {% for i in range(0,5) %}
+            <tr>
+              <td><input name="item_desc" /></td>
+              <td><input name="item_qty" /></td>
+              <td><input name="item_unit" /></td>
+              <td><input name="item_unit_price" /></td>
+            </tr>
+            {% endfor %}
+          {% endif %}
+        </table>
+      </div>
+
+      <div style="margin-top:10px;">
+        <button class="btn btn-ghost" type="button" onclick="addRow()">+ Adicionar item</button>
+      </div>
+
+      <br><br>
+
+      <h3 class="h2" style="font-size:15px;">Etapas de pagamento</h3>
+      <p class="small" style="margin-top:0;">Ao salvar, recalcula valores das etapas.</p>
+
+      <div class="row">
+        <div>
+          <label>Sinal (%)</label>
+          <input name="p1_percent" type="number" min="0" max="100" value="{{ p1 }}">
+        </div>
+        <div>
+          <label>Etapa 1 (%)</label>
+          <input name="p2_percent" type="number" min="0" max="100" value="{{ p2 }}">
+        </div>
+      </div>
+
+      <br>
+
+      <div class="row">
+        <div>
+          <label>Etapa 2 (%)</label>
+          <input name="p3_percent" type="number" min="0" max="100" value="{{ p3 }}">
+        </div>
+        <div>
+          <label>Observação das etapas (opcional)</label>
+          <input name="payment_note" value="{{ payment_note or '' }}" placeholder="Ex: sinal reserva agenda...">
+        </div>
+      </div>
+
+      <br><br>
+
+      <button class="btn" type="submit">Salvar (criar versão)</button>
+    </form>
+  </div>
+</div>
+
+<script>
+function addRow(){
+  const table = document.getElementById("itemsTable");
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
+    <td><input name="item_qty" placeholder="Ex: 1" /></td>
+    <td><input name="item_unit" placeholder="un" /></td>
+    <td><input name="item_unit_price" placeholder="Ex: 100" /></td>
+  `;
+  table.appendChild(tr);
+}
+</script>
+</body>
+</html>

@@ -7,72 +7,77 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-  <div class="container">
-    <div class="nav">
-      <div class="brand">
-        <div class="logo"></div>
-        <div>
-          <h1>PropoFlow</h1>
-          <p>Seu perfil e marca</p>
-        </div>
-      </div>
-
-      <div class="actions">
-        <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
+<div class="container">
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Seu perfil e marca</p>
       </div>
     </div>
 
-    <div class="card">
-      <h2 class="h2">Minha marca</h2>
-      <p class="small">Isso aparece nas propostas (PDF e link público).</p>
-
-      {% if saved %}
-        <div class="error" style="background: rgba(79,124,255,0.15); border-color: rgba(79,124,255,0.35); color: rgba(232,238,252,0.9);">
-          Perfil atualizado com sucesso ✅
-        </div>
-      {% endif %}
-
-      {% if error %}
-        <div class="error">{{ error }}</div>
-      {% endif %}
-
-      <form method="post" action="/profile">
-        <label>Seu nome (responsável)</label>
-        <input name="display_name" placeholder="Ex: João Silva" value="{{ user.display_name or '' }}">
-
-        <br><br>
-
-        <label>Nome da empresa / marca</label>
-        <input name="company_name" placeholder="Ex: Obra do João" value="{{ user.company_name or '' }}">
-
-        <br><br>
-
-        <label>Telefone / WhatsApp</label>
-        <input name="phone" placeholder="Ex: (11) 99999-9999" value="{{ user.phone or '' }}">
-
-        <br><br>
-
-        <label>CPF ou CNPJ (para cobrança da assinatura)</label>
-        <input name="cpf_cnpj" placeholder="Ex: 123.456.789-09" value="{{ user.cpf_cnpj or '' }}">
-
-        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
-
-        <h3 class="h2" style="font-size:15px;">Pix (opcional)</h3>
-        <p class="small">Se você preencher, a proposta vai mostrar a chave Pix para o cliente pagar.</p>
-
-        <label>Chave Pix</label>
-        <input name="pix_key" placeholder="CPF/CNPJ/Email/Telefone/Chave aleatória" value="{{ user.pix_key or '' }}">
-
-        <br><br>
-
-        <label>Nome do recebedor (opcional)</label>
-        <input name="pix_name" placeholder="Ex: João Silva" value="{{ user.pix_name or '' }}">
-
-        <br><br>
-
-        <button class="btn" type="submit">Salvar</button>
-      </form>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
     </div>
   </div>
+
+  <div class="card">
+    <h2 class="h2">Minha marca</h2>
+    <p class="small">Isso aparece no PDF e no link público.</p>
+
+    {% if saved %}
+      <div class="error" style="background: rgba(79,124,255,0.15); border-color: rgba(79,124,255,0.35); color: rgba(232,238,252,0.9);">
+        Perfil atualizado com sucesso ✅
+      </div>
+    {% endif %}
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/profile">
+      <label>Seu nome (responsável)</label>
+      <input name="display_name" value="{{ user.display_name or '' }}">
+
+      <br><br>
+
+      <label>Nome da empresa / marca</label>
+      <input name="company_name" value="{{ user.company_name or '' }}">
+
+      <br><br>
+
+      <label>Telefone / WhatsApp</label>
+      <input name="phone" value="{{ user.phone or '' }}">
+
+      <br><br>
+
+      <label>CPF ou CNPJ (para cobrança da assinatura)</label>
+      <input name="cpf_cnpj" value="{{ user.cpf_cnpj or '' }}">
+
+      <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:16px 0;">
+
+      <h3 class="h2" style="font-size:15px;">Pix (pra receber sinal)</h3>
+      <p class="small">Isso aparece no link público e nas mensagens de cobrança do sinal.</p>
+
+      <label>Chave Pix</label>
+      <input name="pix_key" value="{{ user.pix_key or '' }}">
+
+      <br><br>
+
+      <label>Nome do recebedor</label>
+      <input name="pix_name" value="{{ user.pix_name or '' }}">
+
+      <br><br>
+
+      <label>Cidade (opcional)</label>
+      <input name="pix_city" value="{{ user.pix_city or '' }}" placeholder="Ex: Sao Paulo">
+
+      <br><br>
+
+      <button class="btn" type="submit">Salvar</button>
+    </form>
+  </div>
+</div>
 </body>
 </html>

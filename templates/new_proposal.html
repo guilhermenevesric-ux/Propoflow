@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>PropoFlow • Nova Proposta</title>
+  <title>PropoFlow • Novo Orçamento</title>
   <link rel="stylesheet" href="/static/style.css">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
@@ -13,7 +13,7 @@
         <div class="logo"></div>
         <div>
           <h1>PropoFlow</h1>
-          <p>Nova proposta</p>
+          <p>Novo orçamento (itens + etapas)</p>
         </div>
       </div>
 
@@ -23,10 +23,8 @@
     </div>
 
     <div class="card">
-      <h2 class="h2">Criar proposta</h2>
-      <p class="small">
-        Preencha os dados e depois envie no WhatsApp com 1 clique (com follow-up automático).
-      </p>
+      <h2 class="h2">Criar orçamento</h2>
+      <p class="small">Crie com itens e o sistema calcula total + sinal + etapas. Depois envia no WhatsApp com 1 clique.</p>
 
       {% if error %}
         <div class="error">{{ error }}</div>
@@ -39,7 +37,7 @@
             <input name="client_name" required placeholder="Ex: João Silva">
           </div>
           <div>
-            <label>WhatsApp do cliente (pra enviar e fazer follow-up)</label>
+            <label>WhatsApp do cliente (pra envio e cobrança)</label>
             <input name="client_whatsapp" placeholder="Ex: (11) 99999-9999">
           </div>
         </div>
@@ -52,34 +50,118 @@
             <input name="project_name" required placeholder="Ex: Reforma do banheiro">
           </div>
           <div>
-            <label>Validade do orçamento (dias)</label>
+            <label>Validade (dias)</label>
             <input name="validity_days" type="number" min="1" max="30" value="7" required>
           </div>
         </div>
 
         <br>
 
-        <label>Descrição (escopo)</label>
-        <textarea name="description" required placeholder="Liste o que será entregue, etapas e detalhes importantes."></textarea>
+        <label>Descrição / Observações</label>
+        <textarea name="description" required placeholder="Detalhes, condições, o que está incluso e não incluso."></textarea>
 
         <br><br>
 
         <div class="row">
           <div>
-            <label>Preço</label>
-            <input name="price" required placeholder="Ex: R$ 2.500">
+            <label>Prazo</label>
+            <input name="deadline" required placeholder="Ex: 10 dias úteis">
           </div>
           <div>
-            <label>Prazo</label>
-            <input name="deadline" required placeholder="Ex: 7 dias úteis">
+            <label>Imprevistos (%)</label>
+            <input name="overhead_percent" type="number" min="0" max="50" value="10">
+          </div>
+        </div>
+
+        <br>
+
+        <div class="row">
+          <div>
+            <label>Margem (%) (simples)</label>
+            <input name="margin_percent" type="number" min="0" max="80" value="0">
+          </div>
+          <div>
+            <label>Preço final (opcional — se deixar vazio, calcula pelos itens)</label>
+            <input name="price" placeholder="Ex: R$ 7.500">
           </div>
         </div>
 
         <br><br>
 
-        <button class="btn" type="submit">Criar proposta</button>
+        <h3 class="h2" style="font-size:15px;">Itens</h3>
+        <p class="small" style="margin-top:0;">Preencha os itens. O total é calculado no servidor.</p>
+
+        <div class="table-wrap">
+          <table class="table">
+            <tr>
+              <th>Descrição</th>
+              <th>Qtd</th>
+              <th>Un</th>
+              <th>Valor unit (R$)</th>
+            </tr>
+            {% for i in range(0,5) %}
+            <tr>
+              <td><input name="item_desc" placeholder="Ex: Assentamento de piso" /></td>
+              <td><input name="item_qty" placeholder="Ex: 10" /></td>
+              <td><input name="item_unit" placeholder="m²" /></td>
+              <td><input name="item_unit_price" placeholder="Ex: 120" /></td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+
+        <div style="margin-top:10px;">
+          <button class="btn btn-ghost" type="button" onclick="addRow()">+ Adicionar item</button>
+        </div>
+
+        <br><br>
+
+        <h3 class="h2" style="font-size:15px;">Etapas de pagamento</h3>
+        <p class="small" style="margin-top:0;">Sugestão padrão: 30/40/30.</p>
+
+        <div class="row">
+          <div>
+            <label>Sinal (%)</label>
+            <input name="p1_percent" type="number" min="0" max="100" value="30">
+          </div>
+          <div>
+            <label>Etapa 1 (%)</label>
+            <input name="p2_percent" type="number" min="0" max="100" value="40">
+          </div>
+        </div>
+
+        <br>
+
+        <div class="row">
+          <div>
+            <label>Etapa 2 (%)</label>
+            <input name="p3_percent" type="number" min="0" max="100" value="30">
+          </div>
+          <div>
+            <label>(Opcional) Observação das etapas</label>
+            <input name="payment_note" placeholder="Ex: sinal reserva agenda; etapas conforme andamento">
+          </div>
+        </div>
+
+        <br><br>
+
+        <button class="btn" type="submit">Criar orçamento</button>
       </form>
     </div>
   </div>
+
+  <script>
+    function addRow(){
+      const table = document.querySelector(".table");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
+        <td><input name="item_qty" placeholder="Ex: 1" /></td>
+        <td><input name="item_unit" placeholder="un" /></td>
+        <td><input name="item_unit_price" placeholder="Ex: 100" /></td>
+      `;
+      table.appendChild(tr);
+    }
+  </script>
 </body>
 </html>

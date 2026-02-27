@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>PropoFlow • Proposta</title>
+  <title>PropoFlow • Orçamento</title>
   <link rel="stylesheet" href="/static/style.css">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
@@ -14,101 +14,135 @@
         <div>
           <h1>PropoFlow</h1>
           <p>
-            {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Proposta profissional{% endif %}
+            {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Orçamento{% endif %}
             {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
           </p>
         </div>
       </div>
       <div class="right-actions">
-        <span>ID: {{ p.public_id }}</span>
+        <span>ID: {{ p.public_id }} • v{{ p.revision }}</span>
       </div>
     </div>
 
     <div class="card">
       <h2 class="h2">{{ p.project_name }}</h2>
       <p class="small">
-        Cliente: <b>{{ p.client_name }}</b> • Criada em {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}
-        {% if p.valid_until %} • Válida até <b>{{ p.valid_until.strftime("%d/%m") }}</b>{% endif %}
+        Cliente: <b>{{ p.client_name }}</b>
+        • Criado em {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}
+        {% if p.valid_until %} • Válido até <b>{{ p.valid_until.strftime("%d/%m") }}</b>{% endif %}
       </p>
-
-      {% if owner %}
-        <p class="small" style="margin-top:-6px;">
-          Emitente:
-          <b>{% if owner.display_name %}{{ owner.display_name }}{% else %}{{ owner.email }}{% endif %}</b>
-          {% if owner.company_name %} • {{ owner.company_name }}{% endif %}
-        </p>
-      {% endif %}
 
       <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:14px 0;">
 
-      <h3 class="h2" style="font-size:15px;">Escopo</h3>
+      <h3 class="h2" style="font-size:15px;">Escopo / Observações</h3>
       <p style="color: rgba(232,238,252,0.85); line-height:1.5; white-space: pre-wrap;">{{ p.description }}</p>
 
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:18px;">
-        <div class="card" style="padding:14px;">
-          <p class="small" style="margin:0 0 6px;">Investimento</p>
-          <div style="font-size:20px; font-weight:800;">{{ p.price }}</div>
+      {% if p.items and p.items|length > 0 %}
+        <h3 class="h2" style="font-size:15px; margin-top:16px;">Itens</h3>
+
+        <div class="table-wrap">
+          <table class="table">
+            <tr>
+              <th>Descrição</th>
+              <th>Qtd</th>
+              <th>Un</th>
+              <th>Unit</th>
+              <th>Total</th>
+            </tr>
+            {% for it in p.items %}
+              <tr>
+                <td>{{ it.description }}</td>
+                <td>{{ '%.2f'|format(it.qty or 1) }}</td>
+                <td>{{ it.unit or '' }}</td>
+                <td>R$ {{ ('%.2f'|format((it.unit_price_cents or 0)/100)).replace('.', ',') }}</td>
+                <td><b>R$ {{ ('%.2f'|format((it.line_total_cents or 0)/100)).replace('.', ',') }}</b></td>
+              </tr>
+            {% endfor %}
+          </table>
         </div>
-        <div class="card" style="padding:14px;">
-          <p class="small" style="margin:0 0 6px;">Prazo</p>
-          <div style="font-size:20px; font-weight:800;">{{ p.deadline }}</div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+          <span class="pill">Imprevistos: <b style="color: rgba(232,238,252,0.95);">{{ p.overhead_percent or 0 }}%</b></span>
+          <span class="pill">Margem: <b style="color: rgba(232,238,252,0.95);">{{ p.margin_percent or 0 }}%</b></span>
+          <span class="pill">Total: <b style="color: rgba(232,238,252,0.95);">R$ {{ ('%.2f'|format((p.total_cents or 0)/100)).replace('.', ',') }}</b></span>
         </div>
-      </div>
+      {% else %}
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:18px;">
+          <div class="card" style="padding:14px;">
+            <p class="small" style="margin:0 0 6px;">Investimento</p>
+            <div style="font-size:20px; font-weight:800;">{{ p.price }}</div>
+          </div>
+          <div class="card" style="padding:14px;">
+            <p class="small" style="margin:0 0 6px;">Prazo</p>
+            <div style="font-size:20px; font-weight:800;">{{ p.deadline }}</div>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if p.payment_stages and p.payment_stages|length > 0 %}
+        <div class="card" style="margin-top:14px; padding:14px;">
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">💳 Pagamento (etapas)</h3>
+          <div class="small" style="opacity:.9;">
+            {% for st in p.payment_stages %}
+              <div style="margin:6px 0;">
+                <b>{{ st.title }}</b> — R$ {{ ('%.2f'|format((st.amount_cents or 0)/100)).replace('.', ',') }} ({{ st.percent }}%)
+                {% if st.status == 'paid' %}
+                  <span style="color:#22c55e; font-weight:800;"> • PAGO</span>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+
+          {% if owner and owner.pix_key %}
+            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:12px 0;">
+            <div class="small" style="margin:0;">
+              Pix (chave): <b>{{ owner.pix_key }}</b>
+              {% if owner.pix_name %}<br>Recebedor: <b>{{ owner.pix_name }}</b>{% endif %}
+            </div>
+            <p class="small" style="margin-top:8px; opacity:.85;">
+              Após o pagamento, envie o comprovante no WhatsApp do emitente.
+            </p>
+          {% endif %}
+        </div>
+      {% endif %}
 
       <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
         <a class="btn" href="/p/{{ p.public_id }}/pdf">Baixar PDF</a>
         <button class="btn btn-ghost" onclick="copyLink()">Copiar link</button>
       </div>
 
-      {% if owner and owner.pix_key %}
-        <div class="card" style="margin-top:14px; padding:14px;">
-          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">💳 Pagamento (Pix)</h3>
-          <p class="small" style="margin:0;">
-            Para confirmar, você pode pagar via Pix:
-            <br>
-            Chave: <b>{{ owner.pix_key }}</b>
-            {% if owner.pix_name %}<br>Recebedor: <b>{{ owner.pix_name }}</b>{% endif %}
-          </p>
-          <p class="small" style="margin:10px 0 0; opacity:.8;">
-            Depois do pagamento, envie o comprovante no WhatsApp do emitente.
-          </p>
-        </div>
-      {% endif %}
-
       {% if p.accepted_at %}
         <div class="card" style="margin-top:14px; padding:14px;">
-          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">✅ Proposta já aceita</h3>
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">✅ Orçamento aceito</h3>
           <p class="small" style="margin:0;">
-            Aceita por <b>{{ p.accepted_name }}</b> em {{ p.accepted_at.strftime("%d/%m/%Y %H:%M") }}.
+            Aceito por <b>{{ p.accepted_name }}</b> em {{ p.accepted_at.strftime("%d/%m/%Y %H:%M") }}.
           </p>
         </div>
       {% else %}
         <div class="card" style="margin-top:14px; padding:14px;">
           <h3 class="h2" style="font-size:15px; margin-bottom:6px;">Aprovar agora</h3>
-          <p class="small" style="margin-top:0;">
-            Leva 10 segundos. Se precisar ajustar algo, é só pedir no WhatsApp.
-          </p>
+          <p class="small" style="margin-top:0;">Leva 10 segundos.</p>
 
           <form method="post" action="/p/{{ p.public_id }}/accept">
             <div class="row">
               <div>
                 <label>Seu nome</label>
-                <input name="name" placeholder="Ex: João Cliente" required>
+                <input name="name" required>
               </div>
               <div>
                 <label>Seu email (opcional)</label>
-                <input name="email" placeholder="Ex: cliente@email.com">
+                <input name="email">
               </div>
             </div>
 
             <br>
-            <button class="btn" type="submit">✅ Aceitar proposta</button>
+            <button class="btn" type="submit">✅ Aceitar orçamento</button>
           </form>
         </div>
       {% endif %}
 
       <p class="small" style="margin-top:12px;">
-        Link desta proposta: <span style="color: rgba(232,238,252,0.85);">{{ base_url }}/p/{{ p.public_id }}</span>
+        Link: <span style="color: rgba(232,238,252,0.85);">{{ base_url }}/p/{{ p.public_id }}</span>
       </p>
     </div>
   </div>
