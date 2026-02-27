@@ -134,7 +134,7 @@ def generate_proposal_pdf(data: dict) -> bytes:
 
     c.setFont("Helvetica-Bold", 11)
     c.setFillColorRGB(0.06, 0.10, 0.18)
-    c.drawString(margin_x, y, "ESCOPO / OBSERVAÇÕES")
+    c.drawString(margin_x, y, "O QUE SERÁ FEITO")
     y -= 0.55 * cm
 
     y = _ensure_space(c, y, 2.0 * cm, width, height, brand, tagline)
@@ -190,7 +190,7 @@ def generate_proposal_pdf(data: dict) -> bytes:
         y = _ensure_space(c, y, 2.4 * cm, width, height, brand, tagline)
         c.setFont("Helvetica-Bold", 11)
         c.setFillColorRGB(0.06, 0.10, 0.18)
-        c.drawString(margin_x, y, "PAGAMENTO (ETAPAS)")
+        c.drawString(margin_x, y, "COMO PAGAR")
         y -= 0.6 * cm
         c.setFont("Helvetica", 10)
         c.setFillColorRGB(0.12, 0.16, 0.26)

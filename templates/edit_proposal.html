@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>PropoFlow • Editar Orçamento</title>
+  <title>PropoFlow • Editar orçamento</title>
   <link rel="stylesheet" href="/static/style.css">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
@@ -13,7 +13,7 @@
       <div class="logo"></div>
       <div>
         <h1>PropoFlow</h1>
-        <p>Editar orçamento (gera versão nova)</p>
+        <p>Editar orçamento (salva nova versão)</p>
       </div>
     </div>
     <div class="actions">
@@ -24,12 +24,12 @@
 
   <div class="card">
     <h2 class="h2">Editar orçamento</h2>
-    <p class="small">Ao salvar, cria histórico e incrementa versão (v{{ p.revision + 1 }}).</p>
+    <p class="small">Ao salvar, o sistema cria uma nova versão (v{{ p.revision + 1 }}).</p>
 
-    <form method="post" action="/proposals/{{ p.id }}/edit">
+    <form method="post" action="/proposals/{{ p.id }}/edit" id="formOrc">
       <div class="row">
         <div>
-          <label>Cliente</label>
+          <label>Nome do cliente</label>
           <input name="client_name" value="{{ p.client_name }}" required>
         </div>
         <div>
@@ -42,7 +42,7 @@
 
       <div class="row">
         <div>
-          <label>Projeto</label>
+          <label>Serviço / Projeto</label>
           <input name="project_name" value="{{ p.project_name }}" required>
         </div>
         <div>
@@ -53,46 +53,39 @@
 
       <br>
 
-      <label>Descrição</label>
-      <textarea name="description" required>{{ p.description }}</textarea>
-
-      <br><br>
-
       <div class="row">
         <div>
-          <label>Imprevistos (%)</label>
-          <input name="overhead_percent" type="number" min="0" max="50" value="{{ p.overhead_percent or 10 }}">
+          <label>Total final (opcional)</label>
+          <input name="price" value="{{ p.price or '' }}" placeholder="Ex: R$ 250,00">
         </div>
-        <div>
-          <label>Margem (%)</label>
-          <input name="margin_percent" type="number" min="0" max="80" value="{{ p.margin_percent or 0 }}">
-        </div>
+        <div></div>
       </div>
 
       <br>
 
-      <label>Preço final (opcional)</label>
-      <input name="price" value="{{ p.price or '' }}" placeholder="Ex: R$ 250,00">
+      <label>O que será feito</label>
+      <textarea name="description" required>{{ p.description }}</textarea>
 
       <br><br>
 
-      <h3 class="h2" style="font-size:15px;">Itens</h3>
+      <h3 class="h2" style="font-size:15px;">Itens (opcional)</h3>
 
       <div class="table-wrap">
-        <table class="table" id="itemsTable">
+        <table class="table" id="itemsTable" style="min-width: 680px;">
           <tr>
-            <th>Descrição</th>
-            <th>Qtd</th>
-            <th>Un</th>
-            <th>Valor unit (R$)</th>
+            <th>Item</th>
+            <th>Quantidade</th>
+            <th>Valor (R$)</th>
+            <th>Total</th>
           </tr>
 
           {% for it in p.items %}
           <tr>
             <td><input name="item_desc" value="{{ it.description }}" /></td>
             <td><input name="item_qty" value="{{ it.qty }}" /></td>
-            <td><input name="item_unit" value="{{ it.unit or '' }}" /></td>
             <td><input name="item_unit_price" value="{{ (it.unit_price_cents or 0)/100 }}" /></td>
+            <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+            <input type="hidden" name="item_unit" value="{{ it.unit or 'un' }}">
           </tr>
           {% endfor %}
 
@@ -101,63 +94,138 @@
             <tr>
               <td><input name="item_desc" /></td>
               <td><input name="item_qty" /></td>
-              <td><input name="item_unit" /></td>
               <td><input name="item_unit_price" /></td>
+              <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+              <input type="hidden" name="item_unit" value="un">
             </tr>
             {% endfor %}
           {% endif %}
         </table>
       </div>
 
-      <div style="margin-top:10px;">
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button class="btn btn-ghost" type="button" onclick="addRow()">+ Adicionar item</button>
-      </div>
-
-      <br><br>
-
-      <h3 class="h2" style="font-size:15px;">Etapas de pagamento</h3>
-      <p class="small" style="margin-top:0;">Padrão: 30/40/30.</p>
-
-      <div class="row">
-        <div>
-          <label>Sinal (%)</label>
-          <input name="p1_percent" type="number" min="0" max="100" value="{{ p1 }}">
-        </div>
-        <div>
-          <label>Etapa 1 (%)</label>
-          <input name="p2_percent" type="number" min="0" max="100" value="{{ p2 }}">
-        </div>
+        <span class="pill">Total estimado: <b id="totalEstimado" style="color: rgba(232,238,252,0.95);">R$ 0,00</b></span>
       </div>
 
       <br>
 
-      <div class="row">
-        <div>
-          <label>Etapa 2 (%)</label>
-          <input name="p3_percent" type="number" min="0" max="100" value="{{ p3 }}">
+      <h3 class="h2" style="font-size:15px;">Como será o pagamento</h3>
+
+      <label>Forma de pagamento</label>
+      <select name="payment_plan" id="paymentPlan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color: #e8eefc;">
+        <option value="avista">À vista (100%)</option>
+        <option value="entrada_final_30" selected>Entrada + na entrega (30% / 70%)</option>
+        <option value="entrada_final_50">Entrada + na entrega (50% / 50%)</option>
+        <option value="3x_30_40_30">Entrada + durante + na entrega (30% / 40% / 30%)</option>
+        <option value="personalizado">Personalizado (avançado)</option>
+      </select>
+
+      <div id="customPay" style="display:none; margin-top:12px;">
+        <div class="row">
+          <div>
+            <label>Entrada (%)</label>
+            <input name="p1_percent" type="number" min="0" max="100" value="{{ p1 }}">
+          </div>
+          <div>
+            <label>Durante o serviço (%)</label>
+            <input name="p2_percent" type="number" min="0" max="100" value="{{ p2 }}">
+          </div>
         </div>
-        <div></div>
+        <br>
+        <div class="row">
+          <div>
+            <label>Na entrega (%)</label>
+            <input name="p3_percent" type="number" min="0" max="100" value="{{ p3 }}">
+          </div>
+          <div></div>
+        </div>
       </div>
+
+      <details style="margin-top:14px;">
+        <summary class="small" style="cursor:pointer;">Opções avançadas (opcional)</summary>
+        <div style="margin-top:10px;">
+          <div class="row">
+            <div>
+              <label>Reserva (opcional) — % para cobrir gastos que aparecem</label>
+              <input name="reserve_percent" type="number" min="0" max="50" value="{{ p.overhead_percent or 0 }}">
+            </div>
+            <div>
+              <label>Lucro extra (opcional) — % além do valor dos itens</label>
+              <input name="profit_percent" type="number" min="0" max="80" value="{{ p.margin_percent or 0 }}">
+            </div>
+          </div>
+        </div>
+      </details>
 
       <br><br>
 
-      <button class="btn" type="submit">Salvar (criar versão)</button>
+      <button class="btn" type="submit">Salvar (nova versão)</button>
     </form>
   </div>
 </div>
 
 <script>
-function addRow(){
-  const table = document.getElementById("itemsTable");
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-    <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
-    <td><input name="item_qty" placeholder="1" /></td>
-    <td><input name="item_unit" placeholder="un" /></td>
-    <td><input name="item_unit_price" placeholder="100" /></td>
-  `;
-  table.appendChild(tr);
-}
+  function brl(n){
+    try{
+      const v = (Math.round(n*100)/100).toFixed(2).replace('.', ',');
+      return 'R$ ' + v;
+    }catch(e){ return 'R$ 0,00'; }
+  }
+  function parseNum(v){
+    if(!v) return 0;
+    v = (''+v).replace(/\./g,'').replace(',', '.');
+    const n = parseFloat(v);
+    return isNaN(n) ? 0 : n;
+  }
+  function recalc(){
+    const rows = document.querySelectorAll('#itemsTable tr');
+    let total = 0;
+    rows.forEach((tr, idx) => {
+      if(idx === 0) return;
+      const tds = tr.querySelectorAll('td');
+      const inputs = tr.querySelectorAll('input');
+      if(inputs.length < 3) return;
+
+      const desc = inputs[0].value.trim();
+      const qty = parseNum(inputs[1].value) || 0;
+      const unit = parseNum(inputs[2].value) || 0;
+
+      let line = 0;
+      if(desc && qty > 0 && unit > 0) line = qty * unit;
+
+      const tdTotal = tr.querySelector('.lineTotal');
+      if(tdTotal) tdTotal.textContent = brl(line);
+
+      total += line;
+    });
+    document.getElementById('totalEstimado').textContent = brl(total);
+  }
+  function addRow(){
+    const table = document.getElementById("itemsTable");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
+      <td><input name="item_qty" placeholder="1" /></td>
+      <td><input name="item_unit_price" placeholder="100" /></td>
+      <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+      <input type="hidden" name="item_unit" value="un">
+    `;
+    table.appendChild(tr);
+  }
+  document.addEventListener('input', (e) => {
+    if(e.target && (e.target.name === 'item_desc' || e.target.name === 'item_qty' || e.target.name === 'item_unit_price')){
+      recalc();
+    }
+  });
+
+  const plan = document.getElementById('paymentPlan');
+  const custom = document.getElementById('customPay');
+  plan.addEventListener('change', () => {
+    custom.style.display = (plan.value === 'personalizado') ? 'block' : 'none';
+  });
+
+  recalc();
 </script>
 </body>
 </html>

@@ -34,7 +34,7 @@
 
       <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:14px 0;">
 
-      <h3 class="h2" style="font-size:15px;">Escopo / Observações</h3>
+      <h3 class="h2" style="font-size:15px;">O que será feito</h3>
       <p style="color: rgba(232,238,252,0.85); line-height:1.5; white-space: pre-wrap;">{{ p.description }}</p>
 
       {% if p.items and p.items|length > 0 %}
@@ -43,45 +43,37 @@
         <div class="table-wrap">
           <table class="table">
             <tr>
-              <th>Descrição</th>
+              <th>Item</th>
               <th>Qtd</th>
-              <th>Un</th>
-              <th>Unit</th>
+              <th>Valor</th>
               <th>Total</th>
             </tr>
             {% for it in p.items %}
               <tr>
                 <td>{{ it.description }}</td>
                 <td>{{ '%.2f'|format(it.qty or 1) }}</td>
-                <td>{{ it.unit or '' }}</td>
                 <td>R$ {{ ('%.2f'|format((it.unit_price_cents or 0)/100)).replace('.', ',') }}</td>
                 <td><b>R$ {{ ('%.2f'|format((it.line_total_cents or 0)/100)).replace('.', ',') }}</b></td>
               </tr>
             {% endfor %}
           </table>
         </div>
-
-        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-          <span class="pill">Imprevistos: <b style="color: rgba(232,238,252,0.95);">{{ p.overhead_percent or 0 }}%</b></span>
-          <span class="pill">Margem: <b style="color: rgba(232,238,252,0.95);">{{ p.margin_percent or 0 }}%</b></span>
-          <span class="pill">Total: <b style="color: rgba(232,238,252,0.95);">R$ {{ ('%.2f'|format((p.total_cents or 0)/100)).replace('.', ',') }}</b></span>
-        </div>
-      {% else %}
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:18px;">
-          <div class="card" style="padding:14px;">
-            <p class="small" style="margin:0 0 6px;">Investimento</p>
-            <div style="font-size:20px; font-weight:800;">{{ p.price }}</div>
-          </div>
-          <div class="card" style="padding:14px;">
-            <p class="small" style="margin:0 0 6px;">Prazo</p>
-            <div style="font-size:20px; font-weight:800;">{{ p.deadline }}</div>
-          </div>
-        </div>
       {% endif %}
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:18px;">
+        <div class="card" style="padding:14px;">
+          <p class="small" style="margin:0 0 6px;">Valor total</p>
+          <div style="font-size:20px; font-weight:900;">{{ p.price }}</div>
+        </div>
+        <div class="card" style="padding:14px;">
+          <p class="small" style="margin:0 0 6px;">Prazo</p>
+          <div style="font-size:20px; font-weight:900;">{{ p.deadline }}</div>
+        </div>
+      </div>
 
       {% if p.payment_stages and p.payment_stages|length > 0 %}
         <div class="card" style="margin-top:14px; padding:14px;">
-          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">💳 Pagamento (etapas)</h3>
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">Como pagar</h3>
           <div class="small" style="opacity:.95;">
             {% for st in p.payment_stages %}
               <div style="margin:6px 0;">
@@ -100,7 +92,7 @@
               {% if owner.pix_name %}<br>Recebedor: <b>{{ owner.pix_name }}</b>{% endif %}
             </div>
             <p class="small" style="margin-top:8px; opacity:.85;">
-              Após o pagamento, envie o comprovante no WhatsApp do emitente.
+              Depois de pagar, envie o comprovante no WhatsApp do emitente.
             </p>
           {% endif %}
         </div>

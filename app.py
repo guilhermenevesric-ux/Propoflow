@@ -25,6 +25,7 @@ from models import (
 from pdf_gen import generate_proposal_pdf
 
 
+# ====== migração leve ======
 try:
     subprocess.run([sys.executable, "migrate.py"], check=False)
 except Exception:
@@ -45,6 +46,9 @@ def get_db():
         db.close()
 
 
+# ==========================
+# CONFIG
+# ==========================
 SESSION_COOKIE = "session_token"
 
 APP_BASE_URL = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
@@ -67,6 +71,9 @@ def asaas_headers():
     }
 
 
+# ==========================
+# AUTH
+# ==========================
 def _sha256_hex(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
@@ -124,6 +131,9 @@ def set_user_pro_month(db: Session, user: User, paid_until: datetime, subscripti
     db.commit()
 
 
+# ==========================
+# HELPERS
+# ==========================
 def base_url_from_request(request: Request) -> str:
     if APP_BASE_URL:
         return APP_BASE_URL
@@ -194,7 +204,8 @@ def compute_total(items: list[ProposalItem], overhead_percent: int, margin_perce
 
 def rebuild_items_from_form(descs: list[str], qtys: list[str], units: list[str], unit_prices: list[str]) -> list[ProposalItem]:
     items: list[ProposalItem] = []
-    for i in range(min(len(descs), len(qtys), len(units), len(unit_prices))):
+    n = min(len(descs), len(qtys), len(units), len(unit_prices))
+    for i in range(n):
         d = (descs[i] or "").strip()
         if not d:
             continue
@@ -204,26 +215,43 @@ def rebuild_items_from_form(descs: list[str], qtys: list[str], units: list[str],
                 q = 1.0
         except Exception:
             q = 1.0
-        u = (units[i] or "").strip() or ""
+
+        u = (units[i] or "").strip() or "un"
         up_cents = brl_to_cents(unit_prices[i] or "0")
         line = int(round(q * up_cents))
         items.append(ProposalItem(sort=i, description=d, qty=q, unit=u, unit_price_cents=up_cents, line_total_cents=line))
     return items
 
 
-def upsert_payment_stages(db: Session, p: Proposal, p1: int, p2: int, p3: int):
-    p1 = max(0, min(100, int(p1 or 0)))
-    p2 = max(0, min(100, int(p2 or 0)))
-    p3 = max(0, min(100, int(p3 or 0)))
+def plan_to_percents(payment_plan: str, p1: int, p2: int, p3: int) -> list[tuple[str, int]]:
+    payment_plan = (payment_plan or "").strip()
+    if payment_plan == "avista":
+        return [("À vista", 100)]
+    if payment_plan == "entrada_final_50":
+        return [("Entrada", 50), ("Na entrega", 50)]
+    if payment_plan == "3x_30_40_30":
+        return [("Entrada", 30), ("Durante o serviço", 40), ("Na entrega", 30)]
+    if payment_plan == "personalizado":
+        return [("Entrada", int(p1 or 0)), ("Durante o serviço", int(p2 or 0)), ("Na entrega", int(p3 or 0))]
+    # padrão: entrada_final_30
+    return [("Entrada", 30), ("Na entrega", 70)]
 
-    total_percent = p1 + p2 + p3
-    if total_percent == 0:
-        p1, p2, p3 = 30, 40, 30
-    elif total_percent != 100:
-        factor = 100 / total_percent
-        p1 = int(round(p1 * factor))
-        p2 = int(round(p2 * factor))
-        p3 = 100 - p1 - p2
+
+def upsert_payment_stages(db: Session, p: Proposal, plan: list[tuple[str, int]]):
+    cleaned: list[tuple[str, int]] = []
+    for title, percent in plan:
+        percent = max(0, min(100, int(percent or 0)))
+        if percent > 0:
+            cleaned.append((title, percent))
+
+    if not cleaned:
+        cleaned = [("Entrada", 30), ("Na entrega", 70)]
+
+    total_percent = sum(x[1] for x in cleaned)
+    if total_percent != 100:
+        delta = 100 - total_percent
+        t, pcent = cleaned[-1]
+        cleaned[-1] = (t, max(0, min(100, pcent + delta)))
 
     total = int(p.total_cents or 0)
 
@@ -235,27 +263,33 @@ def upsert_payment_stages(db: Session, p: Proposal, p1: int, p2: int, p3: int):
         db.delete(e)
     db.commit()
 
-    stages = [
-        PaymentStage(proposal_id=p.id, title="Sinal", percent=p1, amount_cents=amt(p1), status="pending"),
-        PaymentStage(proposal_id=p.id, title="Etapa 1", percent=p2, amount_cents=amt(p2), status="pending"),
-        PaymentStage(proposal_id=p.id, title="Etapa 2", percent=p3, amount_cents=amt(p3), status="pending"),
-    ]
-    for st in stages:
-        db.add(st)
+    for title, percent in cleaned:
+        db.add(PaymentStage(
+            proposal_id=p.id,
+            title=title,
+            percent=percent,
+            amount_cents=amt(percent),
+            status="pending"
+        ))
     db.commit()
 
 
 def ensure_signal_reminders(db: Session, p: Proposal):
-    signal = db.query(PaymentStage).filter(PaymentStage.proposal_id == p.id, PaymentStage.title == "Sinal").first()
-    if not signal or signal.status == "paid":
+    first = (
+        db.query(PaymentStage)
+        .filter(PaymentStage.proposal_id == p.id)
+        .order_by(PaymentStage.id.asc())
+        .first()
+    )
+    if not first or first.status == "paid":
         return
 
-    existing = db.query(PaymentReminder).filter(PaymentReminder.stage_id == signal.id).all()
+    existing = db.query(PaymentReminder).filter(PaymentReminder.stage_id == first.id).all()
     if existing:
         return
 
     for days in (0, 1, 3):
-        db.add(PaymentReminder(stage_id=signal.id, due_at=_now() + timedelta(days=days), status="pending"))
+        db.add(PaymentReminder(stage_id=first.id, due_at=_now() + timedelta(days=days), status="pending"))
     db.commit()
 
 
@@ -289,16 +323,19 @@ def build_followup_message(owner: User, p: Proposal, link: str, step: int) -> st
     return f"Oi {p.client_name}! Último toque pra eu não te incomodar:\nVou encerrar esse orçamento e liberar agenda.\nSe ainda tiver interesse, me chama que eu reabro.\n\nLink: {link}"
 
 
-def build_pix_message(owner: User, p: Proposal, amount_cents: int) -> str:
+def build_pix_message(owner: User, p: Proposal, amount_cents: int, stage_title: str = "Entrada") -> str:
     pix_line = f"Chave Pix: {owner.pix_key}" if owner.pix_key else "(Pix não configurado)"
     recebedor = f"Recebedor: {owner.pix_name}\n" if owner.pix_name else ""
     return (
-        f"{p.client_name}, pra reservar a data do *{p.project_name}* o sinal é *{cents_to_brl(amount_cents)}*.\n\n"
+        f"{p.client_name}, para confirmar o serviço *{p.project_name}*, o pagamento de *{stage_title}* é *{cents_to_brl(amount_cents)}*.\n\n"
         f"{recebedor}{pix_line}\n\n"
-        f"Assim que pagar, me manda o comprovante aqui e eu confirmo ✅"
+        f"Assim que pagar, me mande o comprovante aqui ✅"
     )
 
 
+# ==========================
+# ROUTES
+# ==========================
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -307,6 +344,7 @@ def home(request: Request, db: Session = Depends(get_db)):
     return RedirectResponse("/dashboard", status_code=302)
 
 
+# ===== AUTH =====
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None})
@@ -328,7 +366,14 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), d
     db.commit()
 
     resp = RedirectResponse("/dashboard", status_code=302)
-    resp.set_cookie(SESSION_COOKIE, token, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=60 * 60 * 24 * 30)
+    resp.set_cookie(
+        SESSION_COOKIE,
+        token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30
+    )
     return resp
 
 
@@ -348,7 +393,14 @@ def register(request: Request, email: str = Form(...), password: str = Form(...)
     db.commit()
 
     resp = RedirectResponse("/dashboard", status_code=302)
-    resp.set_cookie(SESSION_COOKIE, token, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=60 * 60 * 24 * 30)
+    resp.set_cookie(
+        SESSION_COOKIE,
+        token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30
+    )
     return resp
 
 
@@ -361,11 +413,13 @@ def logout(request: Request, db: Session = Depends(get_db)):
         if sess:
             db.delete(sess)
             db.commit()
+
     resp = RedirectResponse("/login", status_code=302)
     resp.delete_cookie(SESSION_COOKIE)
     return resp
 
 
+# ===== DASHBOARD =====
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -383,8 +437,12 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     due_followups = (
         db.query(FollowUpSchedule)
         .join(Proposal, Proposal.id == FollowUpSchedule.proposal_id)
-        .filter(Proposal.owner_id == user.id, Proposal.accepted_at.is_(None),
-                FollowUpSchedule.status == "pending", FollowUpSchedule.due_at <= now)
+        .filter(
+            Proposal.owner_id == user.id,
+            Proposal.accepted_at.is_(None),
+            FollowUpSchedule.status == "pending",
+            FollowUpSchedule.due_at <= now
+        )
         .order_by(FollowUpSchedule.due_at.asc())
         .all()
     )
@@ -393,11 +451,13 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         db.query(PaymentReminder)
         .join(PaymentStage, PaymentStage.id == PaymentReminder.stage_id)
         .join(Proposal, Proposal.id == PaymentStage.proposal_id)
-        .filter(Proposal.owner_id == user.id,
-                Proposal.accepted_at.isnot(None),
-                PaymentStage.status == "pending",
-                PaymentReminder.status == "pending",
-                PaymentReminder.due_at <= now)
+        .filter(
+            Proposal.owner_id == user.id,
+            Proposal.accepted_at.isnot(None),
+            PaymentStage.status == "pending",
+            PaymentReminder.status == "pending",
+            PaymentReminder.due_at <= now
+        )
         .order_by(PaymentReminder.due_at.asc())
         .all()
     )
@@ -416,6 +476,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     })
 
 
+# ===== NEW PROPOSAL =====
 @app.get("/proposals/new", response_class=HTMLResponse)
 def new_proposal_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -434,15 +495,23 @@ def create_proposal(
     price: str = Form(""),
     deadline: str = Form(...),
     validity_days: int = Form(7),
+
+    # compat (antigo) + simples (novo)
     overhead_percent: int = Form(10),
     margin_percent: int = Form(0),
+    reserve_percent: int = Form(0),
+    profit_percent: int = Form(0),
+
+    payment_plan: str = Form("entrada_final_30"),
     p1_percent: int = Form(30),
     p2_percent: int = Form(40),
     p3_percent: int = Form(30),
+
     item_desc: list[str] = Form([]),
     item_qty: list[str] = Form([]),
     item_unit: list[str] = Form([]),
     item_unit_price: list[str] = Form([]),
+
     db: Session = Depends(get_db),
 ):
     user = get_current_user(request, db)
@@ -456,6 +525,9 @@ def create_proposal(
 
     valid_until = _now() + timedelta(days=max(1, min(int(validity_days or 7), 30)))
 
+    final_overhead = int(reserve_percent or overhead_percent or 0)
+    final_margin = int(profit_percent or margin_percent or 0)
+
     p = Proposal(
         client_name=client_name.strip(),
         client_whatsapp=client_whatsapp.strip() or None,
@@ -466,8 +538,8 @@ def create_proposal(
         status="created",
         valid_until=valid_until,
         last_activity_at=_now(),
-        overhead_percent=int(overhead_percent or 0),
-        margin_percent=int(margin_percent or 0),
+        overhead_percent=final_overhead,
+        margin_percent=final_margin,
         revision=1,
         updated_at=_now(),
     )
@@ -489,15 +561,17 @@ def create_proposal(
         total_cents = override
 
     p.total_cents = total_cents
-    p.price = cents_to_brl(total_cents)  # mantém telas antigas bonitas
+    p.price = cents_to_brl(total_cents)
     db.add(p)
     db.commit()
 
-    upsert_payment_stages(db, p, p1_percent, p2_percent, p3_percent)
+    plan = plan_to_percents(payment_plan, p1_percent, p2_percent, p3_percent)
+    upsert_payment_stages(db, p, plan)
 
     return RedirectResponse("/dashboard", status_code=302)
 
 
+# ===== EDIT PROPOSAL (VERSION) =====
 @app.get("/proposals/{proposal_id}/edit", response_class=HTMLResponse)
 def edit_proposal_page(proposal_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -513,7 +587,14 @@ def edit_proposal_page(proposal_id: int, request: Request, db: Session = Depends
     p2 = stages[1].percent if len(stages) > 1 else 40
     p3 = stages[2].percent if len(stages) > 2 else 30
 
-    return templates.TemplateResponse("edit_proposal.html", {"request": request, "p": p, "p1": p1, "p2": p2, "p3": p3})
+    return templates.TemplateResponse("edit_proposal.html", {
+        "request": request,
+        "p": p,
+        "p1": p1,
+        "p2": p2,
+        "p3": p3
+    })
+
 
 @app.post("/proposals/{proposal_id}/edit")
 def edit_proposal_save(
@@ -524,16 +605,23 @@ def edit_proposal_save(
     project_name: str = Form(...),
     description: str = Form(...),
     deadline: str = Form(...),
+    price: str = Form(""),
+
     overhead_percent: int = Form(10),
     margin_percent: int = Form(0),
-    price: str = Form(""),
+    reserve_percent: int = Form(0),
+    profit_percent: int = Form(0),
+
+    payment_plan: str = Form("entrada_final_30"),
     p1_percent: int = Form(30),
     p2_percent: int = Form(40),
     p3_percent: int = Form(30),
+
     item_desc: list[str] = Form([]),
     item_qty: list[str] = Form([]),
     item_unit: list[str] = Form([]),
     item_unit_price: list[str] = Form([]),
+
     db: Session = Depends(get_db),
 ):
     user = get_current_user(request, db)
@@ -544,6 +632,7 @@ def edit_proposal_save(
     if not p:
         return RedirectResponse("/dashboard", status_code=302)
 
+    # snapshot antes
     snapshot = {
         "revision": p.revision,
         "client_name": p.client_name,
@@ -575,9 +664,13 @@ def edit_proposal_save(
     p.project_name = project_name.strip()
     p.description = description.strip()
     p.deadline = deadline.strip()
-    p.overhead_percent = int(overhead_percent or 0)
-    p.margin_percent = int(margin_percent or 0)
 
+    final_overhead = int(reserve_percent or overhead_percent or 0)
+    final_margin = int(profit_percent or margin_percent or 0)
+    p.overhead_percent = final_overhead
+    p.margin_percent = final_margin
+
+    # recria itens
     for it in list(p.items):
         db.delete(it)
     db.commit()
@@ -601,11 +694,13 @@ def edit_proposal_save(
     db.add(p)
     db.commit()
 
-    upsert_payment_stages(db, p, p1_percent, p2_percent, p3_percent)
+    plan = plan_to_percents(payment_plan, p1_percent, p2_percent, p3_percent)
+    upsert_payment_stages(db, p, plan)
 
     return RedirectResponse("/dashboard", status_code=302)
 
 
+# ===== SEND / FOLLOWUP =====
 @app.get("/proposals/{proposal_id}/send_whatsapp")
 def send_whatsapp(proposal_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -649,7 +744,11 @@ def send_followup(proposal_id: int, step: int, request: Request, db: Session = D
         return RedirectResponse(f"/proposals/{p.id}/edit", status_code=302)
 
     ensure_followups(db, p)
-    f = db.query(FollowUpSchedule).filter(FollowUpSchedule.proposal_id == p.id, FollowUpSchedule.step == step, FollowUpSchedule.status == "pending").first()
+    f = db.query(FollowUpSchedule).filter(
+        FollowUpSchedule.proposal_id == p.id,
+        FollowUpSchedule.step == step,
+        FollowUpSchedule.status == "pending"
+    ).first()
 
     link = proposal_public_link(request, p)
     text = build_followup_message(user, p, link, step)
@@ -663,6 +762,7 @@ def send_followup(proposal_id: int, step: int, request: Request, db: Session = D
     return RedirectResponse(whatsapp_url(phone, text), status_code=302)
 
 
+# ===== PUBLIC (TRACK + ACCEPT) =====
 @app.get("/p/{public_id}", response_class=HTMLResponse)
 def public_proposal(public_id: str, request: Request, db: Session = Depends(get_db)):
     p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
@@ -730,6 +830,7 @@ def accept_proposal(public_id: str, request: Request, name: str = Form(...), ema
     return templates.TemplateResponse("accepted.html", {"request": request, "p": p, "owner": owner, "base_url": base_url})
 
 
+# ===== PDF =====
 @app.get("/p/{public_id}/pdf")
 def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
     p = db.query(Proposal).filter(Proposal.public_id == public_id).first()
@@ -813,6 +914,7 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
+# ===== PAYMENTS =====
 @app.get("/payments/reminders/{reminder_id}/send_whatsapp")
 def send_payment_reminder(reminder_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -835,7 +937,7 @@ def send_payment_reminder(reminder_id: int, request: Request, db: Session = Depe
     if not phone:
         return RedirectResponse(f"/proposals/{p.id}/edit", status_code=302)
 
-    text = build_pix_message(user, p, st.amount_cents)
+    text = build_pix_message(user, p, st.amount_cents, st.title)
 
     r.status = "sent"
     r.sent_at = _now()
@@ -872,6 +974,7 @@ def mark_stage_paid(stage_id: int, request: Request, db: Session = Depends(get_d
     return RedirectResponse("/dashboard", status_code=302)
 
 
+# ===== PROFILE / STATIC =====
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -937,6 +1040,7 @@ def support(request: Request):
     return templates.TemplateResponse("support.html", {"request": request})
 
 
+# ===== ASAAS =====
 def ensure_asaas_customer(db: Session, user: User) -> str:
     if user.asaas_customer_id:
         return user.asaas_customer_id
@@ -946,9 +1050,16 @@ def ensure_asaas_customer(db: Session, user: User) -> str:
     payload = {"name": name, "email": user.email}
     if user.cpf_cnpj:
         payload["cpfCnpj"] = user.cpf_cnpj
+
     r = requests.post(f"{asaas_api_base()}/customers", headers=asaas_headers(), json=payload, timeout=30)
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"Erro Asaas ao criar customer: {r.status_code} - {r.text}")
+
     data = r.json()
     cid = data.get("id")
+    if not cid:
+        raise RuntimeError("Asaas não retornou customer id.")
+
     user.asaas_customer_id = cid
     db.add(user)
     db.commit()
@@ -968,8 +1079,12 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/billing", status_code=302)
 
     if not getattr(user, "cpf_cnpj", None):
-        return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": False,
-            "error": "Para assinar o PRO, preencha seu CPF/CNPJ no perfil e salve."})
+        return templates.TemplateResponse("profile.html", {
+            "request": request,
+            "user": user,
+            "saved": False,
+            "error": "Para assinar o PRO, preencha seu CPF/CNPJ no perfil e salve.",
+        })
 
     customer_id = ensure_asaas_customer(db, user)
     next_due = date.today().strftime("%Y-%m-%d")
@@ -983,6 +1098,9 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
         "externalReference": f"user_{user.id}",
     }
     r = requests.post(f"{asaas_api_base()}/subscriptions", headers=asaas_headers(), json=payload, timeout=30)
+    if r.status_code not in (200, 201):
+        return HTMLResponse(f"Erro Asaas ao criar assinatura: {r.status_code}<br><pre>{r.text}</pre>", status_code=500)
+
     sub = r.json()
     sub_id = sub.get("id")
     user.asaas_subscription_id = sub_id
@@ -1039,4 +1157,3 @@ async def webhooks_asaas(request: Request, db: Session = Depends(get_db)):
         return {"ok": True}
 
     return {"ok": True}
-
