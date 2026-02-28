@@ -213,7 +213,7 @@ def gen_6digit_code() -> str:
 
 def send_email(to_email: str, subject: str, body: str):
     if not (SMTP_HOST and SMTP_USER and SMTP_PASS and SMTP_FROM):
-        raise RuntimeError("SMTP não configurado (defina SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM no Render).")
+        raise RuntimeError("SMTP não configurado (SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM).")
 
     msg = EmailMessage()
     msg["From"] = SMTP_FROM
@@ -221,11 +221,20 @@ def send_email(to_email: str, subject: str, body: str):
     msg["Subject"] = subject
     msg.set_content(body)
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
+    # Porta 465 (SSL) costuma funcionar melhor no Render
+    if SMTP_PORT == 465:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=60) as s:
+            s.login(SMTP_USER, SMTP_PASS)
+            s.send_message(msg)
+        return
+
+    # Porta 587 (STARTTLS)
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=60) as s:
+        s.ehlo()
         s.starttls()
+        s.ehlo()
         s.login(SMTP_USER, SMTP_PASS)
         s.send_message(msg)
-
 
 def issue_verification_code(db: Session, user: User):
     code = gen_6digit_code()
