@@ -49,6 +49,41 @@
       <h3 class="h2" style="font-size:15px;">Descrição do serviço</h3>
       <p style="color: rgba(232,238,252,0.85); line-height:1.5; white-space: pre-wrap;">{{ p.description }}</p>
 
+      <!-- ITENS (se houver) -->
+      {% if items and items|length > 0 %}
+        <div class="card" style="margin-top:14px; padding:14px;">
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">Itens</h3>
+
+          <div class="table-wrap" style="margin-top:10px;">
+            <table class="table" style="min-width: 680px;">
+              <tr>
+                <th>Item</th>
+                <th>Quantidade</th>
+                <th>Valor (R$)</th>
+                <th>Total</th>
+              </tr>
+              {% for it in items %}
+                <tr>
+                  <td>{{ it.desc }}</td>
+                  <td>{{ it.qty }}</td>
+                  <td>{{ it.unit_price_brl }}</td>
+                  <td style="font-weight:900;">{{ it.line_total_brl }}</td>
+                </tr>
+              {% endfor %}
+            </table>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; gap:10px; margin-top:12px; flex-wrap:wrap;">
+            <span class="pill">Total dos itens: <b style="color: rgba(232,238,252,0.95);">{{ items_subtotal_brl }}</b></span>
+            <span class="pill">Total final: <b style="color: rgba(232,238,252,0.95);">{{ final_total_brl }}</b></span>
+          </div>
+
+          <p class="small" style="margin-top:10px; opacity:.75;">
+            (Se o total final for diferente do total dos itens, foi definido um valor total fechado.)
+          </p>
+        </div>
+      {% endif %}
+
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:18px;">
         <div class="card" style="padding:14px;">
           <p class="small" style="margin:0 0 6px;">Valor</p>

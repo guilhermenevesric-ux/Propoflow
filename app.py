@@ -1343,6 +1343,47 @@ def public_proposal(public_id: str, request: Request, db: Session = Depends(get_
     terms_src = (getattr(p, "terms_text", None) or "") or ((getattr(owner, "default_terms", "") or "") if owner else "")
     terms_lines = terms_to_list(terms_src)
 
+    # ===== Itens formatados para o link público =====
+    def _fmt_qty(q):
+        try:
+            f = float(q)
+            if f.is_integer():
+                return str(int(f))
+            s = str(f).rstrip("0").rstrip(".")
+            return s
+        except Exception:
+            return str(q or "")
+
+    display_items = []
+    items_subtotal_cents = 0
+    for it in getattr(p, "items", []) or []:
+        line = int(getattr(it, "line_total_cents", 0) or 0)
+        items_subtotal_cents += line
+        display_items.append({
+            "desc": getattr(it, "description", "") or "",
+            "qty": _fmt_qty(getattr(it, "qty", 1)),
+            "unit_price_brl": cents_to_brl(int(getattr(it, "unit_price_cents", 0) or 0)),
+            "line_total_brl": cents_to_brl(line),
+        })
+
+    items_subtotal_brl = cents_to_brl(items_subtotal_cents)
+    final_total_brl = cents_to_brl(int(getattr(p, "total_cents", 0) or 0))
+
+    # ===== Condições: sempre mostrar (fallback) =====
+    if not terms_lines:
+        valid_txt = ""
+        if getattr(p, "valid_until", None):
+            valid_txt = f"Validade: até {p.valid_until.strftime('%d/%m/%Y')}."
+        else:
+            valid_txt = "Validade: conforme combinado."
+
+        terms_lines = [
+            valid_txt,
+            "Pagamento: conforme “Como pagar” acima.",
+            "O que não estiver descrito no orçamento não está incluso.",
+            "Reagendamento: avisar com antecedência (sujeito à disponibilidade).",
+        ]
+
     resp = templates.TemplateResponse("proposal_public.html", {
         "request": request,
         "p": p,
@@ -1351,6 +1392,9 @@ def public_proposal(public_id: str, request: Request, db: Session = Depends(get_
         "status_label": status_label,
         "stages": stages,
         "terms_lines": terms_lines,
+        "items": display_items,
+        "items_subtotal_brl": items_subtotal_brl,
+        "final_total_brl": final_total_brl,
     })
 
 
@@ -1403,6 +1447,20 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
     terms_src = (getattr(p, "terms_text", None) or "") or (getattr(owner, "default_terms", "") or "")
     payment_terms = terms_to_list(terms_src)
 
+    if not payment_terms:
+        valid_txt = ""
+        if getattr(p, "valid_until", None):
+            valid_txt = f"Validade: até {p.valid_until.strftime('%d/%m/%Y')}."
+        else:
+            valid_txt = "Validade: conforme combinado."
+
+        payment_terms = [
+            valid_txt,
+            "Pagamento: conforme definido no orçamento.",
+            "O que não estiver descrito no orçamento não está incluso.",
+            "Reagendamento: avisar com antecedência (sujeito à disponibilidade).",
+        ]
+
     pdf_bytes = generate_proposal_pdf({
         "client_name": p.client_name,
         "project_name": p.project_name,
@@ -1449,6 +1507,20 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     # termos: usa o congelado do orçamento; se não tiver, cai pro padrão do user
     terms_src = (getattr(p, "terms_text", None) or "") or (getattr(user, "default_terms", "") or "")
     payment_terms = terms_to_list(terms_src)
+
+    if not payment_terms:
+        valid_txt = ""
+        if getattr(p, "valid_until", None):
+            valid_txt = f"Validade: até {p.valid_until.strftime('%d/%m/%Y')}."
+        else:
+            valid_txt = "Validade: conforme combinado."
+
+        payment_terms = [
+            valid_txt,
+            "Pagamento: conforme definido no orçamento.",
+            "O que não estiver descrito no orçamento não está incluso.",
+            "Reagendamento: avisar com antecedência (sujeito à disponibilidade).",
+        ]
 
     pdf_bytes = generate_proposal_pdf({
         "client_name": p.client_name,
