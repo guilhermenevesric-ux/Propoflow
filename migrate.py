@@ -168,4 +168,24 @@ with engine.begin() as conn:
         else:
             conn.execute(text("ALTER TABLE proposals ADD COLUMN last_viewed_at DATETIME"))
 
+
+    # USERS: email verification
+    if not column_exists(conn, "users", "email_verified"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0"))
+
+    if not column_exists(conn, "users", "email_verify_code_hash"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verify_code_hash VARCHAR(255)"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN email_verify_code_hash VARCHAR(255)"))
+
+    if not column_exists(conn, "users", "email_verify_expires_at"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verify_expires_at TIMESTAMP NULL"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN email_verify_expires_at DATETIME"))
+
 print("✅ migrate.py OK")

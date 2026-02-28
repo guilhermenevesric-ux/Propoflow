@@ -6,6 +6,10 @@ from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
 from datetime import datetime, timedelta, date
 
+import secrets
+import smtplib
+from email.message import EmailMessage
+
 import base64
 from PIL import Image
 import io
@@ -43,6 +47,38 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+@app.middleware("http")
+async def require_verified_email(request: Request, call_next):
+    path = request.url.path
+
+    # rotas liberadas
+    allow = (
+        path.startswith("/static")
+        or path.startswith("/p/")      # público
+        or path in ("/login", "/register", "/logout", "/verify")
+        or path.startswith("/verify/")
+        or path.startswith("/webhooks")
+        or path in ("/favicon.ico", "/")
+    )
+    if allow:
+        return await call_next(request)
+
+    # se logado, mas não verificado => manda pro verify
+    user_id = request.cookies.get(COOKIE_NAME)
+    if user_id and user_id not in ("None", "null", ""):
+        try:
+            uid = int(user_id)
+            db = SessionLocal()
+            try:
+                u = db.query(User).filter(User.id == uid).first()
+                if u and not getattr(u, "email_verified", False):
+                    return RedirectResponse("/verify", status_code=302)
+            finally:
+                db.close()
+        except Exception:
+            pass
+
+    return await call_next(request)
 
 def get_db():
     db = SessionLocal()
@@ -59,6 +95,12 @@ SESSION_COOKIE = "session_token"
 
 APP_BASE_URL = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
 COOKIE_SECURE = True if (APP_BASE_URL.startswith("https://")) else False
+
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587").strip() or "587")
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASS = os.getenv("SMTP_PASS", "").strip()
+SMTP_FROM = os.getenv("SMTP_FROM", "").strip()  # ex: "PropoFlow <no-reply@seu-dominio.com>"
 
 ASAAS_API_KEY = os.getenv("ASAAS_API_KEY", "").strip()
 ASAAS_ENV = os.getenv("ASAAS_ENV", "sandbox").strip().lower()
@@ -152,9 +194,110 @@ def render_message_template(tpl: str, cliente: str, servico: str, link: str) -> 
             .replace("{servico}", servico or "")
             .replace("{link}", link or ""))
 
+def normalize_email(email: str) -> str:
+    email = (email or "").strip().lower()
+    if "@" not in email:
+        return email
+    local, domain = email.split("@", 1)
+    domain = domain.lower()
+
+    # evita "contas infinitas" no Gmail: remove +tag e pontos
+    if domain in ("gmail.com", "googlemail.com"):
+        local = local.split("+", 1)[0]
+        local = local.replace(".", "")
+        domain = "gmail.com"
+    return f"{local}@{domain}"
+
+
+def gen_6digit_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def send_email(to_email: str, subject: str, body: str):
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASS and SMTP_FROM):
+        raise RuntimeError("SMTP não configurado (defina SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM no Render).")
+
+    msg = EmailMessage()
+    msg["From"] = SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
+        s.starttls()
+        s.login(SMTP_USER, SMTP_PASS)
+        s.send_message(msg)
+
+
+def issue_verification_code(db: Session, user: User):
+    code = gen_6digit_code()
+    user.email_verify_code_hash = pbkdf2_sha256.hash(code)
+    user.email_verify_expires_at = datetime.utcnow() + timedelta(minutes=15)
+    db.add(user)
+    db.commit()
+
+    body = (
+        "Seu código PropoFlow:\n\n"
+        f"{code}\n\n"
+        "Ele expira em 15 minutos.\n"
+        "Se você não solicitou, ignore este e-mail."
+    )
+    send_email(user.email, "Seu código PropoFlow", body)
+
 # ==========================
 # HELPERS
 # ==========================
+
+import secrets, smtplib
+from email.message import EmailMessage
+
+def normalize_email(email: str) -> str:
+    email = (email or "").strip().lower()
+    if "@" not in email:
+        return email
+    local, domain = email.split("@", 1)
+    domain = domain.lower()
+
+    # Gmail: remove +tag e pontos (evita infinitas contas free no mesmo inbox)
+    if domain in ("gmail.com", "googlemail.com"):
+        local = local.split("+", 1)[0]
+        local = local.replace(".", "")
+        domain = "gmail.com"
+    return f"{local}@{domain}"
+
+def gen_6digit_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+def send_email(to_email: str, subject: str, body: str):
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASS and SMTP_FROM):
+        raise RuntimeError("SMTP não configurado (SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM).")
+
+    msg = EmailMessage()
+    msg["From"] = SMTP_FROM
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
+        s.starttls()
+        s.login(SMTP_USER, SMTP_PASS)
+        s.send_message(msg)
+
+def issue_verification_code(db: Session, user: User):
+    code = gen_6digit_code()
+    user.email_verify_code_hash = pbkdf2_sha256.hash(code)
+    user.email_verify_expires_at = datetime.utcnow() + timedelta(minutes=15)
+    db.add(user)
+    db.commit()
+
+    body = (
+        "Seu código PropoFlow:\n\n"
+        f"{code}\n\n"
+        "Ele expira em 15 minutos.\n"
+        "Se você não solicitou, ignore este e-mail."
+    )
+    send_email(user.email, "Seu código PropoFlow", body)
+
 def base_url_from_request(request: Request) -> str:
     if APP_BASE_URL:
         return APP_BASE_URL
@@ -458,15 +601,31 @@ def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request, "error": None})
 
 
+
 @app.post("/login")
 def login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == email.strip().lower()).first()
+    email_norm = normalize_email(email)
+    user = db.query(User).filter(User.email == email_norm).first()
+
     if (not user) or (not pbkdf2_sha256.verify(password, user.password_hash)):
         return templates.TemplateResponse("login.html", {"request": request, "error": "Email ou senha inválidos."})
 
     token, sess = create_session(user)
     db.add(sess)
     db.commit()
+
+    # Se não verificou, manda pro verify (e reenvia se expirou/não existe)
+    if not getattr(user, "email_verified", False):
+        expired = (not getattr(user, "email_verify_expires_at", None)) or (user.email_verify_expires_at < datetime.utcnow())
+        if expired or not getattr(user, "email_verify_code_hash", None):
+            try:
+                issue_verification_code(db, user)
+            except Exception as e:
+                return templates.TemplateResponse("login.html", {"request": request, "error": f"Confirme seu e-mail. Erro ao enviar código: {str(e)}"})
+
+        resp = RedirectResponse("/verify", status_code=302)
+        resp.set_cookie(SESSION_COOKIE, token, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=60 * 60 * 24 * 30)
+        return resp
 
     resp = RedirectResponse("/dashboard", status_code=302)
     resp.set_cookie(SESSION_COOKIE, token, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=60 * 60 * 24 * 30)
@@ -475,23 +634,134 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), d
 
 @app.post("/register")
 def register(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    email = email.strip().lower()
-    if db.query(User).filter(User.email == email).first():
+    email_norm = normalize_email(email)
+
+    if db.query(User).filter(User.email == email_norm).first():
         return templates.TemplateResponse("register.html", {"request": request, "error": "Esse email já existe. Faça login."})
 
-    user = User(email=email, password_hash=pbkdf2_sha256.hash(password), proposal_limit=5, plan="free", delete_credits=1)
+    user = User(
+        email=email_norm,
+        password_hash=pbkdf2_sha256.hash(password),
+        proposal_limit=5,
+        plan="free",
+        delete_credits=1,
+        email_verified=False,
+        email_verify_code_hash=None,
+        email_verify_expires_at=None,
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
 
+    # envia código
+    try:
+        issue_verification_code(db, user)
+    except Exception as e:
+        return templates.TemplateResponse("register.html", {"request": request, "error": f"Erro ao enviar código: {str(e)}"})
+
+    # cria sessão e manda pro verify
     token, sess = create_session(user)
     db.add(sess)
     db.commit()
 
-    resp = RedirectResponse("/dashboard", status_code=302)
+    resp = RedirectResponse("/verify", status_code=302)
     resp.set_cookie(SESSION_COOKIE, token, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=60 * 60 * 24 * 30)
     return resp
 
+
+@app.get("/verify", response_class=HTMLResponse)
+def verify_page(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    if getattr(user, "email_verified", False):
+        return RedirectResponse("/dashboard", status_code=302)
+
+    return templates.TemplateResponse("verify.html", {
+        "request": request,
+        "email": user.email,
+        "error": None,
+        "info": None,
+    })
+
+
+@app.post("/verify")
+def verify_submit(request: Request, code: str = Form(...), db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    if getattr(user, "email_verified", False):
+        return RedirectResponse("/dashboard", status_code=302)
+
+    code = (code or "").strip()
+    if not re.fullmatch(r"\d{6}", code):
+        return templates.TemplateResponse("verify.html", {
+            "request": request,
+            "email": user.email,
+            "error": "Código inválido. Digite 6 números.",
+            "info": None,
+        })
+
+    if not user.email_verify_code_hash or not user.email_verify_expires_at:
+        return templates.TemplateResponse("verify.html", {
+            "request": request,
+            "email": user.email,
+            "error": "Seu código expirou. Clique em reenviar.",
+            "info": None,
+        })
+
+    if user.email_verify_expires_at < datetime.utcnow():
+        return templates.TemplateResponse("verify.html", {
+            "request": request,
+            "email": user.email,
+            "error": "Seu código expirou. Clique em reenviar.",
+            "info": None,
+        })
+
+    if not pbkdf2_sha256.verify(code, user.email_verify_code_hash):
+        return templates.TemplateResponse("verify.html", {
+            "request": request,
+            "email": user.email,
+            "error": "Código incorreto. Tente novamente.",
+            "info": None,
+        })
+
+    user.email_verified = True
+    user.email_verify_code_hash = None
+    user.email_verify_expires_at = None
+    db.add(user)
+    db.commit()
+
+    return RedirectResponse("/dashboard", status_code=302)
+
+
+@app.post("/verify/resend")
+def verify_resend(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    if getattr(user, "email_verified", False):
+        return RedirectResponse("/dashboard", status_code=302)
+
+    try:
+        issue_verification_code(db, user)
+    except Exception as e:
+        return templates.TemplateResponse("verify.html", {
+            "request": request,
+            "email": user.email,
+            "error": f"Erro ao reenviar código: {str(e)}",
+            "info": None,
+        })
+
+    return templates.TemplateResponse("verify.html", {
+        "request": request,
+        "email": user.email,
+        "error": None,
+        "info": "Código reenviado. Verifique seu e-mail.",
+    })
 
 @app.get("/logout")
 def logout(request: Request, db: Session = Depends(get_db)):

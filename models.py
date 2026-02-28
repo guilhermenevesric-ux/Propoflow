@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db import Base
@@ -7,6 +7,10 @@ from sqlalchemy import Boolean
 
 class User(Base):
     __tablename__ = "users"
+
+    email_verified = Column(Boolean, default=False)
+    email_verify_code_hash = Column(String(255), nullable=True)
+    email_verify_expires_at = Column(DateTime, nullable=True)
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
