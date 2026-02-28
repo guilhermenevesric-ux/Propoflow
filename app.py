@@ -54,7 +54,7 @@ async def require_verified_email(request: Request, call_next):
     # rotas liberadas
     allow = (
         path.startswith("/static")
-        or path.startswith("/p/")      # público
+        or path.startswith("/p/")          # público
         or path in ("/login", "/register", "/logout", "/verify")
         or path.startswith("/verify/")
         or path.startswith("/webhooks")
@@ -63,22 +63,20 @@ async def require_verified_email(request: Request, call_next):
     if allow:
         return await call_next(request)
 
-    # se logado, mas não verificado => manda pro verify
-    user_id = request.cookies.get(COOKIE_NAME)
-    if user_id and user_id not in ("None", "null", ""):
+    # se está logado e não verificado => manda pro verify
+    try:
+        db = SessionLocal()
         try:
-            uid = int(user_id)
-            db = SessionLocal()
-            try:
-                u = db.query(User).filter(User.id == uid).first()
-                if u and not getattr(u, "email_verified", False):
-                    return RedirectResponse("/verify", status_code=302)
-            finally:
-                db.close()
-        except Exception:
-            pass
+            user = get_current_user(request, db)  # usa sua sessão (SESSION_COOKIE)
+            if user and not getattr(user, "email_verified", False):
+                return RedirectResponse("/verify", status_code=302)
+        finally:
+            db.close()
+    except Exception:
+        pass
 
     return await call_next(request)
+
 
 def get_db():
     db = SessionLocal()
