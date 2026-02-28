@@ -1504,8 +1504,8 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         "payment_stages": stages,
         "accept_url": accept_url,
         "payment_terms": payment_terms,
-        "logo_mime": getattr(owner_or_user, "logo_mime", None),
-        "logo_b64": getattr(owner_or_user, "logo_b64", None),
+        "logo_mime": getattr(owner, "logo_mime", None) if owner else None,
+        "logo_b64": getattr(owner, "logo_b64", None) if owner else None,
     })
 
     filename = f"orcamento_{p.client_name.replace(' ', '')}_{p.public_id}.pdf"
