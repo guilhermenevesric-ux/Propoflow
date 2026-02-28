@@ -212,29 +212,33 @@ def gen_6digit_code() -> str:
 
 
 def send_email(to_email: str, subject: str, body: str):
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASS and SMTP_FROM):
-        raise RuntimeError("SMTP não configurado (SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM).")
+    brevo_key = os.getenv("BREVO_API_KEY", "").strip()
+    sender_email = os.getenv("BREVO_SENDER_EMAIL", "").strip()
+    sender_name = os.getenv("BREVO_SENDER_NAME", "PropoFlow").strip()
 
-    msg = EmailMessage()
-    msg["From"] = SMTP_FROM
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.set_content(body)
+    if not (brevo_key and sender_email):
+        raise RuntimeError("Brevo API não configurada (BREVO_API_KEY e BREVO_SENDER_EMAIL).")
 
-    # Porta 465 (SSL) costuma funcionar melhor no Render
-    if SMTP_PORT == 465:
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=60) as s:
-            s.login(SMTP_USER, SMTP_PASS)
-            s.send_message(msg)
-        return
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "textContent": body,
+    }
 
-    # Porta 587 (STARTTLS)
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=60) as s:
-        s.ehlo()
-        s.starttls()
-        s.ehlo()
-        s.login(SMTP_USER, SMTP_PASS)
-        s.send_message(msg)
+    r = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "api-key": brevo_key,
+            "Content-Type": "application/json",
+            "accept": "application/json",
+        },
+        json=payload,
+        timeout=30,
+    )
+
+    if r.status_code not in (200, 201, 202):
+        raise RuntimeError(f"Brevo API erro {r.status_code}: {r.text}")
 
 def issue_verification_code(db: Session, user: User):
     code = gen_6digit_code()
