@@ -1417,7 +1417,7 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         "total_cents": p.total_cents,
         "payment_stages": stages,
         "accept_url": accept_url,
-        "payment_terms": terms_to_list(user.default_terms or "")
+        "payment_terms": terms_to_list(user.default_terms or ""),
         "payment_terms": payment_terms,
     })
 
@@ -1447,7 +1447,7 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
         for st in p.payment_stages
     ]
 
-    terms_src = (getattr(p, "terms_text", None) or "") or ((owner.default_terms or "") if owner else "")
+    terms_src = (getattr(p, "terms_text", None) or "") or ((owner.default_terms or "") if owner else "") ,
     payment_terms = terms_to_list(terms_src)
 
     pdf_bytes = generate_proposal_pdf({
