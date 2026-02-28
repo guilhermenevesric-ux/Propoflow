@@ -1340,7 +1340,7 @@ def public_proposal(public_id: str, request: Request, db: Session = Depends(get_
 
     stages = db.query(PaymentStage).filter(PaymentStage.proposal_id == p.id).order_by(PaymentStage.id.asc()).all()
 
-    terms_src = (getattr(p, "terms_text", None) or "") or ((owner.default_terms or "") if owner else "")
+    terms_src = (getattr(p, "terms_text", None) or "") or ((getattr(owner, "default_terms", "") or "") if owner else "")
     terms_lines = terms_to_list(terms_src)
 
     resp = templates.TemplateResponse("proposal_public.html", {
@@ -1399,7 +1399,8 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         for st in p.payment_stages
     ]
 
-    terms_src = (getattr(p, "terms_text", None) or "") or ((owner.default_terms or "") if owner else "")
+    # termos: usa o congelado do orçamento; se não tiver, cai pro padrão do owner
+    terms_src = (getattr(p, "terms_text", None) or "") or (getattr(owner, "default_terms", "") or "")
     payment_terms = terms_to_list(terms_src)
 
     pdf_bytes = generate_proposal_pdf({
@@ -1417,14 +1418,12 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         "total_cents": p.total_cents,
         "payment_stages": stages,
         "accept_url": accept_url,
-        "payment_terms": terms_to_list(user.default_terms or ""),
         "payment_terms": payment_terms,
     })
 
     filename = f"orcamento_{p.client_name.replace(' ', '')}_{p.public_id}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
-
 
 @app.get("/proposals/{proposal_id}/pdf")
 def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_db)):
@@ -1447,7 +1446,8 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
         for st in p.payment_stages
     ]
 
-    terms_src = (getattr(p, "terms_text", None) or "") or ((owner.default_terms or "") if owner else "") ,
+    # termos: usa o congelado do orçamento; se não tiver, cai pro padrão do user
+    terms_src = (getattr(p, "terms_text", None) or "") or (getattr(user, "default_terms", "") or "")
     payment_terms = terms_to_list(terms_src)
 
     pdf_bytes = generate_proposal_pdf({
@@ -1471,8 +1471,6 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     filename = f"orcamento_{p.client_name.replace(' ', '')}_{p.id}.pdf"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
-
-
 # ===== PROFILE / BILLING / PRICING / STATIC =====
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, db: Session = Depends(get_db)):
