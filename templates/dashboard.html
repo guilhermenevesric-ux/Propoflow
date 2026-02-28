@@ -8,48 +8,54 @@
 </head>
 <body>
   <div class="container">
+
+    <!-- TOPBAR (simples) -->
     <div class="nav">
       <div class="brand">
         <div class="logo"></div>
         <div>
-          {% if owner and owner.company_name %}
-            <h1>{{ owner.company_name }}</h1>
-            <p>
-              {% if owner.display_name %}{{ owner.display_name }}{% endif %}
-              {% if owner.phone %} • {{ owner.phone }}{% endif %}
-            </p>
-          {% else %}
-            <h1>PropoFlow</h1>
-            <p>
-              {% if owner and owner.display_name %}{{ owner.display_name }}{% else %}Orçamentos profissionais{% endif %}
-              {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
-            </p>
-          {% endif %}
+          <h1>
+            {% if owner and owner.company_name %}
+              {{ owner.company_name }}
+            {% else %}
+              PropoFlow
+            {% endif %}
+          </h1>
+          <p>
+            {% if owner and owner.display_name %}{{ owner.display_name }}{% endif %}
+            {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
+          </p>
         </div>
       </div>
 
       <div class="actions">
-        <a class="btn btn-ghost" href="/wizard">Assistente</a>
-        <a class="btn btn-ghost" href="/services">Meus serviços</a>
-        <a class="btn btn-ghost" href="/clients">Clientes</a>
-        <a class="btn btn-ghost" href="/settings">Padrões</a>
+        <a class="btn" href="/wizard">+ Novo orçamento</a>
 
-        <a class="btn btn-ghost" href="/profile">Perfil</a>
-        <a class="btn btn-ghost" href="/billing">Assinatura</a>
-
-        {% if user and user.plan == "pro" %}
-          <span class="pill">✨ PRO</span>
+        {% if user and user.plan != "pro" %}
+          <a class="btn btn-ghost" href="/pricing">Upgrade</a>
         {% else %}
-          <a class="btn" href="/pricing">Upgrade</a>
+          <span class="pill">✨ PRO</span>
         {% endif %}
 
-        <a class="btn" href="/wizard">+ Novo orçamento</a>
-        <a class="btn btn-ghost" href="/logout">Sair</a>
+        <!-- Menu compacto -->
+        <details class="menu">
+          <summary class="btn btn-ghost icon-btn" title="Menu">☰</summary>
+          <div class="menu-panel">
+            <a href="/wizard">Assistente</a>
+            <a href="/services">Meus serviços</a>
+            <a href="/clients">Clientes</a>
+            <a href="/settings">Padrões</a>
+            <a href="/profile">Perfil</a>
+            <a href="/billing">Assinatura</a>
+            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:8px 0;">
+            <a href="/logout">Sair</a>
+          </div>
+        </details>
       </div>
     </div>
 
     <div class="card">
-      <h2 class="h2">Seus orçamentos</h2>
+      <h2 class="h2">Orçamentos</h2>
       <p class="small">Crie, envie e acompanhe em link público e PDF.</p>
 
       {% if error %}
@@ -64,27 +70,27 @@
         </div>
       {% endif %}
 
-      <!-- KPIs -->
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0 12px;">
+      <!-- KPIs (compacto) -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0;">
         <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
         <span class="pill">✅ Aceitos: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
-        <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
         <span class="pill">👀 Vistos: <b style="color: rgba(232,238,252,0.95);">{{ viewed }}</b></span>
+        <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
       </div>
 
-      <!-- Filtros de status -->
+      <!-- Filtros -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 0 0 14px;">
-        <a class="btn btn-ghost" href="/dashboard?status=all&days={{ days or 30 }}"
+        <a class="btn btn-ghost" href="/dashboard?status=all&days={{ days or 30 }}&q={{ q or '' }}"
            style="{% if status == 'all' %}border-color: rgba(79,124,255,0.8);{% endif %}">
           Todas
         </a>
 
-        <a class="btn btn-ghost" href="/dashboard?status=pending&days={{ days or 30 }}"
+        <a class="btn btn-ghost" href="/dashboard?status=pending&days={{ days or 30 }}&q={{ q or '' }}"
            style="{% if status == 'pending' %}border-color: rgba(79,124,255,0.8);{% endif %}">
           Pendentes
         </a>
 
-        <a class="btn btn-ghost" href="/dashboard?status=accepted&days={{ days or 30 }}"
+        <a class="btn btn-ghost" href="/dashboard?status=accepted&days={{ days or 30 }}&q={{ q or '' }}"
            style="{% if status == 'accepted' %}border-color: rgba(79,124,255,0.8);{% endif %}">
           Aceitos
         </a>
@@ -120,12 +126,12 @@
 
       {% if proposals|length == 0 %}
         <p class="small">
-          Nenhum orçamento encontrado neste filtro.
+          Nenhum orçamento encontrado.
           <a href="/wizard">Criar novo</a>.
         </p>
       {% else %}
 
-        <!-- Mobile cards -->
+        <!-- MOBILE -->
         <div class="mobile-list">
           {% for p in proposals %}
             <div class="card proposal-card">
@@ -136,38 +142,41 @@
               </p>
 
               <p class="small" style="margin-top:0;">
-                Status:
-                <td>
-  {% if p.accepted_at %}
-    <span style="color:#22c55e; font-weight:800;">✓ ACEITO</span>
-    <div class="small" style="opacity:.85;">{{ p.accepted_at.strftime("%d/%m/%Y") }}</div>
-  {% elif p.last_viewed_at %}
-    <span style="color:#60a5fa; font-weight:800;">👀 VISTO</span>
-    <div class="small" style="opacity:.85;">{{ p.last_viewed_at.strftime("%d/%m/%Y %H:%M") }}</div>
-    <div class="small" style="opacity:.75;">{{ p.view_count or 0 }}x</div>
-  {% else %}
-    <span class="small">Não visto</span>
-  {% endif %}
-</td>
+                {% if p.accepted_at %}
+                  <span class="status-pill ok">✓ Aceito</span>
+                  <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m %H:%M") }}</span>
+                {% elif p.last_viewed_at %}
+                  <span class="status-pill seen">👀 Visto</span>
+                  <span class="small" style="opacity:.85;">
+                    • {{ p.last_viewed_at.strftime("%d/%m %H:%M") }} • {{ p.view_count or 0 }}x
+                  </span>
+                {% else %}
+                  <span class="status-pill none">Não visto</span>
+                {% endif %}
               </p>
 
               <div class="actions">
-                <a class="btn" href="/p/{{ p.public_id }}">Abrir link</a>
+                <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
                 <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
-                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/again">Novo igual</a>
-                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/edit">Editar</a>
-                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
 
-                <form method="post" action="/proposals/{{ p.id }}/delete"
-                      onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
-                  <button class="btn btn-ghost" type="submit">Excluir</button>
-                </form>
+                <details class="menu">
+                  <summary class="btn btn-ghost icon-btn">⋯</summary>
+                  <div class="menu-panel">
+                    <a href="/proposals/{{ p.id }}/again">Novo igual</a>
+                    <a href="/proposals/{{ p.id }}/edit">Editar</a>
+                    <a href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+                    <form method="post" action="/proposals/{{ p.id }}/delete"
+                          onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
+                      <button type="submit">Excluir</button>
+                    </form>
+                  </div>
+                </details>
               </div>
             </div>
           {% endfor %}
         </div>
 
-        <!-- Desktop table -->
+        <!-- DESKTOP -->
         <div class="table-wrap">
           <table class="table">
             <tr>
@@ -184,30 +193,38 @@
               <td>{{ p.client_name }}</td>
               <td>{{ p.project_name }}</td>
 
-              <p class="small" style="margin-top:0;">
-  Status:
-  {% if p.accepted_at %}
-    <span style="color:#22c55e; font-weight:800;">✓ ACEITO</span>
-    <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m/%Y") }}</span>
-  {% elif p.last_viewed_at %}
-    <span style="color:#60a5fa; font-weight:800;">👀 VISTO</span>
-    <span class="small" style="opacity:.85;"> • {{ p.last_viewed_at.strftime("%d/%m/%Y %H:%M") }} ({{ p.view_count or 0 }}x)</span>
-  {% else %}
-    <span class="small">Não visto</span>
-  {% endif %}
-</p>
+              <td>
+                {% if p.accepted_at %}
+                  <span class="status-pill ok">✓ Aceito</span>
+                  <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m %H:%M") }}</span>
+                {% elif p.last_viewed_at %}
+                  <span class="status-pill seen">👀 Visto</span>
+                  <span class="small" style="opacity:.85;">
+                    • {{ p.last_viewed_at.strftime("%d/%m %H:%M") }} • {{ p.view_count or 0 }}x
+                  </span>
+                {% else %}
+                  <span class="status-pill none">Não visto</span>
+                {% endif %}
+              </td>
 
               <td>
-                <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
-                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
-                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/again">Novo igual</a>
-                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/edit">Editar</a>
-                <a class="btn btn-ghost" href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+                <div class="actions">
+                  <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
+                  <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
 
-                <form method="post" action="/proposals/{{ p.id }}/delete" style="display:inline;"
-                      onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
-                  <button class="btn btn-ghost" type="submit">Excluir</button>
-                </form>
+                  <details class="menu">
+                    <summary class="btn btn-ghost icon-btn">⋯</summary>
+                    <div class="menu-panel">
+                      <a href="/proposals/{{ p.id }}/again">Novo igual</a>
+                      <a href="/proposals/{{ p.id }}/edit">Editar</a>
+                      <a href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
+                      <form method="post" action="/proposals/{{ p.id }}/delete"
+                            onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
+                        <button type="submit">Excluir</button>
+                      </form>
+                    </div>
+                  </details>
+                </div>
               </td>
             </tr>
             {% endfor %}
