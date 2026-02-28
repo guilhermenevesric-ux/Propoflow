@@ -129,4 +129,11 @@ with engine.begin() as conn:
         else:
             conn.execute(text("ALTER TABLE clients ADD COLUMN favorite INTEGER DEFAULT 0"))
 
+# PROPOSALS: terms_text (condições congeladas)
+    if not column_exists(conn, "proposals", "terms_text"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN IF NOT EXISTS terms_text TEXT"))
+        else:
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN terms_text TEXT"))
+
 print("✅ migrate.py OK")

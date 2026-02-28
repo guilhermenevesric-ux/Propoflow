@@ -187,6 +187,17 @@ def status_label(s: str) -> str:
     }.get(s or "", s or "Criado")
 
 
+def terms_to_list(text: str) -> list[str]:
+    lines = []
+    for ln in (text or "").splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        ln = re.sub(r"^(\-|\•|\*|\d+\)|\d+\.)\s+", "", ln).strip()
+        if ln:
+            lines.append(ln)
+    return lines
+
 def brl_to_cents(v: str) -> int:
     """
     Aceita:
@@ -957,6 +968,7 @@ def create_proposal(
         last_activity_at=_now(),
         revision=1,
         updated_at=_now(),
+        terms_text=(user.default_terms or "").strip() or None,
     )
     db.add(p)
     db.commit()
@@ -1063,6 +1075,10 @@ def edit_proposal_save(
     p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
     if not p:
         return RedirectResponse("/dashboard", status_code=302)
+
+    # Se o orçamento é antigo e ainda não tem terms_text, congela agora (uma vez só)
+    if not getattr(p, "terms_text", None):
+        p.terms_text = (user.default_terms or "").strip() or None
 
     # snapshot antes
     snapshot = {
@@ -1322,13 +1338,22 @@ def public_proposal(public_id: str, request: Request, db: Session = Depends(get_
         db.add(p)
         db.commit()
 
+    stages = db.query(PaymentStage).filter(PaymentStage.proposal_id == p.id).order_by(PaymentStage.id.asc()).all()
+
+    terms_src = (getattr(p, "terms_text", None) or "") or ((owner.default_terms or "") if owner else "")
+    terms_lines = terms_to_list(terms_src)
+
     resp = templates.TemplateResponse("proposal_public.html", {
         "request": request,
         "p": p,
         "owner": owner,
         "base_url": base_url,
         "status_label": status_label,
+        "stages": stages,
+        "terms_lines": terms_lines,
     })
+
+
     resp.set_cookie(view_cookie, _now().isoformat(), max_age=60 * 60 * 24 * 30, samesite="lax")
     return resp
 
@@ -1374,6 +1399,9 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         for st in p.payment_stages
     ]
 
+    terms_src = (getattr(p, "terms_text", None) or "") or ((owner.default_terms or "") if owner else "")
+    payment_terms = terms_to_list(terms_src)
+
     pdf_bytes = generate_proposal_pdf({
         "client_name": p.client_name,
         "project_name": p.project_name,
@@ -1390,6 +1418,7 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         "payment_stages": stages,
         "accept_url": accept_url,
         "payment_terms": terms_to_list(user.default_terms or "")
+        "payment_terms": payment_terms,
     })
 
     filename = f"orcamento_{p.client_name.replace(' ', '')}_{p.public_id}.pdf"
@@ -1418,6 +1447,9 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
         for st in p.payment_stages
     ]
 
+    terms_src = (getattr(p, "terms_text", None) or "") or ((owner.default_terms or "") if owner else "")
+    payment_terms = terms_to_list(terms_src)
+
     pdf_bytes = generate_proposal_pdf({
         "client_name": p.client_name,
         "project_name": p.project_name,
@@ -1433,6 +1465,7 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
         "total_cents": p.total_cents,
         "payment_stages": stages,
         "accept_url": accept_url,
+        "payment_terms": payment_terms,
     })
 
     filename = f"orcamento_{p.client_name.replace(' ', '')}_{p.id}.pdf"

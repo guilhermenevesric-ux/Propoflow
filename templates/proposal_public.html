@@ -14,13 +14,13 @@
         <div>
           <h1>PropoFlow</h1>
           <p>
-            {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Orçamento{% endif %}
+            {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Orçamento profissional{% endif %}
             {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
           </p>
         </div>
       </div>
       <div class="right-actions">
-        <span>ID: {{ p.public_id }} • v{{ p.revision }}</span>
+        <span>ID: {{ p.public_id }}</span>
       </div>
     </div>
 
@@ -29,40 +29,29 @@
       <p class="small">
         Cliente: <b>{{ p.client_name }}</b>
         • Criado em {{ p.created_at.strftime("%d/%m/%Y %H:%M") }}
-        {% if p.valid_until %} • Válido até <b>{{ p.valid_until.strftime("%d/%m") }}</b>{% endif %}
+        {% if p.valid_until %}
+          • Válido até <b>{{ p.valid_until.strftime("%d/%m/%Y") }}</b>
+        {% endif %}
       </p>
+
+      {% if owner %}
+        <p class="small" style="margin-top:-6px;">
+          Emitente:
+          <b>
+            {% if owner.display_name %}{{ owner.display_name }}{% else %}{{ owner.email }}{% endif %}
+          </b>
+          {% if owner.company_name %} • {{ owner.company_name }}{% endif %}
+        </p>
+      {% endif %}
 
       <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:14px 0;">
 
-      <h3 class="h2" style="font-size:15px;">O que será feito</h3>
+      <h3 class="h2" style="font-size:15px;">Descrição do serviço</h3>
       <p style="color: rgba(232,238,252,0.85); line-height:1.5; white-space: pre-wrap;">{{ p.description }}</p>
-
-      {% if p.items and p.items|length > 0 %}
-        <h3 class="h2" style="font-size:15px; margin-top:16px;">Itens</h3>
-
-        <div class="table-wrap">
-          <table class="table">
-            <tr>
-              <th>Item</th>
-              <th>Qtd</th>
-              <th>Valor</th>
-              <th>Total</th>
-            </tr>
-            {% for it in p.items %}
-              <tr>
-                <td>{{ it.description }}</td>
-                <td>{{ '%.2f'|format(it.qty or 1) }}</td>
-                <td>R$ {{ ('%.2f'|format((it.unit_price_cents or 0)/100)).replace('.', ',') }}</td>
-                <td><b>R$ {{ ('%.2f'|format((it.line_total_cents or 0)/100)).replace('.', ',') }}</b></td>
-              </tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% endif %}
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:18px;">
         <div class="card" style="padding:14px;">
-          <p class="small" style="margin:0 0 6px;">Valor total</p>
+          <p class="small" style="margin:0 0 6px;">Valor</p>
           <div style="font-size:20px; font-weight:900;">{{ p.price }}</div>
         </div>
         <div class="card" style="padding:14px;">
@@ -71,30 +60,50 @@
         </div>
       </div>
 
-      {% if p.payment_stages and p.payment_stages|length > 0 %}
+      {% if stages and stages|length > 0 %}
         <div class="card" style="margin-top:14px; padding:14px;">
           <h3 class="h2" style="font-size:15px; margin-bottom:6px;">Como pagar</h3>
-          <div class="small" style="opacity:.95;">
-            {% for st in p.payment_stages %}
-              <div style="margin:6px 0;">
-                <b>{{ st.title }}</b> — R$ {{ ('%.2f'|format((st.amount_cents or 0)/100)).replace('.', ',') }} ({{ st.percent }}%)
-                {% if st.status == 'paid' %}
-                  <span style="color:#22c55e; font-weight:800;"> • PAGO</span>
-                {% endif %}
+          <p class="small" style="margin-top:0; opacity:.85;">Etapas sugeridas:</p>
+
+          <div style="display:grid; gap:8px; margin-top:10px;">
+            {% for s in stages %}
+              <div style="display:flex; justify-content:space-between; gap:10px;">
+                <div style="opacity:.92;">
+                  <b>{{ s.title }}</b>
+                  {% if s.percent %}<span class="small" style="opacity:.8;"> ({{ s.percent }}%)</span>{% endif %}
+                </div>
+                <div style="font-weight:900;">
+                  R$ {{ ('%.2f'|format((s.amount_cents or 0)/100)).replace('.', ',') }}
+                </div>
               </div>
             {% endfor %}
           </div>
 
           {% if owner and owner.pix_key %}
             <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:12px 0;">
-            <div class="small" style="margin:0;">
-              Pix (chave): <b>{{ owner.pix_key }}</b>
-              {% if owner.pix_name %}<br>Recebedor: <b>{{ owner.pix_name }}</b>{% endif %}
+            <p class="small" style="margin:0 0 6px;">Pix</p>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <div style="opacity:.92;">
+                <b>Chave:</b> <span id="pixKey">{{ owner.pix_key }}</span>
+                {% if owner.pix_name %}<span class="small" style="opacity:.8;"> • {{ owner.pix_name }}</span>{% endif %}
+              </div>
+              <button class="btn btn-ghost" type="button" onclick="copyPix()">Copiar chave</button>
             </div>
-            <p class="small" style="margin-top:8px; opacity:.85;">
-              Depois de pagar, envie o comprovante no WhatsApp do emitente.
-            </p>
           {% endif %}
+        </div>
+      {% endif %}
+
+      {% if terms_lines and terms_lines|length > 0 %}
+        <div class="card" style="margin-top:14px; padding:14px;">
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">Condições</h3>
+          <div style="display:grid; gap:6px; margin-top:10px;">
+            {% for t in terms_lines %}
+              <div style="display:flex; gap:8px; align-items:flex-start;">
+                <div style="opacity:.8;">•</div>
+                <div style="opacity:.92;">{{ t }}</div>
+              </div>
+            {% endfor %}
+          </div>
         </div>
       {% endif %}
 
@@ -105,36 +114,36 @@
 
       {% if p.accepted_at %}
         <div class="card" style="margin-top:14px; padding:14px;">
-          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">✅ Orçamento aceito</h3>
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">✅ Orçamento já aceito</h3>
           <p class="small" style="margin:0;">
             Aceito por <b>{{ p.accepted_name }}</b> em {{ p.accepted_at.strftime("%d/%m/%Y %H:%M") }}.
           </p>
         </div>
       {% else %}
         <div class="card" style="margin-top:14px; padding:14px;">
-          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">Aprovar agora</h3>
-          <p class="small" style="margin-top:0;">Leva 10 segundos.</p>
+          <h3 class="h2" style="font-size:15px; margin-bottom:6px;">Aceitar orçamento</h3>
+          <p class="small" style="margin-top:0;">Se estiver tudo certo, preencha e confirme.</p>
 
           <form method="post" action="/p/{{ p.public_id }}/accept">
             <div class="row">
               <div>
                 <label>Seu nome</label>
-                <input name="name" required>
+                <input name="name" placeholder="Ex: João Cliente" required>
               </div>
               <div>
                 <label>Seu email (opcional)</label>
-                <input name="email">
+                <input name="email" placeholder="Ex: cliente@email.com">
               </div>
             </div>
 
-            <br>
-            <button class="btn" type="submit">✅ Aceitar orçamento</button>
+            <div style="height:12px;"></div>
+            <button class="btn" type="submit">Aceitar</button>
           </form>
         </div>
       {% endif %}
 
       <p class="small" style="margin-top:12px;">
-        Link: <span style="color: rgba(232,238,252,0.85);">{{ base_url }}/p/{{ p.public_id }}</span>
+        Link deste orçamento: <span style="color: rgba(232,238,252,0.85);">{{ base_url }}/p/{{ p.public_id }}</span>
       </p>
     </div>
   </div>
@@ -144,6 +153,12 @@
       const url = "{{ base_url }}/p/{{ p.public_id }}";
       navigator.clipboard.writeText(url);
       alert("Link copiado!");
+    }
+    function copyPix(){
+      const el = document.getElementById("pixKey");
+      if(!el) return;
+      navigator.clipboard.writeText(el.innerText);
+      alert("Chave Pix copiada!");
     }
   </script>
 </body>

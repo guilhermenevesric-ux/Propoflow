@@ -109,6 +109,7 @@ class Proposal(Base):
 
     project_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
+    terms_text = Column(Text, nullable=True)  # condições congeladas deste orçamento
 
     price = Column(String(50), nullable=False, default="")
     deadline = Column(String(100), nullable=False)
