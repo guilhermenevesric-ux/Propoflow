@@ -1,3 +1,5 @@
+from reportlab.lib.utils import ImageReader
+import base64
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
@@ -40,25 +42,17 @@ def _brl(value):
     except Exception:
         return s
 
-def _draw_header(c, width, height, brand, tagline, doc_title="ORÇAMENTO"):
-    c.setFillColorRGB(0.06, 0.10, 0.18)
-    c.rect(0, height - 3.3 * cm, width, 3.3 * cm, fill=1, stroke=0)
-
-    c.setFillColorRGB(0.31, 0.49, 1.00)
-    c.roundRect(2 * cm, height - 2.55 * cm, 1.15 * cm, 1.15 * cm, 0.28 * cm, fill=1, stroke=0)
-
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 13.5)
-    c.drawString(3.45 * cm, height - 2.02 * cm, brand)
-
-    if tagline:
-        c.setFont("Helvetica", 9)
-        c.setFillColorRGB(0.86, 0.90, 1.00)
-        c.drawString(3.45 * cm, height - 2.42 * cm, tagline)
-
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 18)
-    c.drawRightString(width - 2 * cm, height - 2.05 * cm, doc_title)
+def _draw_header(c, width, height, brand, tagline, doc_title="PROPOSTA COMERCIAL", logo_img=None):
+    # ícone / logo
+    if logo_img:
+        try:
+            c.drawImage(logo_img, 2 * cm, height - 2.75 * cm, 1.6 * cm, 1.6 * cm, mask='auto')
+        except Exception:
+            c.setFillColorRGB(0.31, 0.49, 1.00)
+            c.roundRect(2 * cm, height - 2.55 * cm, 1.15 * cm, 1.15 * cm, 0.28 * cm, fill=1, stroke=0)
+    else:
+        c.setFillColorRGB(0.31, 0.49, 1.00)
+        c.roundRect(2 * cm, height - 2.55 * cm, 1.15 * cm, 1.15 * cm, 0.28 * cm, fill=1, stroke=0)
 
 def _wrap_draw(c, text, x, y, max_w, font="Helvetica", size=10, leading=13, color=(0.12, 0.16, 0.26)):
     c.setFont(font, size)
@@ -105,7 +99,17 @@ def generate_proposal_pdf(data: dict) -> bytes:
         tagline = "Orçamentos profissionais em minutos"
         footer_text = "Documento gerado automaticamente pelo PropoFlow."
 
-    _draw_header(c, width, height, brand=brand, tagline=tagline, doc_title="ORÇAMENTO")
+    logo_b64 = data.get("logo_b64")
+    logo_mime = data.get("logo_mime")
+    logo_img = None
+    if logo_b64:
+        try:
+            logo_bytes = base64.b64decode(logo_b64)
+            logo_img = ImageReader(io.BytesIO(logo_bytes))
+        except Exception:
+            logo_img = None
+
+    _draw_header(c, width, height, brand=brand, tagline=tagline, logo_img=logo_img)
 
     margin_x = 2 * cm
     content_w = width - 4 * cm

@@ -1,10 +1,14 @@
-from fastapi import FastAPI, Request, Form, Depends, Response
+from fastapi import FastAPI, Request, Form, Depends, Response, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
 from datetime import datetime, timedelta, date
+
+import base64
+from PIL import Image
+import io
 import os
 import requests
 import subprocess
@@ -14,6 +18,8 @@ import hashlib
 from urllib.parse import quote_plus
 import re
 import json
+
+
 
 from db import SessionLocal, engine, Base
 from models import (
@@ -197,6 +203,27 @@ def terms_to_list(text: str) -> list[str]:
         if ln:
             lines.append(ln)
     return lines
+
+def process_logo_upload(file_bytes: bytes) -> tuple[str, str]:
+    """
+    Retorna (mime, b64). Converte para PNG e reduz para um tamanho seguro.
+    """
+    img = Image.open(io.BytesIO(file_bytes))
+    img = img.convert("RGBA")
+
+    # Reduz para ficar leve (logo não precisa gigante)
+    img.thumbnail((320, 320))
+
+    out = io.BytesIO()
+    img.save(out, format="PNG", optimize=True)
+    png_bytes = out.getvalue()
+
+    # limita tamanho (evita estourar banco)
+    if len(png_bytes) > 250_000:
+        raise ValueError("Logo muito grande. Use uma imagem menor (até ~250KB).")
+
+    b64 = base64.b64encode(png_bytes).decode("utf-8")
+    return ("image/png", b64)
 
 def brl_to_cents(v: str) -> int:
     """
@@ -1477,6 +1504,8 @@ def public_pdf(public_id: str, request: Request, db: Session = Depends(get_db)):
         "payment_stages": stages,
         "accept_url": accept_url,
         "payment_terms": payment_terms,
+        "logo_mime": getattr(owner_or_user, "logo_mime", None),
+        "logo_b64": getattr(owner_or_user, "logo_b64", None),
     })
 
     filename = f"orcamento_{p.client_name.replace(' ', '')}_{p.public_id}.pdf"
@@ -1538,6 +1567,8 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
         "payment_stages": stages,
         "accept_url": accept_url,
         "payment_terms": payment_terms,
+        "logo_mime": getattr(user, "logo_mime", None),
+        "logo_b64": getattr(user, "logo_b64", None),
     })
 
     filename = f"orcamento_{p.client_name.replace(' ', '')}_{p.id}.pdf"
@@ -1561,8 +1592,39 @@ def profile_save(
     cpf_cnpj: str = Form(""),
     pix_key: str = Form(""),
     pix_name: str = Form(""),
+    remove_logo: str = Form(""),
+    logo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
+    # remover logo
+    if (remove_logo or "").strip() == "1":
+        user.logo_mime = None
+        user.logo_b64 = None
+
+    # upload logo (só PRO)
+    if logo is not None and getattr(logo, "filename", ""):
+        if not is_pro_active(user):
+            return templates.TemplateResponse("profile.html", {
+                "request": request,
+                "user": user,
+                "saved": False,
+                "error": "Upload de logo é disponível apenas no plano PRO.",
+            })
+
+        data = awaitable_read = None
+        try:
+            file_bytes = logo.file.read()
+            mime, b64 = process_logo_upload(file_bytes)
+            user.logo_mime = mime
+            user.logo_b64 = b64
+        except Exception as e:
+            return templates.TemplateResponse("profile.html", {
+                "request": request,
+                "user": user,
+                "saved": False,
+                "error": f"Erro ao salvar logo: {str(e)}",
+            })
+
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)

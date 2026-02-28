@@ -136,4 +136,17 @@ with engine.begin() as conn:
         else:
             conn.execute(text("ALTER TABLE proposals ADD COLUMN terms_text TEXT"))
 
+# USERS: logo (white-label)
+    if not column_exists(conn, "users", "logo_mime"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS logo_mime VARCHAR(50)"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN logo_mime VARCHAR(50)"))
+
+    if not column_exists(conn, "users", "logo_b64"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS logo_b64 TEXT"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN logo_b64 TEXT"))
+
 print("✅ migrate.py OK")
