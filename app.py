@@ -1422,6 +1422,7 @@ def public_proposal(public_id: str, request: Request, db: Session = Depends(get_
         "items": display_items,
         "items_subtotal_brl": items_subtotal_brl,
         "final_total_brl": final_total_brl,
+        "is_pro": (owner is not None and is_pro_active(owner)),
     })
 
 

@@ -12,11 +12,29 @@
       <div class="brand">
         <div class="logo"></div>
         <div>
-          <h1>PropoFlow</h1>
-          <p>
-            {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Proposta profissional{% endif %}
-            {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
-          </p>
+          {% if is_pro and owner %}
+  <div style="display:flex; gap:12px; align-items:center;">
+    {% if owner.logo_b64 %}
+      <img src="data:{{ owner.logo_mime }};base64,{{ owner.logo_b64 }}"
+           style="width:40px;height:40px;border-radius:12px;object-fit:cover;">
+    {% else %}
+      <div class="logo"></div>
+    {% endif %}
+
+    <div>
+      <h1 style="margin:0;">{{ owner.company_name or owner.display_name or "Orçamento" }}</h1>
+      <p style="margin:0;">
+        {% if owner.phone %}{{ owner.phone }}{% endif %}
+      </p>
+    </div>
+  </div>
+{% else %}
+  <h1>PropoFlow</h1>
+  <p>
+    {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Orçamento profissional{% endif %}
+    {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
+  </p>
+{% endif %}
         </div>
       </div>
       <div class="right-actions">
