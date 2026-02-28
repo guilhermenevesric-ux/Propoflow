@@ -548,6 +548,12 @@ def dashboard(
 
     total = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
     accepted = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.accepted_at.isnot(None)).count()
+
+    viewed = db.query(Proposal).filter(
+        Proposal.owner_id == user.id,
+        Proposal.first_viewed_at.isnot(None)
+    ).count()
+
     rate = round((accepted / total) * 100) if total else 0
 
     return templates.TemplateResponse("dashboard.html", {
@@ -564,6 +570,7 @@ def dashboard(
         "status_label": status_label,
         "error": None,
         "show_upgrade": False,
+        "viewed": viewed,
     })
 
 @app.get("/proposals/{proposal_id}/again")
@@ -1340,6 +1347,20 @@ def public_proposal(public_id: str, request: Request, db: Session = Depends(get_
         return HTMLResponse("Orçamento não encontrado.", status_code=404)
 
     owner = db.query(User).filter(User.id == p.owner_id).first()
+    # ===== Etapa 13: rastrear visualizações (sem contar o dono logado) =====
+    viewer = get_current_user(request, db)  # se estiver logado
+    is_owner_view = bool(viewer and viewer.id == p.owner_id)
+
+    if not is_owner_view:
+        now = datetime.utcnow()
+        p.view_count = int(getattr(p, "view_count", 0) or 0) + 1
+        if getattr(p, "first_viewed_at", None) is None:
+            p.first_viewed_at = now
+        p.last_viewed_at = now
+        db.add(p)
+        db.commit()
+        db.refresh(p)
+
     base_url = base_url_from_request(request)
 
     view_cookie = f"pv_{public_id}"

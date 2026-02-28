@@ -134,6 +134,9 @@ class Proposal(Base):
     accepted_at = Column(DateTime, nullable=True)
     accepted_name = Column(String(255), nullable=True)
     accepted_email = Column(String(255), nullable=True)
+    view_count = Column(Integer, default=0)
+    first_viewed_at = Column(DateTime, nullable=True)
+    last_viewed_at = Column(DateTime, nullable=True)
 
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     owner = relationship("User", back_populates="proposals")

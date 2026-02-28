@@ -149,4 +149,23 @@ with engine.begin() as conn:
         else:
             conn.execute(text("ALTER TABLE users ADD COLUMN logo_b64 TEXT"))
 
+    # PROPOSALS: views tracking (etapa 13)
+    if not column_exists(conn, "proposals", "view_count"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0"))
+        else:
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN view_count INTEGER DEFAULT 0"))
+
+    if not column_exists(conn, "proposals", "first_viewed_at"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN IF NOT EXISTS first_viewed_at TIMESTAMP NULL"))
+        else:
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN first_viewed_at DATETIME"))
+
+    if not column_exists(conn, "proposals", "last_viewed_at"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN IF NOT EXISTS last_viewed_at TIMESTAMP NULL"))
+        else:
+            conn.execute(text("ALTER TABLE proposals ADD COLUMN last_viewed_at DATETIME"))
+
 print("✅ migrate.py OK")

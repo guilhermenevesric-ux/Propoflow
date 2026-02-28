@@ -69,6 +69,7 @@
         <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
         <span class="pill">✅ Aceitos: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
         <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
+        <span class="pill">👀 Vistos: <b style="color: rgba(232,238,252,0.95);">{{ viewed }}</b></span>
       </div>
 
       <!-- Filtros de status -->
@@ -136,12 +137,18 @@
 
               <p class="small" style="margin-top:0;">
                 Status:
-                {% if p.accepted_at %}
-                  <span style="color:#22c55e; font-weight:800;">✓ ACEITO</span>
-                  <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m/%Y") }}</span>
-                {% else %}
-                  <span class="small">{{ status_label(p.status) if status_label else 'Pendente' }}</span>
-                {% endif %}
+                <td>
+  {% if p.accepted_at %}
+    <span style="color:#22c55e; font-weight:800;">✓ ACEITO</span>
+    <div class="small" style="opacity:.85;">{{ p.accepted_at.strftime("%d/%m/%Y") }}</div>
+  {% elif p.last_viewed_at %}
+    <span style="color:#60a5fa; font-weight:800;">👀 VISTO</span>
+    <div class="small" style="opacity:.85;">{{ p.last_viewed_at.strftime("%d/%m/%Y %H:%M") }}</div>
+    <div class="small" style="opacity:.75;">{{ p.view_count or 0 }}x</div>
+  {% else %}
+    <span class="small">Não visto</span>
+  {% endif %}
+</td>
               </p>
 
               <div class="actions">
@@ -177,14 +184,18 @@
               <td>{{ p.client_name }}</td>
               <td>{{ p.project_name }}</td>
 
-              <td>
-                {% if p.accepted_at %}
-                  <span style="color:#22c55e; font-weight:800;">✓ ACEITO</span>
-                  <div class="small" style="opacity:.85;">{{ p.accepted_at.strftime("%d/%m/%Y") }}</div>
-                {% else %}
-                  <span class="small">{{ status_label(p.status) if status_label else 'Pendente' }}</span>
-                {% endif %}
-              </td>
+              <p class="small" style="margin-top:0;">
+  Status:
+  {% if p.accepted_at %}
+    <span style="color:#22c55e; font-weight:800;">✓ ACEITO</span>
+    <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m/%Y") }}</span>
+  {% elif p.last_viewed_at %}
+    <span style="color:#60a5fa; font-weight:800;">👀 VISTO</span>
+    <span class="small" style="opacity:.85;"> • {{ p.last_viewed_at.strftime("%d/%m/%Y %H:%M") }} ({{ p.view_count or 0 }}x)</span>
+  {% else %}
+    <span class="small">Não visto</span>
+  {% endif %}
+</p>
 
               <td>
                 <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
