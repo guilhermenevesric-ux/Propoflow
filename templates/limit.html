@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Limite do plano</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Limite do plano gratuito</p>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">Voltar</a>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:720px; margin:0 auto;">
+    <h2 class="h2">Você chegou no limite do Gratuito</h2>
+    <p class="small" style="margin-top:6px;">
+      O plano gratuito permite <b>até 5 orçamentos</b> e <b>1 exclusão</b>.
+      Para continuar usando sem travar, ative o PRO.
+    </p>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:14px;">
+      <div class="card" style="padding:14px;">
+        <p class="small" style="margin:0 0 6px;">Recomendado</p>
+        <div style="font-weight:900; font-size:16px;">PRO com Pix</div>
+        <p class="small" style="margin:8px 0 0; opacity:.85;">
+          Libera rápido e sem cartão.
+        </p>
+        <a class="btn" href="/upgrade/pro/pix?from=limit" style="margin-top:12px; width:100%; text-align:center;">
+          Ativar agora com Pix
+        </a>
+      </div>
+
+      <div class="card" style="padding:14px;">
+        <p class="small" style="margin:0 0 6px;">Alternativa</p>
+        <div style="font-weight:900; font-size:16px;">PRO com cartão</div>
+        <p class="small" style="margin:8px 0 0; opacity:.85;">
+          Assinatura mensal no cartão.
+        </p>
+        <a class="btn btn-ghost" href="/upgrade/pro" style="margin-top:12px; width:100%; text-align:center;">
+          Ativar com cartão
+        </a>
+      </div>
+    </div>
+
+    <div class="card" style="padding:14px; margin-top:12px;">
+      <p class="small" style="margin:0;">
+        <b>O que você ganha no PRO:</b><br>
+        ✓ Orçamentos ilimitados<br>
+        ✓ Exclusões ilimitadas<br>
+        ✓ Sem travas no fluxo
+      </p>
+    </div>
+
+    <p class="small" style="margin-top:12px; opacity:.75;">
+      Se precisar, fale com o suporte em <a href="/support">Suporte</a>.
+    </p>
+  </div>
+</div>
+</body>
+</html>

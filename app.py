@@ -884,7 +884,7 @@ def proposal_again(proposal_id: int, request: Request, db: Session = Depends(get
     if not is_pro_active(user):
         count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
         if count >= (user.proposal_limit or 5):
-            return RedirectResponse("/pricing", status_code=302)
+            return RedirectResponse("/limit", status_code=302)
 
     new_p = Proposal(
         client_id=original.client_id,
@@ -1245,7 +1245,7 @@ def create_proposal(
     if not is_pro_active(user):
         count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
         if count >= (user.proposal_limit or 5):
-            return RedirectResponse("/pricing", status_code=302)
+            return RedirectResponse("/limit", status_code=302)
 
     # Prefill por serviço (se escolhido)
     if service_id:
@@ -1891,6 +1891,14 @@ def download_pdf(proposal_id: int, request: Request, db: Session = Depends(get_d
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 # ===== PROFILE / BILLING / PRICING / STATIC =====
+
+@app.get("/limit", response_class=HTMLResponse)
+def limit_page(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    return templates.TemplateResponse("limit.html", {"request": request, "user": user})
+
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
