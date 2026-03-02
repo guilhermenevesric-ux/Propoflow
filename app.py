@@ -1997,7 +1997,23 @@ def support(request: Request):
 # ===== ASAAS =====
 def ensure_asaas_customer(db: Session, user: User) -> str:
     if user.asaas_customer_id:
-        return user.asaas_customer_id
+        # valida se esse customer existe no ambiente atual (prod/sandbox)
+        try:
+            vr = requests.get(
+                f"{asaas_api_base()}/customers/{user.asaas_customer_id}",
+                headers=asaas_headers(),
+                timeout=15,
+            )
+            if vr.status_code == 200:
+                return user.asaas_customer_id
+        except Exception:
+            pass
+
+        # se não existe nesse ambiente, zera pra recriar
+        user.asaas_customer_id = None
+        user.asaas_subscription_id = None
+        db.add(user)
+        db.commit()
     if not ASAAS_API_KEY:
         raise RuntimeError("ASAAS_API_KEY não configurado.")
     name = user.display_name or user.company_name or user.email.split("@")[0]
