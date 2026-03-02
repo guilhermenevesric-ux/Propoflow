@@ -37,6 +37,12 @@ def add_column(conn, ddl_sqlite: str, ddl_pg: str):
 
 with engine.begin() as conn:
     # USERS: PIX (se não existir)
+    if not column_exists(conn, "users", "email_verify_last_sent_at"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verify_last_sent_at TIMESTAMP NULL"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN email_verify_last_sent_at DATETIME"))
+
     if not column_exists(conn, "users", "pix_key"):
         add_column(conn,
                    "ALTER TABLE users ADD COLUMN pix_key VARCHAR(120)",
