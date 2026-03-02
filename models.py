@@ -11,6 +11,8 @@ class User(Base):
     email_verified = Column(Boolean, default=False)
     email_verify_code_hash = Column(String(255), nullable=True)
     email_verify_expires_at = Column(DateTime, nullable=True)
+    email_verify_last_sent_at = Column(DateTime, nullable=True)
+
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)

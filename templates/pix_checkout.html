@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Pagar com Pix</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="container">
+
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Ativar PRO via Pix</p>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/pricing">Voltar</a>
+      <a class="btn btn-ghost" href="/billing">Assinatura</a>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:760px; margin:0 auto;">
+    <h2 class="h2">Pague com Pix para liberar o PRO</h2>
+    <p class="small" style="margin-bottom:12px;">
+      1) Abra o app do banco → 2) Escaneie o QR → 3) Pague → 4) Volte aqui e clique <b>Já paguei</b>.
+    </p>
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+      <div class="card" style="padding:14px;">
+        <p class="small" style="margin:0 0 6px;">Valor</p>
+        <div style="font-size:22px; font-weight:900;">{{ value_brl }}</div>
+        <p class="small" style="margin:8px 0 0;">Vencimento: <b>{{ due_date }}</b></p>
+        {% if expiration_date %}
+          <p class="small" style="margin:6px 0 0; opacity:.85;">QR expira em: <b>{{ expiration_date }}</b></p>
+        {% endif %}
+      </div>
+
+      <div class="card" style="padding:14px;">
+        <p class="small" style="margin:0 0 6px;">Status</p>
+        <div style="font-weight:900;">{{ status }}</div>
+        <p class="small" style="margin:8px 0 0; opacity:.85;">
+          Se o QR expirar, clique em <b>Gerar novo QR</b>.
+        </p>
+      </div>
+    </div>
+
+    <div style="height:12px;"></div>
+
+    <div class="card" style="padding:16px;">
+      <h3 class="h2" style="font-size:15px; margin:0 0 10px;">QR Code Pix</h3>
+
+      {% if qr_image %}
+        <div style="display:flex; justify-content:center;">
+          <img src="data:image/png;base64,{{ qr_image }}" style="max-width:280px; width:100%; border-radius:16px; border:1px solid rgba(255,255,255,0.12);">
+        </div>
+      {% else %}
+        <p class="small">Não consegui gerar o QR agora. Tente “Gerar novo QR”.</p>
+      {% endif %}
+
+      <div style="height:12px;"></div>
+
+      <label>Copia e cola Pix</label>
+      <textarea id="pixPayload" readonly style="min-height:88px;">{{ payload }}</textarea>
+
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn" type="button" onclick="copyPix()">Copiar Pix</button>
+
+        <a class="btn btn-ghost" href="/upgrade/pro/pix?refresh=1">Gerar novo QR</a>
+
+        <a class="btn" href="/upgrade/pro/pix/check?sub={{ sub_id }}&pay={{ pay_id }}">Já paguei</a>
+      </div>
+
+      <p class="small" style="margin-top:10px; opacity:.75;">
+        Se o pagamento foi aprovado, o PRO libera automaticamente (webhook). Se demorar, clique em “Já paguei”.
+      </p>
+    </div>
+
+  </div>
+
+  <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+    <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
+  </p>
+
+</div>
+
+<script>
+function copyPix(){
+  const el = document.getElementById("pixPayload");
+  el.select();
+  el.setSelectionRange(0, 999999);
+  navigator.clipboard.writeText(el.value);
+  alert("Pix copiado!");
+}
+</script>
+
+</body>
+</html>

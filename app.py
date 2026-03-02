@@ -111,6 +111,35 @@ def asaas_headers():
     }
 
 
+def brl(v: float) -> str:
+    try:
+        return f"R$ {float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "R$ 0,00"
+
+
+def asaas_get_subscription_payments(sub_id: str):
+    r = requests.get(
+        f"{asaas_api_base()}/subscriptions/{sub_id}/payments",
+        headers=asaas_headers(),
+        timeout=30,
+    )
+    if r.status_code != 200:
+        raise RuntimeError(f"Erro ao listar cobranças da assinatura: {r.status_code} - {r.text}")
+    data = r.json()
+    return data.get("data", []) if isinstance(data, dict) else []
+
+
+def asaas_get_pix_qr(payment_id: str):
+    r = requests.get(
+        f"{asaas_api_base()}/payments/{payment_id}/pixQrCode",
+        headers=asaas_headers(),
+        timeout=30,
+    )
+    if r.status_code != 200:
+        raise RuntimeError(f"Erro ao obter QR Pix: {r.status_code} - {r.text}")
+    return r.json()  # deve conter encodedImage, payload, expirationDate
+
 # ==========================
 # AUTH / SESSIONS
 # ==========================
@@ -234,10 +263,18 @@ def send_email(to_email: str, subject: str, body: str):
     if r.status_code not in (200, 201, 202):
         raise RuntimeError(f"Brevo API erro {r.status_code}: {r.text}")
 
-def issue_verification_code(db: Session, user: User):
+def issue_verification_code(db: Session, user: User, force: bool = False):
+    now = datetime.utcnow()
+
+    last = getattr(user, "email_verify_last_sent_at", None)
+    if (not force) and last and (now - last).total_seconds() < 60:
+        wait = int(60 - (now - last).total_seconds())
+        raise RuntimeError(f"Aguarde {wait}s para reenviar o código.")
+
     code = gen_6digit_code()
     user.email_verify_code_hash = pbkdf2_sha256.hash(code)
-    user.email_verify_expires_at = datetime.utcnow() + timedelta(minutes=15)
+    user.email_verify_expires_at = now + timedelta(minutes=15)
+    user.email_verify_last_sent_at = now
     db.add(user)
     db.commit()
 
@@ -248,7 +285,6 @@ def issue_verification_code(db: Session, user: User):
         "Se você não solicitou, ignore este e-mail."
     )
     send_email(user.email, "Seu código PropoFlow", body)
-
 # ==========================
 # HELPERS
 # ==========================
@@ -1975,6 +2011,192 @@ def ensure_asaas_customer(db: Session, user: User) -> str:
     db.commit()
     return cid
 
+
+@app.get("/upgrade/pro/pix", response_class=HTMLResponse)
+def upgrade_pro_pix(request: Request, db: Session = Depends(get_db), refresh: int = 0):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    if not ASAAS_API_KEY:
+        return HTMLResponse("ASAAS_API_KEY não configurado.", status_code=500)
+
+    # se já é PRO ativo
+    if is_pro_active(user):
+        return RedirectResponse("/billing", status_code=302)
+
+    # CPF/CNPJ (mantém a mesma regra do seu cartão)
+    if not getattr(user, "cpf_cnpj", None):
+        return RedirectResponse("/profile", status_code=302)
+
+    # garante customer
+    try:
+        customer_id = ensure_asaas_customer(db, user)
+    except Exception as e:
+        return templates.TemplateResponse("pix_checkout.html", {
+            "request": request,
+            "error": f"Erro ao criar/obter customer no Asaas: {str(e)}",
+            "value_brl": "R$ 19,90",
+            "due_date": "-",
+            "status": "—",
+            "qr_image": None,
+            "payload": "",
+            "expiration_date": None,
+            "sub_id": "",
+            "pay_id": "",
+        })
+
+    # 1) Reusar assinatura existente (se houver) — evita criar duplicado
+    sub_id = getattr(user, "asaas_subscription_id", None)
+
+    if not sub_id:
+        # cria assinatura PIX mensal
+        next_due = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+        payload = {
+            "customer": customer_id,
+            "billingType": "PIX",
+            "value": 19.90,
+            "nextDueDate": next_due,
+            "cycle": "MONTHLY",
+            "description": "PropoFlow Pro (assinatura mensal via Pix)",
+            "externalReference": f"user_{user.id}",
+        }
+
+        r = requests.post(
+            f"{asaas_api_base()}/subscriptions",
+            headers=asaas_headers(),
+            json=payload,
+            timeout=30,
+        )
+
+        if r.status_code not in (200, 201):
+            return templates.TemplateResponse("pix_checkout.html", {
+                "request": request,
+                "error": f"Erro Asaas ao criar assinatura Pix: {r.status_code} - {r.text}",
+                "value_brl": "R$ 19,90",
+                "due_date": "-",
+                "status": "—",
+                "qr_image": None,
+                "payload": "",
+                "expiration_date": None,
+                "sub_id": "",
+                "pay_id": "",
+            })
+
+        sub = r.json()
+        sub_id = sub.get("id")
+
+        user.asaas_subscription_id = sub_id
+        db.add(user)
+        db.commit()
+
+    # 2) buscar pagamentos da assinatura (Asaas exige segunda chamada) 3
+    try:
+        payments = asaas_get_subscription_payments(sub_id)
+    except Exception as e:
+        return templates.TemplateResponse("pix_checkout.html", {
+            "request": request,
+            "error": str(e),
+            "value_brl": "R$ 19,90",
+            "due_date": "-",
+            "status": "—",
+            "qr_image": None,
+            "payload": "",
+            "expiration_date": None,
+            "sub_id": sub_id,
+            "pay_id": "",
+        })
+
+    # escolhe o mais recente PENDING/OVERDUE (ou o primeiro)
+    chosen = None
+    for p in payments:
+        if (p.get("status") in ("PENDING", "OVERDUE")):
+            chosen = p
+            break
+    if not chosen and payments:
+        chosen = payments[0]
+
+    if not chosen:
+        return templates.TemplateResponse("pix_checkout.html", {
+            "request": request,
+            "error": "Assinatura criada, mas ainda não há cobrança gerada. Tente novamente em alguns segundos.",
+            "value_brl": "R$ 19,90",
+            "due_date": "-",
+            "status": "—",
+            "qr_image": None,
+            "payload": "",
+            "expiration_date": None,
+            "sub_id": sub_id,
+            "pay_id": "",
+        })
+
+    pay_id = chosen.get("id")
+    due_date = chosen.get("dueDate") or "-"
+    status = chosen.get("status") or "—"
+    value_brl = brl(chosen.get("value") or 19.90)
+
+    # 3) obter QR Pix do pagamento 4
+    qr_image = None
+    payload_pix = ""
+    expiration_date = None
+
+    try:
+        qr = asaas_get_pix_qr(pay_id)
+        qr_image = qr.get("encodedImage")
+        payload_pix = qr.get("payload") or ""
+        expiration_date = qr.get("expirationDate")
+    except Exception as e:
+        # mostra tela mesmo assim
+        return templates.TemplateResponse("pix_checkout.html", {
+            "request": request,
+            "error": str(e),
+            "value_brl": value_brl,
+            "due_date": due_date,
+            "status": status,
+            "qr_image": None,
+            "payload": "",
+            "expiration_date": None,
+            "sub_id": sub_id,
+            "pay_id": pay_id,
+        })
+
+    return templates.TemplateResponse("pix_checkout.html", {
+        "request": request,
+        "error": None,
+        "value_brl": value_brl,
+        "due_date": due_date,
+        "status": status,
+        "qr_image": qr_image,
+        "payload": payload_pix,
+        "expiration_date": expiration_date,
+        "sub_id": sub_id,
+        "pay_id": pay_id,
+    })
+
+@app.get("/upgrade/pro/pix/check")
+def upgrade_pro_pix_check(request: Request, sub: str, pay: str, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    # consulta o pagamento no Asaas
+    r = requests.get(
+        f"{asaas_api_base()}/payments/{pay}",
+        headers=asaas_headers(),
+        timeout=30,
+    )
+    if r.status_code != 200:
+        return RedirectResponse("/upgrade/pro/pix", status_code=302)
+
+    pj = r.json()
+    status = (pj.get("status") or "").upper()
+
+    # quando pago, libera PRO por 30 dias (webhook também vai fazer, mas aqui é “aceleração”)
+    if status in ("RECEIVED", "CONFIRMED"):
+        set_user_pro_month(db, user, paid_until=datetime.utcnow() + timedelta(days=32), subscription_id=sub, customer_id=user.asaas_customer_id)
+        return RedirectResponse("/billing", status_code=302)
+
+    return RedirectResponse("/upgrade/pro/pix", status_code=302)
 
 @app.get("/upgrade/pro")
 def upgrade_pro(request: Request, db: Session = Depends(get_db)):
