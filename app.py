@@ -1296,7 +1296,7 @@ def create_proposal(
         last_activity_at=_now(),
         revision=1,
         updated_at=_now(),
-        terms_text=(user.default_terms or "").strip() or None,
+        terms_text=(getattr(user, "default_terms", "") or "").strip() or None,
     )
     db.add(p)
     db.commit()

@@ -108,11 +108,11 @@ with engine.begin() as conn:
             else:
                 conn.execute(text("ALTER TABLE users ADD COLUMN default_message_template TEXT"))
 
-        if not column_exists(conn, "users", "default_terms"):
-            if is_postgres():
-                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_terms TEXT"))
-            else:
-                conn.execute(text("ALTER TABLE users ADD COLUMN default_terms TEXT"))
+    if not column_exists(conn, "users", "default_terms"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_terms TEXT"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN default_terms TEXT"))
 
 # PROPOSALS: client_id
     if not column_exists(conn, "proposals", "client_id"):
