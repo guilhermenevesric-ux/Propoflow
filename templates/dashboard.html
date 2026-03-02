@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>PropoFlow • Dashboard</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=9999">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
@@ -275,7 +275,7 @@
                 <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
 
                 <button class="btn btn-ghost icon-btn" type="button"
-                        onclick="openActions(this)"
+                        onclick="openActions(this);"
                         data-title="{{ p.project_name|e }}"
                         data-again="/proposals/{{ p.id }}/again"
                         data-edit="/proposals/{{ p.id }}/edit"
@@ -415,7 +415,9 @@
     function openActions(btn){
       const title = btn.getAttribute("data-title") || "Ações";
       document.getElementById("pfSheetTitle").textContent = title;
-
+if (window.innerWidth > 820) {
+  // no desktop, abre o menu igual sheet mesmo? (se quiser dropdown, a gente faz depois)
+}
       document.getElementById("pfAgain").href = btn.getAttribute("data-again") || "#";
       document.getElementById("pfEdit").href = btn.getAttribute("data-edit") || "#";
       document.getElementById("pfDuplicate").href = btn.getAttribute("data-duplicate") || "#";
