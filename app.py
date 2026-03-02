@@ -253,9 +253,6 @@ def issue_verification_code(db: Session, user: User):
 # HELPERS
 # ==========================
 
-import secrets, smtplib
-from email.message import EmailMessage
-
 def normalize_email(email: str) -> str:
     email = (email or "").strip().lower()
     if "@" not in email:
@@ -2305,3 +2302,32 @@ def head_root():
 @app.get("/favicon.ico")
 def favicon():
     return Response(status_code=204)
+
+def send_email(to_email: str, subject: str, body: str):
+    brevo_key = os.getenv("BREVO_API_KEY", "").strip()
+    sender_email = os.getenv("BREVO_SENDER_EMAIL", "").strip()
+    sender_name = os.getenv("BREVO_SENDER_NAME", "PropoFlow").strip()
+
+    if not (brevo_key and sender_email):
+        raise RuntimeError("Brevo API não configurada (BREVO_API_KEY e BREVO_SENDER_EMAIL).")
+
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "textContent": body,
+    }
+
+    r = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "api-key": brevo_key,
+            "Content-Type": "application/json",
+            "accept": "application/json",
+        },
+        json=payload,
+        timeout=30,
+    )
+
+    if r.status_code not in (200, 201, 202):
+        raise RuntimeError(f"Brevo API erro {r.status_code}: {r.text}")
