@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Ativar PRO via Pix</title>
+  <link rel="stylesheet" href="/static/style.css?v=3001">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="container">
+
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Ativar PRO via Pix</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a class="btn btn-ghost" href="/pricing">Voltar</a>
+      <a class="btn btn-ghost" href="/billing">Assinatura</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="h2">Pague com Pix para liberar o PRO</h2>
+    <p class="small">1) Abra o app do banco → 2) Escaneie o QR → 3) Pague → 4) Volte aqui e clique <b>Já paguei</b>.</p>
+
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:10px;">
+      <div class="card" style="padding:14px;">
+        <p class="small" style="margin:0 0 6px;">Valor</p>
+        <div style="font-size:20px; font-weight:900;">R$ {{ '%.2f'|format(value)|replace('.', ',') }}</div>
+        <p class="small" style="margin:6px 0 0;">Vencimento: {{ due_date }}</p>
+      </div>
+      <div class="card" style="padding:14px;">
+        <p class="small" style="margin:0 0 6px;">Status</p>
+        <div style="font-size:18px; font-weight:900;">{{ status }}</div>
+        <p class="small" style="margin:6px 0 0;">Se o QR expirar, clique em <b>Gerar novo QR</b>.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px; padding:14px;">
+      <h3 class="h2" style="font-size:15px; margin-bottom:10px;">QR Code Pix</h3>
+
+      {% if qr_base64 %}
+        <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
+          <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR Pix" style="width:220px; border-radius:12px; border:1px solid rgba(255,255,255,0.12);">
+          <div style="flex:1; min-width:240px;">
+            <label>Copia e cola Pix</label>
+            <textarea id="pix" readonly style="min-height:140px;">{{ pix_payload }}</textarea>
+          </div>
+        </div>
+      {% else %}
+        <p class="small" style="margin:0;">Não consegui gerar o QR agora. Tente “Gerar novo QR”.</p>
+        <textarea id="pix" readonly style="min-height:140px;"></textarea>
+      {% endif %}
+
+      <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-ghost" type="button" onclick="copyPix()">Copiar Pix</button>
+        <a class="btn btn-ghost" href="/upgrade/pro/pix?new=1">Gerar novo QR</a>
+        <a class="btn" href="/upgrade/pro/pix/status?pay={{ pay_id }}">Já paguei</a>
+      </div>
+
+      <p class="small" style="margin-top:10px; opacity:.85;">
+        Se o pagamento for aprovado, o PRO libera automaticamente (webhook). Se demorar, clique em “Já paguei”.
+      </p>
+    </div>
+  </div>
+
+  <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+    <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
+  </p>
+</div>
+
+<script>
+  function copyPix(){
+    const el = document.getElementById("pix");
+    const txt = (el && el.value) ? el.value : "";
+    if(!txt){ alert("Pix não disponível."); return; }
+    navigator.clipboard.writeText(txt);
+    alert("Pix copiado!");
+  }
+</script>
+</body>
+</html>

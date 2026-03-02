@@ -2020,8 +2020,55 @@ def ensure_asaas_customer(db: Session, user: User) -> str:
     return cid
 
 
+from datetime import date, timedelta
+from fastapi import Query
+
+def _asaas_create_pix_payment(customer_id: str, user_id: int, value: float, due_date: str):
+    payload = {
+        "customer": customer_id,
+        "billingType": "PIX",
+        "value": value,
+        "dueDate": due_date,
+        "description": "PropoFlow PRO (Pix - 30 dias)",
+        "externalReference": f"user_{user_id}",
+    }
+    r = requests.post(
+        f"{asaas_api_base()}/payments",
+        headers=asaas_headers(),
+        json=payload,
+        timeout=30,
+    )
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"Erro Asaas ao criar cobrança Pix: {r.status_code} - {r.text}")
+    data = r.json()
+    pay_id = data.get("id")
+    if not pay_id:
+        raise RuntimeError(f"Asaas não retornou id da cobrança: {data}")
+    return data
+
+def _asaas_get_pix_qr(payment_id: str):
+    r = requests.get(
+        f"{asaas_api_base()}/payments/{payment_id}/pixQrCode",
+        headers=asaas_headers(),
+        timeout=30,
+    )
+    if r.status_code != 200:
+        raise RuntimeError(f"Erro ao obter QR Pix: {r.status_code} - {r.text}")
+    j = r.json()
+    # normalmente vem: encodedImage (base64 PNG) + payload (copia e cola)
+    return {
+        "encodedImage": j.get("encodedImage") or "",
+        "payload": j.get("payload") or "",
+        "expirationDate": j.get("expirationDate"),
+    }
+
 @app.get("/upgrade/pro/pix", response_class=HTMLResponse)
-def upgrade_pro_pix(request: Request, db: Session = Depends(get_db), refresh: int = 0):
+def upgrade_pro_pix_page(
+    request: Request,
+    new: int = Query(0),
+    pay: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -2029,156 +2076,75 @@ def upgrade_pro_pix(request: Request, db: Session = Depends(get_db), refresh: in
     if not ASAAS_API_KEY:
         return HTMLResponse("ASAAS_API_KEY não configurado.", status_code=500)
 
-    # se já é PRO ativo
+    # Se já é PRO ativo
     if is_pro_active(user):
         return RedirectResponse("/billing", status_code=302)
 
-    # CPF/CNPJ (mantém a mesma regra do seu cartão)
+    # CPF/CNPJ (mantém pra evitar erro no customer)
     if not getattr(user, "cpf_cnpj", None):
-        return RedirectResponse("/profile", status_code=302)
+        return templates.TemplateResponse("profile.html", {
+            "request": request,
+            "user": user,
+            "saved": False,
+            "error": "Para pagar via Pix, preencha seu CPF/CNPJ no perfil e salve.",
+        })
 
-    # garante customer
+    # customer
     try:
         customer_id = ensure_asaas_customer(db, user)
     except Exception as e:
-        return templates.TemplateResponse("pix_checkout.html", {
-            "request": request,
-            "error": f"Erro ao criar/obter customer no Asaas: {str(e)}",
-            "value_brl": "R$ 19,90",
-            "due_date": "-",
-            "status": "—",
-            "qr_image": None,
-            "payload": "",
-            "expiration_date": None,
-            "sub_id": "",
-            "pay_id": "",
-        })
+        return HTMLResponse(f"Erro ao criar/obter customer no Asaas:<br><pre>{str(e)}</pre>", status_code=500)
 
-    # 1) Reusar assinatura existente (se houver) — evita criar duplicado
-    sub_id = getattr(user, "asaas_subscription_id", None)
+    error = None
+    payment = None
+    qr = {"encodedImage": "", "payload": "", "expirationDate": None}
 
-    if not sub_id:
-        # cria assinatura PIX mensal
-        next_due = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
-        payload = {
-            "customer": customer_id,
-            "billingType": "PIX",
-            "value": 19.90,
-            "nextDueDate": next_due,
-            "cycle": "MONTHLY",
-            "description": "PropoFlow Pro (assinatura mensal via Pix)",
-            "externalReference": f"user_{user.id}",
-        }
-
-        r = requests.post(
-            f"{asaas_api_base()}/subscriptions",
-            headers=asaas_headers(),
-            json=payload,
-            timeout=30,
-        )
-
-        if r.status_code not in (200, 201):
-            return templates.TemplateResponse("pix_checkout.html", {
-                "request": request,
-                "error": f"Erro Asaas ao criar assinatura Pix: {r.status_code} - {r.text}",
-                "value_brl": "R$ 19,90",
-                "due_date": "-",
-                "status": "—",
-                "qr_image": None,
-                "payload": "",
-                "expiration_date": None,
-                "sub_id": "",
-                "pay_id": "",
-            })
-
-        sub = r.json()
-        sub_id = sub.get("id")
-
-        user.asaas_subscription_id = sub_id
-        db.add(user)
-        db.commit()
-
-    # 2) buscar pagamentos da assinatura (Asaas exige segunda chamada) 3
+    # Se veio ?pay=..., tenta usar esse pagamento
+    # Se new=1, força criar outro
     try:
-        payments = asaas_get_subscription_payments(sub_id)
+        if (not pay) or new == 1:
+            # vence amanhã pra não expirar rápido
+            due = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+            payment = _asaas_create_pix_payment(customer_id, user.id, 19.90, due)
+            pay = payment.get("id")
+        else:
+            # busca dados do pagamento existente (pra exibir valor/status)
+            rp = requests.get(
+                f"{asaas_api_base()}/payments/{pay}",
+                headers=asaas_headers(),
+                timeout=30,
+            )
+            if rp.status_code == 200:
+                payment = rp.json()
+            else:
+                payment = {"id": pay}
+
+        # gera QR (aqui é onde estava quebrando antes porque a cobrança não era PIX)
+        qr = _asaas_get_pix_qr(pay)
+
+        # Garantia extra: se por algum motivo não for PIX, mostra claramente
+        billing_type = (payment or {}).get("billingType")
+        if billing_type and billing_type != "PIX":
+            error = f"Essa cobrança veio como {billing_type}, não PIX. Gere um novo QR."
     except Exception as e:
-        return templates.TemplateResponse("pix_checkout.html", {
-            "request": request,
-            "error": str(e),
-            "value_brl": "R$ 19,90",
-            "due_date": "-",
-            "status": "—",
-            "qr_image": None,
-            "payload": "",
-            "expiration_date": None,
-            "sub_id": sub_id,
-            "pay_id": "",
-        })
+        error = str(e)
 
-    # escolhe o mais recente PENDING/OVERDUE (ou o primeiro)
-    chosen = None
-    for p in payments:
-        if (p.get("status") in ("PENDING", "OVERDUE")):
-            chosen = p
-            break
-    if not chosen and payments:
-        chosen = payments[0]
+    # status atual do pagamento
+    status = (payment or {}).get("status") or "PENDING"
+    value = (payment or {}).get("value") or 19.90
+    due_date = (payment or {}).get("dueDate") or ""
 
-    if not chosen:
-        return templates.TemplateResponse("pix_checkout.html", {
-            "request": request,
-            "error": "Assinatura criada, mas ainda não há cobrança gerada. Tente novamente em alguns segundos.",
-            "value_brl": "R$ 19,90",
-            "due_date": "-",
-            "status": "—",
-            "qr_image": None,
-            "payload": "",
-            "expiration_date": None,
-            "sub_id": sub_id,
-            "pay_id": "",
-        })
-
-    pay_id = chosen.get("id")
-    due_date = chosen.get("dueDate") or "-"
-    status = chosen.get("status") or "—"
-    value_brl = brl(chosen.get("value") or 19.90)
-
-    # 3) obter QR Pix do pagamento 4
-    qr_image = None
-    payload_pix = ""
-    expiration_date = None
-
-    try:
-        qr = asaas_get_pix_qr(pay_id)
-        qr_image = qr.get("encodedImage")
-        payload_pix = qr.get("payload") or ""
-        expiration_date = qr.get("expirationDate")
-    except Exception as e:
-        # mostra tela mesmo assim
-        return templates.TemplateResponse("pix_checkout.html", {
-            "request": request,
-            "error": str(e),
-            "value_brl": value_brl,
-            "due_date": due_date,
-            "status": status,
-            "qr_image": None,
-            "payload": "",
-            "expiration_date": None,
-            "sub_id": sub_id,
-            "pay_id": pay_id,
-        })
-
-    return templates.TemplateResponse("pix_checkout.html", {
+    return templates.TemplateResponse("upgrade_pro_pix.html", {
         "request": request,
-        "error": None,
-        "value_brl": value_brl,
-        "due_date": due_date,
+        "user": user,
+        "pay_id": pay,
         "status": status,
-        "qr_image": qr_image,
-        "payload": payload_pix,
-        "expiration_date": expiration_date,
-        "sub_id": sub_id,
-        "pay_id": pay_id,
+        "value": value,
+        "due_date": due_date,
+        "qr_base64": qr.get("encodedImage", ""),
+        "pix_payload": qr.get("payload", ""),
+        "qr_expiration": qr.get("expirationDate"),
+        "error": error,
     })
 
 @app.get("/upgrade/pro/pix/check")
