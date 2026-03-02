@@ -5,11 +5,138 @@
   <title>PropoFlow • Dashboard</title>
   <link rel="stylesheet" href="/static/style.css">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    /* ====== FIX DEFINITIVO: overlays (não corta no mobile) ====== */
+    .pf-overlay{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 9998;
+      display: none;
+    }
+    .pf-overlay.show{ display:block; }
+
+    body.pf-noscroll{ overflow:hidden; }
+
+    /* Drawer (menu ☰) */
+    .pf-drawer{
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(360px, 92vw);
+      height: 100vh;
+      z-index: 9999;
+      transform: translateX(110%);
+      transition: transform .18s ease;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.09));
+      border-left: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(10px);
+      box-shadow: -20px 0 50px rgba(0,0,0,0.35);
+      padding: 14px;
+    }
+    .pf-drawer.show{ transform: translateX(0); }
+
+    .pf-drawer .pf-drawer-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom: 10px;
+    }
+    .pf-drawer a{
+      display:block;
+      padding: 12px 10px;
+      border-radius: 12px;
+      color: rgba(232,238,252,0.92);
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.12);
+      margin-bottom: 10px;
+      text-decoration:none;
+    }
+    .pf-drawer a:hover{ background: rgba(255,255,255,0.06); }
+
+    /* Bottom sheet (menu ⋯) */
+    .pf-sheet{
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 9999;
+      transform: translateY(110%);
+      transition: transform .18s ease;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.09));
+      border-top: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 -20px 50px rgba(0,0,0,0.35);
+      border-radius: 18px 18px 0 0;
+      padding: 14px;
+    }
+    .pf-sheet.show{ transform: translateY(0); }
+
+    .pf-sheet .pf-sheet-handle{
+      width: 54px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.16);
+      margin: 6px auto 12px;
+    }
+    .pf-sheet .pf-sheet-title{
+      font-weight: 800;
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .pf-sheet .pf-sheet-actions a,
+    .pf-sheet .pf-sheet-actions button{
+      width:100%;
+      text-align:left;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.12);
+      color: rgba(232,238,252,0.92);
+      margin-bottom: 10px;
+      cursor:pointer;
+      font-size: 14px;
+    }
+    .pf-sheet .pf-sheet-actions a{ display:block; text-decoration:none; }
+    .pf-sheet .pf-sheet-actions a:hover,
+    .pf-sheet .pf-sheet-actions button:hover{ background: rgba(255,255,255,0.06); }
+
+    .pf-sheet .pf-danger{
+      border-color: rgba(255,93,93,0.35) !important;
+      background: rgba(255,93,93,0.10) !important;
+      color: #ffd6d6 !important;
+    }
+
+    /* Botão ⋯ consistente */
+    .icon-btn{ min-width: 44px; }
+
+    /* status pills (se não tiver no CSS global) */
+    .status-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.16);
+      font-size: 12px;
+      color: rgba(232,238,252,0.86);
+    }
+    .status-pill.ok{ border-color: rgba(34,197,94,0.35); }
+    .status-pill.seen{ border-color: rgba(79,124,255,0.35); }
+    .status-pill.none{ opacity:.8; }
+
+    /* garantir que cards não criem recorte visual no mobile */
+    .proposal-card{ overflow: visible !important; }
+  </style>
 </head>
+
 <body>
   <div class="container">
 
-    <!-- TOPBAR (simples) -->
+    <!-- TOPBAR -->
     <div class="nav">
       <div class="brand">
         <div class="logo"></div>
@@ -37,20 +164,8 @@
           <span class="pill">✨ PRO</span>
         {% endif %}
 
-        <!-- Menu compacto -->
-        <details class="menu">
-          <summary class="btn btn-ghost icon-btn" title="Menu">☰</summary>
-          <div class="menu-panel">
-            <a href="/wizard">Assistente</a>
-            <a href="/services">Meus serviços</a>
-            <a href="/clients">Clientes</a>
-            <a href="/settings">Padrões</a>
-            <a href="/profile">Perfil</a>
-            <a href="/billing">Assinatura</a>
-            <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:8px 0;">
-            <a href="/logout">Sair</a>
-          </div>
-        </details>
+        <!-- Menu ☰ (agora é drawer, com fechar) -->
+        <button class="btn btn-ghost icon-btn" type="button" onclick="openDrawer()">☰</button>
       </div>
     </div>
 
@@ -70,7 +185,7 @@
         </div>
       {% endif %}
 
-      <!-- KPIs (compacto) -->
+      <!-- KPIs -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0;">
         <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
         <span class="pill">✅ Aceitos: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
@@ -134,7 +249,7 @@
         <!-- MOBILE -->
         <div class="mobile-list">
           {% for p in proposals %}
-            <div class="card proposal-card" style="overflow: visible;">
+            <div class="card proposal-card">
               <p class="title">{{ p.project_name }}</p>
               <p class="meta">
                 Cliente: <b>{{ p.client_name }}</b><br>
@@ -155,25 +270,17 @@
                 {% endif %}
               </p>
 
-              <div class="actions" style="overflow: visible;">
+              <div class="actions">
                 <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
                 <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
 
-                <!-- DROPDOWN FIX (mobile) -->
-                <div class="dropdown">
-                  <button class="btn btn-ghost dropdown-toggle" type="button"
-                          onclick="toggleDropdown('menu-{{ p.id }}', event)">⋯</button>
-
-                  <div id="menu-{{ p.id }}" class="dropdown-menu">
-                    <a href="/proposals/{{ p.id }}/again">Novo igual</a>
-                    <a href="/proposals/{{ p.id }}/edit">Editar</a>
-                    <a href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
-                    <form method="post" action="/proposals/{{ p.id }}/delete"
-                          onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
-                      <button type="submit">Excluir</button>
-                    </form>
-                  </div>
-                </div>
+                <button class="btn btn-ghost icon-btn" type="button"
+                        onclick="openActions(this)"
+                        data-title="{{ p.project_name|e }}"
+                        data-again="/proposals/{{ p.id }}/again"
+                        data-edit="/proposals/{{ p.id }}/edit"
+                        data-duplicate="/proposals/{{ p.id }}/duplicate"
+                        data-delete="/proposals/{{ p.id }}/delete">⋯</button>
               </div>
             </div>
           {% endfor %}
@@ -211,23 +318,17 @@
               </td>
 
               <td>
-                <div class="actions" style="overflow: visible;">
+                <div class="actions">
                   <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
                   <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
 
-                  <!-- Dropdown desktop (mantém details, mas com z-index pelo CSS) -->
-                  <details class="menu">
-                    <summary class="btn btn-ghost icon-btn">⋯</summary>
-                    <div class="menu-panel">
-                      <a href="/proposals/{{ p.id }}/again">Novo igual</a>
-                      <a href="/proposals/{{ p.id }}/edit">Editar</a>
-                      <a href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
-                      <form method="post" action="/proposals/{{ p.id }}/delete"
-                            onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
-                        <button type="submit">Excluir</button>
-                      </form>
-                    </div>
-                  </details>
+                  <button class="btn btn-ghost icon-btn" type="button"
+                          onclick="openActions(this)"
+                          data-title="{{ p.project_name|e }}"
+                          data-again="/proposals/{{ p.id }}/again"
+                          data-edit="/proposals/{{ p.id }}/edit"
+                          data-duplicate="/proposals/{{ p.id }}/duplicate"
+                          data-delete="/proposals/{{ p.id }}/delete">⋯</button>
                 </div>
               </td>
             </tr>
@@ -243,35 +344,103 @@
     </p>
   </div>
 
-  <!-- Dropdown JS (mobile) -->
+  <!-- OVERLAY (reutilizado) -->
+  <div id="pfOverlay" class="pf-overlay" onclick="closeAll()"></div>
+
+  <!-- DRAWER MENU (☰) -->
+  <aside id="pfDrawer" class="pf-drawer" aria-hidden="true">
+    <div class="pf-drawer-top">
+      <div style="font-weight:800;">Menu</div>
+      <button class="btn btn-ghost icon-btn" type="button" onclick="closeDrawer()">✕</button>
+    </div>
+
+    <a href="/wizard">Assistente</a>
+    <a href="/services">Meus serviços</a>
+    <a href="/clients">Clientes</a>
+    <a href="/settings">Padrões</a>
+    <a href="/profile">Perfil</a>
+    <a href="/billing">Assinatura</a>
+    <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:10px 0;">
+    <a href="/logout">Sair</a>
+  </aside>
+
+  <!-- ACTION SHEET (⋯) -->
+  <div id="pfSheet" class="pf-sheet" aria-hidden="true">
+    <div class="pf-sheet-handle"></div>
+    <p id="pfSheetTitle" class="pf-sheet-title">Ações</p>
+
+    <div class="pf-sheet-actions">
+      <a id="pfAgain" href="#">Novo igual</a>
+      <a id="pfEdit" href="#">Editar</a>
+      <a id="pfDuplicate" href="#">Duplicar</a>
+
+      <form id="pfDeleteForm" method="post" action="#" onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
+        <button class="pf-danger" type="submit">Excluir</button>
+      </form>
+
+      <button class="btn btn-ghost" type="button" onclick="closeSheet()">Fechar</button>
+    </div>
+  </div>
+
   <script>
-    function closeAllDropdowns(){
-      document.querySelectorAll('.dropdown-menu.show').forEach(el => el.classList.remove('show'));
+    const overlay = document.getElementById("pfOverlay");
+    const drawer  = document.getElementById("pfDrawer");
+    const sheet   = document.getElementById("pfSheet");
+
+    function lockScroll(on){
+      document.body.classList.toggle("pf-noscroll", !!on);
     }
 
-    function toggleDropdown(id, ev){
-      ev.preventDefault();
-      ev.stopPropagation();
-      const el = document.getElementById(id);
-      if(!el) return;
-
-      const isOpen = el.classList.contains('show');
-      closeAllDropdowns();
-      if(!isOpen) el.classList.add('show');
+    function closeAll(){
+      closeDrawer();
+      closeSheet();
     }
 
-    document.addEventListener('click', closeAllDropdowns);
-    document.addEventListener('scroll', closeAllDropdowns, { passive: true });
-  </script>
+    /* Drawer */
+    function openDrawer(){
+      overlay.classList.add("show");
+      drawer.classList.add("show");
+      lockScroll(true);
+    }
+    function closeDrawer(){
+      drawer.classList.remove("show");
+      // só remove overlay se sheet não estiver aberto
+      if(!sheet.classList.contains("show")){
+        overlay.classList.remove("show");
+        lockScroll(false);
+      }
+    }
 
-<script>
-  // Fecha qualquer menu aberto ao clicar fora
-  document.addEventListener("click", function(e){
-    document.querySelectorAll("details.menu[open]").forEach(function(d){
-      if (!d.contains(e.target)) d.removeAttribute("open");
+    /* Sheet */
+    function openActions(btn){
+      const title = btn.getAttribute("data-title") || "Ações";
+      document.getElementById("pfSheetTitle").textContent = title;
+
+      document.getElementById("pfAgain").href = btn.getAttribute("data-again") || "#";
+      document.getElementById("pfEdit").href = btn.getAttribute("data-edit") || "#";
+      document.getElementById("pfDuplicate").href = btn.getAttribute("data-duplicate") || "#";
+      document.getElementById("pfDeleteForm").action = btn.getAttribute("data-delete") || "#";
+
+      overlay.classList.add("show");
+      sheet.classList.add("show");
+      lockScroll(true);
+    }
+    function closeSheet(){
+      sheet.classList.remove("show");
+      if(!drawer.classList.contains("show")){
+        overlay.classList.remove("show");
+        lockScroll(false);
+      }
+    }
+
+    // ESC fecha (desktop)
+    document.addEventListener("keydown", (e) => {
+      if(e.key === "Escape") closeAll();
     });
-  });
-</script>
 
+    // evita clique no sheet fechar tudo
+    sheet.addEventListener("click", (e) => e.stopPropagation());
+    drawer.addEventListener("click", (e) => e.stopPropagation());
+  </script>
 </body>
 </html>
