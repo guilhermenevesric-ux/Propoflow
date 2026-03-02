@@ -94,12 +94,6 @@ SESSION_COOKIE = "session_token"
 APP_BASE_URL = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
 COOKIE_SECURE = True if (APP_BASE_URL.startswith("https://")) else False
 
-SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587").strip() or "587")
-SMTP_USER = os.getenv("SMTP_USER", "").strip()
-SMTP_PASS = os.getenv("SMTP_PASS", "").strip()
-SMTP_FROM = os.getenv("SMTP_FROM", "").strip()  # ex: "PropoFlow <no-reply@seu-dominio.com>"
-
 ASAAS_API_KEY = os.getenv("ASAAS_API_KEY", "").strip()
 ASAAS_ENV = os.getenv("ASAAS_ENV", "sandbox").strip().lower()
 ASAAS_WEBHOOK_TOKEN = os.getenv("ASAAS_WEBHOOK_TOKEN", "").strip()
@@ -279,20 +273,6 @@ def normalize_email(email: str) -> str:
 def gen_6digit_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
-def send_email(to_email: str, subject: str, body: str):
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASS and SMTP_FROM):
-        raise RuntimeError("SMTP não configurado (SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM).")
-
-    msg = EmailMessage()
-    msg["From"] = SMTP_FROM
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.set_content(body)
-
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
-        s.starttls()
-        s.login(SMTP_USER, SMTP_PASS)
-        s.send_message(msg)
 
 def issue_verification_code(db: Session, user: User):
     code = gen_6digit_code()
