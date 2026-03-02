@@ -263,5 +263,15 @@
     document.addEventListener('click', closeAllDropdowns);
     document.addEventListener('scroll', closeAllDropdowns, { passive: true });
   </script>
+
+<script>
+  // Fecha qualquer menu aberto ao clicar fora
+  document.addEventListener("click", function(e){
+    document.querySelectorAll("details.menu[open]").forEach(function(d){
+      if (!d.contains(e.target)) d.removeAttribute("open");
+    });
+  });
+</script>
+
 </body>
 </html>

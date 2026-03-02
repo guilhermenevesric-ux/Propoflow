@@ -491,3 +491,102 @@ html, body {
 .dropdown-toggle {
   min-width: 56px;
 }
+
+/* =========================
+   MENU (⋯) - FIX MOBILE
+   ========================= */
+
+details.menu{
+  position: relative;
+  display: inline-block;
+}
+
+/* tira setinha padrão do <summary> */
+details.menu summary{
+  list-style: none;
+}
+details.menu summary::-webkit-details-marker{
+  display:none;
+}
+
+/* garante que o card não “corte” o menu */
+.proposal-card{
+  position: relative;
+  overflow: visible;
+}
+
+/* painel do menu (desktop default) */
+details.menu .menu-panel{
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 190px;
+
+  background: rgba(10, 16, 28, 0.95);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  padding: 8px;
+
+  box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+  backdrop-filter: blur(10px);
+
+  z-index: 9999;
+}
+
+/* quando abre, traz o <details> pra frente */
+details.menu[open]{
+  z-index: 9999;
+}
+
+/* itens do menu */
+details.menu .menu-panel a,
+details.menu .menu-panel button{
+  display:block;
+  width: 100%;
+  text-align:left;
+
+  padding: 10px 10px;
+  border-radius: 10px;
+
+  color: var(--text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+details.menu .menu-panel a:hover,
+details.menu .menu-panel button:hover{
+  background: rgba(255,255,255,0.06);
+}
+
+/* ===== MOBILE: vira bottom sheet (não corta mais) ===== */
+@media (max-width: 820px){
+  /* fundo escuro quando menu abre */
+  details.menu[open]::before{
+    content:"";
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 9998;
+  }
+
+  details.menu .menu-panel{
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    top: auto;
+    min-width: auto;
+
+    z-index: 9999;
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  details.menu .menu-panel a,
+  details.menu .menu-panel button{
+    padding: 14px 12px;
+    font-size: 15px;
+  }
+}
