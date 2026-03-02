@@ -209,9 +209,23 @@ html, body {
 /* Container da tabela com scroll horizontal só nela */
 .table-wrap {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: auto;      /* mantém scroll horizontal */
+  overflow-y: visible;   /* deixa o dropdown aparecer */
   -webkit-overflow-scrolling: touch;
   border-radius: 16px;
+}
+
+.table{
+  width:100%;
+  border-collapse: collapse;
+  overflow: visible;     /* NÃO cortar dropdown */
+  border-radius: 14px;
+  border: 1px solid var(--line);
+}
+
+/* garante que dropdown fique por cima da tabela */
+.table td, .table th {
+  position: relative;
 }
 
 /* Garantir que a tabela não quebre feio */
@@ -407,4 +421,13 @@ html, body {
   border-color: rgba(255,255,255,0.16);
   background: rgba(0,0,0,0.18);
   color: rgba(232,238,252,0.8);
+}
+
+.dropdown { position: relative; display: inline-block; }
+
+.dropdown-menu{
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 9999;
 }
