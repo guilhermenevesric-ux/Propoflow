@@ -360,233 +360,296 @@ html, body {
   padding: 11px 0;
 }
 
-.menu-panel{
-  position:absolute;
-  right:0;
-  top: calc(100% + 8px);
-  min-width: 210px;
-  background: rgba(10,16,28,0.98);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 8px;
-  z-index: 50;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.45);
-}
+.menu-panel {
+  /* ========= MENUS (⋯ e ☰) ========= */
 
-.menu-panel a,
-.menu-panel button{
-  display:block;
-  width:100%;
-  text-align:left;
-  padding: 10px 10px;
-  border-radius: 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text);
-  cursor:pointer;
-  font-size: 14px;
-}
-
-.menu-panel a:hover,
-.menu-panel button:hover{
-  background: rgba(255,255,255,0.06);
-  border-color: var(--line);
-}
-
-.status-pill{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.status-pill.ok{
-  border-color: rgba(34,197,94,0.35);
-  background: rgba(34,197,94,0.10);
-  color: rgba(232,238,252,0.95);
-}
-
-.status-pill.seen{
-  border-color: rgba(96,165,250,0.35);
-  background: rgba(96,165,250,0.10);
-  color: rgba(232,238,252,0.95);
-}
-
-.status-pill.none{
-  border-color: rgba(255,255,255,0.16);
-  background: rgba(0,0,0,0.18);
-  color: rgba(232,238,252,0.8);
-}
-
-.dropdown { position: relative; display: inline-block; }
-
-.dropdown-menu{
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 9999;
-}
-
-/* ===== DROPDOWN (3 pontinhos) — mobile fix ===== */
-.proposal-card,
-.mobile-list,
-.card {
-  overflow: visible; /* garante que nada corta o menu */
-}
-
-.dropdown {
-  position: relative;
-  display: inline-block;
-}
-
-.dropdown-menu {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 10px); /* abre pra cima (melhor no celular) */
-  min-width: 220px;
-
-  background: rgba(10, 16, 30, 0.98); /* NÃO vazar o fundo */
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 14px;
-  padding: 8px;
-
-  box-shadow: 0 18px 50px rgba(0,0,0,0.55);
-  backdrop-filter: blur(14px);
-
-  z-index: 99999; /* fica por cima de tudo */
-  display: none;
-  max-height: 60vh;
-  overflow: auto;
-}
-
-.dropdown-menu.show {
-  display: block;
-}
-
-.dropdown-menu a,
-.dropdown-menu button {
-  width: 100%;
-  display: block;
-  text-align: left;
-
-  padding: 10px 10px;
-  border-radius: 10px;
-  border: 0;
-  background: transparent;
-  color: rgba(232,238,252,0.95);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.dropdown-menu a:hover,
-.dropdown-menu button:hover {
-  background: rgba(255,255,255,0.06);
-}
-
-.dropdown-toggle {
-  min-width: 56px;
-}
-
-/* =========================
-   MENU (⋯) - FIX MOBILE
-   ========================= */
-
-details.menu{
-  position: relative;
-  display: inline-block;
-}
-
-/* tira setinha padrão do <summary> */
-details.menu summary{
-  list-style: none;
-}
-details.menu summary::-webkit-details-marker{
-  display:none;
-}
-
-/* garante que o card não “corte” o menu */
-.proposal-card{
-  position: relative;
-  overflow: visible;
-}
-
-/* painel do menu (desktop default) */
-details.menu .menu-panel{
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  min-width: 190px;
-
-  background: rgba(10, 16, 28, 0.95);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 14px;
-  padding: 8px;
-
-  box-shadow: 0 20px 60px rgba(0,0,0,0.55);
-  backdrop-filter: blur(10px);
-
-  z-index: 9999;
-}
-
-/* quando abre, traz o <details> pra frente */
-details.menu[open]{
-  z-index: 9999;
-}
-
-/* itens do menu */
-details.menu .menu-panel a,
-details.menu .menu-panel button{
-  display:block;
-  width: 100%;
-  text-align:left;
-
-  padding: 10px 10px;
-  border-radius: 10px;
-
-  color: var(--text);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-details.menu .menu-panel a:hover,
-details.menu .menu-panel button:hover{
-  background: rgba(255,255,255,0.06);
-}
-
-/* ===== MOBILE: vira bottom sheet (não corta mais) ===== */
-@media (max-width: 820px){
-  /* fundo escuro quando menu abre */
-  details.menu[open]::before{
-    content:"";
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    z-index: 9998;
+  details.menu {
+    position: relative;
   }
 
-  details.menu .menu-panel{
-    position: fixed;
-    left: 14px;
-    right: 14px;
-    bottom: 14px;
-    top: auto;
-    min-width: auto;
+  details.menu > summary {
+    list-style: none;
+  }
 
-    z-index: 9999;
+  details.menu > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* Desktop: dropdown normal (não ocupa a tela) */
+
+  details.menu .menu-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    min-width: 220px;
+    max-width: 280px;
     padding: 10px;
-    border-radius: 16px;
+    border-radius: 14px;
+    background: rgba(10, 14, 24, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(10px);
+    z-index: 9999;
   }
 
   details.menu .menu-panel a,
-  details.menu .menu-panel button{
-    padding: 14px 12px;
-    font-size: 15px;
+  details.menu .menu-panel button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 12px 12px;
+    border-radius: 12px;
+    color: rgba(232, 238, 252, 0.92);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  details.menu .menu-panel a:hover,
+  details.menu .menu-panel button:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  /* Mobile: vira “sheet” (não full width no desktop) */
+  @media (max-width: 820px) {
+    details.menu .menu-panel {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      top: auto;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 12px;
+    }
+  }
+
+  .menu-panel a,
+  .menu-panel button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 10px;
+    border-radius: 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .menu-panel a:hover,
+  .menu-panel button:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--line);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .status-pill.ok {
+    border-color: rgba(34, 197, 94, 0.35);
+    background: rgba(34, 197, 94, 0.10);
+    color: rgba(232, 238, 252, 0.95);
+  }
+
+  .status-pill.seen {
+    border-color: rgba(96, 165, 250, 0.35);
+    background: rgba(96, 165, 250, 0.10);
+    color: rgba(232, 238, 252, 0.95);
+  }
+
+  .status-pill.none {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(0, 0, 0, 0.18);
+    color: rgba(232, 238, 252, 0.8);
+  }
+
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 9999;
+  }
+
+  /* ===== DROPDOWN (3 pontinhos) — mobile fix ===== */
+
+  .proposal-card,
+  .mobile-list,
+  .card {
+    overflow: visible; /* garante que nada corta o menu */
+  }
+
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px); /* abre pra cima (melhor no celular) */
+    min-width: 220px;
+
+    background: rgba(10, 16, 30, 0.98); /* NÃO vazar o fundo */
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    padding: 8px;
+
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(14px);
+
+    z-index: 99999; /* fica por cima de tudo */
+    display: none;
+    max-height: 60vh;
+    overflow: auto;
+  }
+
+  .dropdown-menu.show {
+    display: block;
+  }
+
+  .dropdown-menu a,
+  .dropdown-menu button {
+    width: 100%;
+    display: block;
+    text-align: left;
+
+    padding: 10px 10px;
+    border-radius: 10px;
+    border: 0;
+    background: transparent;
+    color: rgba(232, 238, 252, 0.95);
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .dropdown-menu a:hover,
+  .dropdown-menu button:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .dropdown-toggle {
+    min-width: 56px;
+  }
+
+  /* =========================
+     MENU (⋯) - FIX MOBILE
+     ========================= */
+
+  details.menu {
+    position: relative;
+    display: inline-block;
+  }
+
+  /* tira setinha padrão do <summary> */
+
+  details.menu summary {
+    list-style: none;
+  }
+
+  details.menu summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* garante que o card não “corte” o menu */
+
+  .proposal-card {
+    position: relative;
+    overflow: visible;
+  }
+
+  /* painel do menu (desktop default) */
+
+  details.menu .menu-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    min-width: 190px;
+
+    background: rgba(10, 16, 28, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 8px;
+
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(10px);
+
+    z-index: 9999;
+  }
+
+  /* quando abre, traz o <details> pra frente */
+
+  details.menu[open] {
+    z-index: 9999;
+  }
+
+  /* itens do menu */
+
+  details.menu .menu-panel a,
+  details.menu .menu-panel button {
+    display: block;
+    width: 100%;
+    text-align: left;
+
+    padding: 10px 10px;
+    border-radius: 10px;
+
+    color: var(--text);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  details.menu .menu-panel a:hover,
+  details.menu .menu-panel button:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  /* ===== MOBILE: vira bottom sheet (não corta mais) ===== */
+  @media (max-width: 820px) {
+    /* fundo escuro quando menu abre */
+    details.menu[open]::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      z-index: 9998;
+    }
+
+    details.menu .menu-panel {
+      position: fixed;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+      top: auto;
+      min-width: auto;
+
+      z-index: 9999;
+      padding: 10px;
+      border-radius: 16px;
+    }
+
+    details.menu .menu-panel a,
+    details.menu .menu-panel button {
+      padding: 14px 12px;
+      font-size: 15px;
+    }
   }
 }
