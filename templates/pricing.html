@@ -2,218 +2,93 @@
 <html>
 <head>
 <meta charset="utf-8">
-
 <title>PropoFlow • Planos</title>
-
-<link rel="stylesheet" href="/static/style.css?v=2001">
-
+<link rel="stylesheet" href="/static/style.css?v=3000">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-
-
 <body>
-
 
 <div class="container">
 
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Escolha seu plano</p>
+      </div>
+    </div>
 
-<div class="nav">
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">Voltar</a>
+    </div>
+  </div>
 
-<div class="brand">
+  <div class="card" style="margin-bottom:14px;">
+    <h2 class="h2">Ative o PRO e use sem limites</h2>
+    <p class="small" style="margin:0;">
+      O PRO libera <b>orçamentos ilimitados</b> e deixa seu PDF com aparência mais profissional.
+      <span style="opacity:.85;">(Pix recomendado)</span>
+    </p>
+  </div>
 
-<div class="logo"></div>
+  <div class="pricing-grid">
 
-<div>
+    <!-- FREE -->
+    <div class="card pricing-card">
+      <h2 class="h2">Gratuito</h2>
+      <p class="small">Para testar e começar</p>
 
-<h1>PropoFlow</h1>
+      <ul class="small" style="margin-top:14px; padding-left:18px;">
+        <li>✓ Até <b>5 orçamentos</b></li>
+        <li>✓ Link público + PDF</li>
+        <li>✓ Aceite online</li>
+        <li>✓ 1 exclusão</li>
+      </ul>
 
-<p>Escolha seu plano</p>
+      <div class="price">R$ 0</div>
 
-</div>
+      {% if user and user.plan != "pro" %}
+        <button class="btn btn-ghost" style="margin-top:16px; width:100%; cursor:default;">Plano atual</button>
+      {% else %}
+        <button class="btn btn-ghost" style="margin-top:16px; width:100%; opacity:.5; cursor:default;">Disponível</button>
+      {% endif %}
+    </div>
 
-</div>
+    <!-- PRO -->
+    <div class="card pricing-card" style="border:1px solid rgba(79,124,255,0.55);">
+      <h2 class="h2">Pro</h2>
+      <p class="small">Para trabalhar todo dia com isso</p>
 
+      <ul class="small" style="margin-top:14px; padding-left:18px;">
+        <li>✓ Orçamentos <b>ilimitados</b></li>
+        <li>✓ Exclusões <b>ilimitadas</b></li>
+        <li>✓ PDF mais profissional</li>
+        <li>✓ Prioridade no suporte</li>
+      </ul>
 
-<div class="actions">
+      <div class="price">R$ 19,90/mês</div>
 
-<a class="btn btn-ghost" href="/dashboard">
+      {% if user and user.plan == "pro" %}
+        <button class="btn" style="margin-top:16px; width:100%; cursor:default; background:#22c55e; border:none;">
+          Você já é PRO ✓
+        </button>
+      {% else %}
+        <a href="/upgrade/pro/pix" class="btn" style="margin-top:16px; width:100%;">Ativar PRO com Pix (recomendado)</a>
+        <a href="/upgrade/pro" class="btn btn-ghost" style="margin-top:10px; width:100%;">Ativar com cartão</a>
+      {% endif %}
 
-Voltar
+      <p class="small" style="margin-top:12px; opacity:.8;">
+        Pix libera rápido. Se demorar, você pode clicar em “Já paguei” na tela do Pix.
+      </p>
+    </div>
 
-</a>
+  </div>
 
-</div>
-
-</div>
-
-
-
-<div class="pricing-grid">
-
-
-<!-- FREE -->
-
-<div class="card pricing-card">
-
-
-<h2 class="h2">
-
-Plano Gratuito
-
-</h2>
-
-
-<p class="small">
-
-Ideal para começar
-
-</p>
-
-
-
-<ul class="small" style="margin-top:14px; padding-left:18px;">
-
-<li>✓ Até 5 propostas</li>
-
-<li>✓ Link público profissional</li>
-
-<li>✓ Aceite online</li>
-
-<li>✓ 1 exclusão</li>
-
-</ul>
-
-
-
-<div class="price">
-
-R$ 0
-
-</div>
-
-
-
-{% if user and user.plan != "pro" %}
-
-<button class="btn btn-ghost"
-
-style="margin-top:16px; width:100%; cursor:default;">
-
-Plano atual
-
-</button>
-
-{% else %}
-
-<button class="btn btn-ghost"
-
-style="margin-top:16px; width:100%; opacity:.5; cursor:default;">
-
-Disponível
-
-</button>
-
-{% endif %}
-
+  <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+    <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
+  </p>
 
 </div>
-
-
-
-
-<!-- PRO -->
-
-<div class="card pricing-card"
-
-style="border:1px solid rgba(79,124,255,0.5);">
-
-
-<h2 class="h2">
-
-Plano Pro
-
-</h2>
-
-
-<p class="small">
-
-Sistema completo liberado
-
-</p>
-
-
-
-<ul class="small"
-
-style="margin-top:14px; padding-left:18px;">
-
-<li>✓ Propostas ilimitadas</li>
-
-<li>✓ Exclusões ilimitadas</li>
-
-<li>✓ Sem limitações</li>
-
-<li>✓ Prioridade</li>
-
-</ul>
-
-
-
-<div class="price">
-
-R$ 19/mês
-
-</div>
-
-
-
-{% if user and user.plan == "pro" %}
-
-<button class="btn"
-
-style="margin-top:16px; width:100%; cursor:default; background:#22c55e; border:none;">
-
-Você já é PRO ✓
-
-</button>
-
-{% else %}
-
-<a href="/upgrade/pro"
-
-class="btn"
-
-style="margin-top:16px; width:100%;">
-
-Quero acesso Pro
-
-<a href="/upgrade/pro/pix" class="btn btn-ghost" style="margin-top:10px; width:100%;">Pagar com Pix</a>
-
-{% endif %}
-
-
-
-</div>
-
-
-
-</div>
-
-
-
-<p class="small"
-
-style="margin-top:24px; text-align:center; opacity:.6;">
-
-PropoFlow • Sistema profissional de propostas
-
-</p>
-
-
-
-</div>
-
-
 </body>
-
 </html>
