@@ -431,3 +431,63 @@ html, body {
   right: 0;
   z-index: 9999;
 }
+
+/* ===== DROPDOWN (3 pontinhos) — mobile fix ===== */
+.proposal-card,
+.mobile-list,
+.card {
+  overflow: visible; /* garante que nada corta o menu */
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px); /* abre pra cima (melhor no celular) */
+  min-width: 220px;
+
+  background: rgba(10, 16, 30, 0.98); /* NÃO vazar o fundo */
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px;
+  padding: 8px;
+
+  box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+  backdrop-filter: blur(14px);
+
+  z-index: 99999; /* fica por cima de tudo */
+  display: none;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-menu a,
+.dropdown-menu button {
+  width: 100%;
+  display: block;
+  text-align: left;
+
+  padding: 10px 10px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: rgba(232,238,252,0.95);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dropdown-menu a:hover,
+.dropdown-menu button:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.dropdown-toggle {
+  min-width: 56px;
+}

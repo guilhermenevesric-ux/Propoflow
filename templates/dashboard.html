@@ -134,7 +134,7 @@
         <!-- MOBILE -->
         <div class="mobile-list">
           {% for p in proposals %}
-            <div class="card proposal-card">
+            <div class="card proposal-card" style="overflow: visible;">
               <p class="title">{{ p.project_name }}</p>
               <p class="meta">
                 Cliente: <b>{{ p.client_name }}</b><br>
@@ -155,13 +155,16 @@
                 {% endif %}
               </p>
 
-              <div class="actions">
+              <div class="actions" style="overflow: visible;">
                 <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
                 <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
 
-                <details class="menu">
-                  <summary class="btn btn-ghost icon-btn">⋯</summary>
-                  <div class="menu-panel">
+                <!-- DROPDOWN FIX (mobile) -->
+                <div class="dropdown">
+                  <button class="btn btn-ghost dropdown-toggle" type="button"
+                          onclick="toggleDropdown('menu-{{ p.id }}', event)">⋯</button>
+
+                  <div id="menu-{{ p.id }}" class="dropdown-menu">
                     <a href="/proposals/{{ p.id }}/again">Novo igual</a>
                     <a href="/proposals/{{ p.id }}/edit">Editar</a>
                     <a href="/proposals/{{ p.id }}/duplicate">Duplicar</a>
@@ -170,7 +173,7 @@
                       <button type="submit">Excluir</button>
                     </form>
                   </div>
-                </details>
+                </div>
               </div>
             </div>
           {% endfor %}
@@ -208,10 +211,11 @@
               </td>
 
               <td>
-                <div class="actions">
+                <div class="actions" style="overflow: visible;">
                   <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
                   <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
 
+                  <!-- Dropdown desktop (mantém details, mas com z-index pelo CSS) -->
                   <details class="menu">
                     <summary class="btn btn-ghost icon-btn">⋯</summary>
                     <div class="menu-panel">
@@ -238,5 +242,26 @@
       <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
     </p>
   </div>
+
+  <!-- Dropdown JS (mobile) -->
+  <script>
+    function closeAllDropdowns(){
+      document.querySelectorAll('.dropdown-menu.show').forEach(el => el.classList.remove('show'));
+    }
+
+    function toggleDropdown(id, ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+      const el = document.getElementById(id);
+      if(!el) return;
+
+      const isOpen = el.classList.contains('show');
+      closeAllDropdowns();
+      if(!isOpen) el.classList.add('show');
+    }
+
+    document.addEventListener('click', closeAllDropdowns);
+    document.addEventListener('scroll', closeAllDropdowns, { passive: true });
+  </script>
 </body>
 </html>

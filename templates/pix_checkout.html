@@ -78,6 +78,10 @@
         <a class="btn" href="/upgrade/pro/pix/check?sub={{ sub_id }}&pay={{ pay_id }}">Já paguei</a>
       </div>
 
+      <p class="small" id="autoStatus" style="margin-top:10px; opacity:.8;">
+  Estamos verificando o pagamento automaticamente…
+</p>
+
       <p class="small" style="margin-top:10px; opacity:.75;">
         Se o pagamento foi aprovado, o PRO libera automaticamente (webhook). Se demorar, clique em “Já paguei”.
       </p>
@@ -99,6 +103,50 @@ function copyPix(){
   navigator.clipboard.writeText(el.value);
   alert("Pix copiado!");
 }
+</script>
+
+<script>
+(function(){
+  const payId = "{{ pay_id }}";
+  const subId = "{{ sub_id }}";
+  const el = document.getElementById("autoStatus");
+
+  if(!payId) return;
+
+  let tries = 0;
+  const maxTries = 45; // ~7-8 min (45 * 10s)
+
+  async function check(){
+    tries++;
+    try{
+      const res = await fetch(`/upgrade/pro/pix/status?pay=${encodeURIComponent(payId)}&sub=${encodeURIComponent(subId)}`, {
+        headers: { "accept": "application/json" }
+      });
+      const data = await res.json();
+
+      if(el){
+        el.textContent = data.paid
+          ? "Pagamento confirmado ✅ Liberando PRO…"
+          : `Status: ${data.status || "PENDENTE"} (atualizando…)`;
+      }
+
+      if(data && data.paid){
+        window.location.href = "/billing";
+        return;
+      }
+    }catch(e){
+      if(el) el.textContent = "Verificando… (se demorar, clique em “Já paguei”)";
+    }
+
+    if(tries < maxTries){
+      setTimeout(check, 10000); // 10s
+    }else{
+      if(el) el.textContent = "Se você já pagou, clique em “Já paguei” para atualizar.";
+    }
+  }
+
+  setTimeout(check, 2500);
+})();
 </script>
 
 </body>

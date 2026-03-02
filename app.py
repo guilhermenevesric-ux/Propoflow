@@ -2206,6 +2206,47 @@ def upgrade_pro_pix_check(request: Request, sub: str, pay: str, db: Session = De
 
     return RedirectResponse("/upgrade/pro/pix", status_code=302)
 
+@app.get("/upgrade/pro/pix/status")
+def upgrade_pro_pix_status(request: Request, pay: str, sub: str | None = None, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return {"ok": False, "status": "UNAUTH"}
+
+    if not ASAAS_API_KEY:
+        return {"ok": False, "status": "NO_ASAAS"}
+
+    # consulta o pagamento no Asaas
+    try:
+        r = requests.get(
+            f"{asaas_api_base()}/payments/{pay}",
+            headers=asaas_headers(),
+            timeout=20,
+        )
+    except Exception:
+        return {"ok": False, "status": "ERROR"}
+
+    if r.status_code != 200:
+        return {"ok": False, "status": "ERROR"}
+
+    pj = r.json()
+    st = (pj.get("status") or "").upper()
+
+    # pago -> libera pro (aceleração; webhook também faz)
+    if st in ("RECEIVED", "CONFIRMED"):
+        # tenta usar subscription_id se veio
+        if sub:
+            user.asaas_subscription_id = user.asaas_subscription_id or sub
+        set_user_pro_month(
+            db,
+            user,
+            paid_until=datetime.utcnow() + timedelta(days=32),
+            subscription_id=getattr(user, "asaas_subscription_id", None),
+            customer_id=getattr(user, "asaas_customer_id", None),
+        )
+        return {"ok": True, "status": st, "paid": True}
+
+    return {"ok": True, "status": st, "paid": False}
+
 @app.get("/upgrade/pro")
 def upgrade_pro(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
