@@ -23,6 +23,87 @@ from urllib.parse import quote_plus
 import re
 import json
 
+# ===== Anti-spam / Rate limit (mínimo viável, sem Redis) =====
+from collections import deque
+import time
+
+DISPOSABLE_EMAIL_DOMAINS = {
+    "mailinator.com", "tempmail.com", "temp-mail.org", "10minutemail.com",
+    "10minutemail.net", "guerrillamail.com", "guerrillamail.net",
+    "yopmail.com", "yopmail.net", "yopmail.fr",
+    "getnada.com", "trashmail.com", "trashmail.net",
+    "throwawaymail.com", "dispostable.com", "fakeinbox.com",
+    "maildrop.cc", "mailnesia.com", "inboxbear.com",
+    "minuteinbox.com", "mohmal.com", "emailondeck.com",
+    "tempinbox.com", "tempmailo.com", "sharklasers.com"
+}
+
+def normalize_email(s: str) -> str:
+    return (s or "").strip().lower()
+
+def get_client_ip(request) -> str:
+    # Render geralmente manda X-Forwarded-For; o ProxyHeadersMiddleware já ajuda,
+    # mas isso aqui garante.
+    xf = request.headers.get("x-forwarded-for")
+    if xf:
+        return xf.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+def is_disposable_email(email: str) -> bool:
+    email = normalize_email(email)
+    if "@" not in email:
+        return True
+    domain = email.split("@", 1)[1]
+    # bloqueia domínios exatos e subdomínios desses provedores
+    if domain in DISPOSABLE_EMAIL_DOMAINS:
+        return True
+    for d in DISPOSABLE_EMAIL_DOMAINS:
+        if domain.endswith("." + d):
+            return True
+    # heurística leve (evita bloquear e-mails reais)
+    bad_words = ("tempmail", "temp-mail", "throwaway", "disposable", "mailinator", "yopmail", "guerrilla")
+    if any(w in domain for w in bad_words):
+        return True
+    return False
+
+class MemoryRateLimiter:
+    """
+    Rate-limit em memória (bom o suficiente pra começar).
+    Limitação: se você tiver múltiplas instâncias, cada uma tem seu contador.
+    """
+    def __init__(self):
+        self._buckets = {}
+
+    def _prune(self, key: str, window_sec: int):
+        now = time.time()
+        dq = self._buckets.get(key)
+        if not dq:
+            dq = deque()
+        while dq and dq[0] < now - window_sec:
+            dq.popleft()
+        self._buckets[key] = dq
+        return dq
+
+    def allow_and_hit(self, key: str, limit: int, window_sec: int) -> bool:
+        dq = self._prune(key, window_sec)
+        if len(dq) >= limit:
+            return False
+        dq.append(time.time())
+        return True
+
+    def is_limited(self, key: str, limit: int, window_sec: int) -> bool:
+        dq = self._prune(key, window_sec)
+        return len(dq) >= limit
+
+rate_limiter = MemoryRateLimiter()
+
+def rl_key(request, action: str, extra: str = "") -> str:
+    ip = get_client_ip(request)
+    if extra:
+        return f"{action}:ip={ip}:x={extra}"
+    return f"{action}:ip={ip}"
 
 
 from db import SessionLocal, engine, Base
@@ -266,10 +347,23 @@ def send_email(to_email: str, subject: str, body: str):
 def issue_verification_code(db: Session, user: User, force: bool = False):
     now = datetime.utcnow()
 
+    from datetime import datetime, timezone
+
     last = getattr(user, "email_verify_last_sent_at", None)
-    if (not force) and last and (now - last).total_seconds() < 60:
-        wait = int(60 - (now - last).total_seconds())
-        raise RuntimeError(f"Aguarde {wait}s para reenviar o código.")
+    if last:
+        # garante timezone
+        try:
+            now = datetime.now(timezone.utc)
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            if (now - last).total_seconds() < 60:
+                return templates.TemplateResponse("verify.html", {
+                    "request": request,
+                    "email": user.email,
+                    "error": "Aguarde 1 minuto para reenviar o código."
+                })
+        except Exception:
+            pass
 
     code = gen_6digit_code()
     user.email_verify_code_hash = pbkdf2_sha256.hash(code)
@@ -661,11 +755,30 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), d
     user = db.query(User).filter(User.email == email_norm).first()
 
     if (not user) or (not pbkdf2_sha256.verify(password, user.password_hash)):
-        return templates.TemplateResponse("login.html", {"request": request, "error": "Email ou senha inválidos."})
+        # Rate limit por IP+email: 8 falhas em 10 min
+        key = rl_key(request, "login_fail", extra=email)
+        if not rate_limiter.allow_and_hit(key, limit=8, window_sec=600):
+            return templates.TemplateResponse("login.html", {
+                "request": request,
+                "error": "Muitas tentativas com esse e-mail. Aguarde 10 minutos."
+            })
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Email ou senha inválidos."
+        })
 
     token, sess = create_session(user)
     db.add(sess)
     db.commit()
+
+    email = normalize_email(email)
+
+    # Rate limit de login por IP (ex.: 30 tentativas / 10 min)
+    if rate_limiter.is_limited(rl_key(request, "login"), limit=30, window_sec=600):
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Muitas tentativas de login. Aguarde 10 minutos e tente novamente."
+        })
 
     # Se não verificou, manda pro verify (e reenvia se expirou/não existe)
     if not getattr(user, "email_verified", False):
@@ -687,7 +800,22 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), d
 
 @app.post("/register")
 def register(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    email_norm = normalize_email(email)
+    email = normalize_email(email)
+
+    # 1) Rate limit por IP (cadastro)
+    #    Ex.: máx 5 cadastros por hora por IP
+    if not rate_limiter.allow_and_hit(rl_key(request, "register"), limit=5, window_sec=3600):
+        return templates.TemplateResponse("register.html", {
+            "request": request,
+            "error": "Muitas contas criadas deste IP. Tente novamente em 1 hora."
+        })
+
+    # 2) Bloqueia e-mail temporário
+    if is_disposable_email(email):
+        return templates.TemplateResponse("register.html", {
+            "request": request,
+            "error": "Use um e-mail real (Gmail/Outlook/etc). E-mails temporários não são aceitos."
+        })
 
     if db.query(User).filter(User.email == email_norm).first():
         return templates.TemplateResponse("register.html", {"request": request, "error": "Esse email já existe. Faça login."})
@@ -807,6 +935,14 @@ def verify_resend(request: Request, db: Session = Depends(get_db)):
             "email": user.email,
             "error": f"Erro ao reenviar código: {str(e)}",
             "info": None,
+        })
+
+    # Rate limit por IP: 10 reenvios / hora
+    if not rate_limiter.allow_and_hit(rl_key(request, "verify_resend"), limit=10, window_sec=3600):
+        return templates.TemplateResponse("verify.html", {
+            "request": request,
+            "email": user.email,
+            "error": "Muitas tentativas de reenvio. Tente novamente em 1 hora."
         })
 
     return templates.TemplateResponse("verify.html", {
