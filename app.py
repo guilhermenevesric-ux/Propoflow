@@ -915,6 +915,9 @@ def verify_submit(request: Request, code: str = Form(...), db: Session = Depends
     db.add(user)
     db.commit()
 
+    count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+    if count == 0:
+        return RedirectResponse("/welcome", status_code=302)
     return RedirectResponse("/dashboard", status_code=302)
 
 
@@ -966,6 +969,35 @@ def logout(request: Request, db: Session = Depends(get_db)):
     resp.delete_cookie(SESSION_COOKIE)
     return resp
 
+
+@app.get("/welcome")
+def welcome(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    # se ainda não verificou email, força verificação
+    if not getattr(user, "email_verified", False):
+        return RedirectResponse("/verify", status_code=302)
+
+    # se já tem orçamentos, não precisa welcome
+    count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
+    if count > 0:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    missing = []
+    if not (user.display_name or "").strip():
+        missing.append("Nome")
+    if not (user.phone or "").strip():
+        missing.append("WhatsApp")
+    if not (user.pix_key or "").strip():
+        missing.append("Pix")
+
+    return templates.TemplateResponse("welcome.html", {
+        "request": request,
+        "user": user,
+        "missing_profile": missing
+    })
 
 # ===== DASHBOARD =====
 @app.get("/dashboard", response_class=HTMLResponse)

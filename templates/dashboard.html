@@ -240,10 +240,14 @@
       </form>
 
       {% if proposals|length == 0 %}
-        <p class="small">
-          Nenhum orçamento encontrado.
-          <a href="/wizard">Criar novo</a>.
-        </p>
+        <div class="card" style="margin-top:12px;">
+  <h3 style="margin:0 0 6px;">Seu primeiro orçamento em 60 segundos</h3>
+  <p class="small" style="margin:0 0 12px;">Clique no botão e siga o assistente. Depois é só copiar o link e mandar no WhatsApp.</p>
+  <div class="actions">
+    <a class="btn" href="/wizard">Criar meu primeiro orçamento</a>
+    <a class="btn btn-ghost" href="/welcome">Ver passos</a>
+  </div>
+</div>
       {% else %}
 
         <!-- MOBILE -->
