@@ -33,7 +33,7 @@ from models import (
     PaymentStage
 )
 from pdf_gen import generate_proposal_pdf
-
+import traceback
 
 # ====== migração leve ======
 try:
@@ -288,6 +288,35 @@ def issue_verification_code(db: Session, user: User, force: bool = False):
 # ==========================
 # HELPERS
 # ==========================
+
+import re
+
+def parse_money_to_cents(v: str | None) -> int | None:
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    # remove tudo que não for dígito, vírgula, ponto, sinal
+    s = re.sub(r"[^\d,.-]", "", s)
+    # se veio no formato BR: 1.234,56 -> remove milhares e troca vírgula por ponto
+    if "," in s:
+        s = s.replace(".", "").replace(",", ".")
+    try:
+        return int(round(float(s) * 100))
+    except:
+        return None
+
+def parse_qty(v: str | None) -> float:
+    s = (v or "").strip()
+    if not s:
+        return 1.0
+    s = s.replace(",", ".")
+    try:
+        return float(s)
+    except:
+        return 1.0
+
 
 def normalize_email(email: str) -> str:
     email = (email or "").strip().lower()
@@ -1402,7 +1431,16 @@ def edit_proposal_save(
 
     p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
     if not p:
-        return RedirectResponse("/dashboard", status_code=302)
+        try:
+            # ... seu código atual de salvar (atualiza proposal, itens, etapas etc)
+            db.commit()
+            return RedirectResponse("/dashboard", status_code=302)
+
+        except Exception as e:
+            db.rollback()
+            print("❌ ERRO ao salvar /proposals/{id}/edit:", str(e))
+            traceback.print_exc()
+            return HTMLResponse("Internal Server Error", status_code=500)
 
     # Se o orçamento é antigo e ainda não tem terms_text, congela agora (uma vez só)
     if not getattr(p, "terms_text", None):
