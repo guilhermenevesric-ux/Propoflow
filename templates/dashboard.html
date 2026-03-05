@@ -7,23 +7,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
-    /* ====== FIX DEFINITIVO: overlays (não corta no mobile) ====== */
+    /* ===== Overlay + Drawer + Sheet (menus) ===== */
     .pf-overlay{
-      position: fixed;
-      inset: 0;
+      position: fixed; inset: 0;
       background: rgba(0,0,0,0.55);
       z-index: 9998;
-      display: none;
+      display:none;
     }
     .pf-overlay.show{ display:block; }
-
     body.pf-noscroll{ overflow:hidden; }
 
-    /* Drawer (menu ☰) */
+    /* Drawer (☰) */
     .pf-drawer{
-      position: fixed;
-      top: 0;
-      right: 0;
+      position: fixed; top:0; right:0;
       width: min(360px, 92vw);
       height: 100vh;
       z-index: 9999;
@@ -36,13 +32,9 @@
       padding: 14px;
     }
     .pf-drawer.show{ transform: translateX(0); }
-
     .pf-drawer .pf-drawer-top{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin-bottom: 10px;
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px; margin-bottom:10px;
     }
     .pf-drawer a{
       display:block;
@@ -56,28 +48,36 @@
     }
     .pf-drawer a:hover{ background: rgba(255,255,255,0.06); }
 
-    /* Bottom sheet (menu ⋯) */
+    /* Sheet (⋯) - no desktop fica “card” central; no mobile vira bottom sheet */
     .pf-sheet{
       position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      left: 50%;
+      bottom: 16px;
+      width: min(520px, calc(100% - 24px));
       z-index: 9999;
-      transform: translateY(110%);
+      transform: translate(-50%, 110%);
       transition: transform .18s ease;
       background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.09));
-      border-top: 1px solid rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.12);
       backdrop-filter: blur(12px);
-      box-shadow: 0 -20px 50px rgba(0,0,0,0.35);
-      border-radius: 18px 18px 0 0;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      border-radius: 18px;
       padding: 14px;
     }
-    .pf-sheet.show{ transform: translateY(0); }
+    .pf-sheet.show{ transform: translate(-50%, 0); }
+
+    @media (max-width: 820px){
+      .pf-sheet{
+        left: 0; right: 0; width: auto;
+        border-radius: 18px 18px 0 0;
+        border-left: 0; border-right: 0; border-bottom: 0;
+        transform: translateY(110%);
+      }
+      .pf-sheet.show{ transform: translateY(0); }
+    }
 
     .pf-sheet .pf-sheet-handle{
-      width: 54px;
-      height: 6px;
-      border-radius: 999px;
+      width: 54px; height: 6px; border-radius: 999px;
       background: rgba(255,255,255,0.16);
       margin: 6px auto 12px;
     }
@@ -102,67 +102,64 @@
     .pf-sheet .pf-sheet-actions a{ display:block; text-decoration:none; }
     .pf-sheet .pf-sheet-actions a:hover,
     .pf-sheet .pf-sheet-actions button:hover{ background: rgba(255,255,255,0.06); }
-
     .pf-sheet .pf-danger{
       border-color: rgba(255,93,93,0.35) !important;
       background: rgba(255,93,93,0.10) !important;
       color: #ffd6d6 !important;
     }
 
-    /* Botão ⋯ consistente */
-    .icon-btn{ min-width: 44px; }
-
-    /* status pills (se não tiver no CSS global) */
-    .status-pill{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      padding: 7px 10px;
-      border-radius: 999px;
+    /* ===== Barra de uso (0/5) mais “premium” ===== */
+    .pf-usage{
+      margin: 12px 0 14px;
+      padding: 14px;
+      border-radius: 18px;
       border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(0,0,0,0.16);
-      font-size: 12px;
-      color: rgba(232,238,252,0.86);
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.08));
+      box-shadow: 0 18px 45px rgba(0,0,0,0.25);
+      backdrop-filter: blur(10px);
     }
-    .status-pill.ok{ border-color: rgba(34,197,94,0.35); }
-    .status-pill.seen{ border-color: rgba(79,124,255,0.35); }
-    .status-pill.none{ opacity:.8; }
+    .pf-usage-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .pf-usage-title{
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: .2px;
+    }
+    .pf-usage-sub{
+      margin-top: 4px;
+      font-size: 12px;
+      color: rgba(232,238,252,0.70);
+    }
+    .pf-progress{
+      margin-top: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.12);
+      overflow: hidden;
+    }
+    .pf-progress span{
+      display:block; height:100%;
+      background: linear-gradient(90deg, var(--primary), var(--primary2));
+      width: 0%;
+    }
+    @media (max-width: 640px){
+      .pf-usage .btn{ width: 100%; justify-content:center; }
+    }
 
-    <style>
-  /* ...seu CSS já existente... */
-
-  .pf-usage{
-    padding: 14px;
-    margin: 12px 0;
-  }
-  .pf-usage-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    flex-wrap:wrap;
-  }
-  .pf-bar{
-    height: 10px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.10);
-    border: 1px solid rgba(255,255,255,0.12);
-    overflow:hidden;
-    margin-top: 10px;
-  }
-  .pf-bar > div {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(135deg, var(--primary), var(--primary2));
-  }}
-</style>
-
-
+    /* evitar recortes no mobile */
+    .proposal-card{ overflow: visible !important; }
+  </style>
+</head>
 
 <body>
   <div class="container">
 
-    <!-- TOPBAR -->
     <div class="nav">
       <div class="brand">
         <div class="logo"></div>
@@ -190,7 +187,6 @@
           <span class="pill">✨ PRO</span>
         {% endif %}
 
-        <!-- Menu ☰ (agora é drawer, com fechar) -->
         <button class="btn btn-ghost icon-btn" type="button" onclick="openDrawer()">☰</button>
       </div>
     </div>
@@ -211,7 +207,6 @@
         </div>
       {% endif %}
 
-      <!-- KPIs -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0;">
         <span class="pill">📄 Total: <b style="color: rgba(232,238,252,0.95);">{{ total }}</b></span>
         <span class="pill">✅ Aceitos: <b style="color: rgba(232,238,252,0.95);">{{ accepted }}</b></span>
@@ -219,46 +214,43 @@
         <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
       </div>
 
-
-  <div class="pf-usage">
-    <div class="pf-usage-top">
-      <div>
-        <div class="pf-usage-title">
-          Plano grátis: <b>{{ used }}/{{ limit }}</b> orçamentos
+      {% if user and user.plan != "pro" %}
+      <div class="pf-usage">
+        <div class="pf-usage-top">
+          <div>
+            <div class="pf-usage-title">Uso do plano grátis: <b>{{ free_used }}</b>/<b>{{ free_limit }}</b></div>
+            <div class="pf-usage-sub">Ao chegar em {{ free_limit }}, trava. PRO libera ilimitado + logo + PDF melhor.</div>
+          </div>
+          <a class="btn pf-usage-cta" href="/pricing">Ativar PRO</a>
         </div>
-        <div class="pf-usage-sub">
-          Desbloqueie PRO: ilimitado + logo + PDF premium.
+        <div class="pf-progress">
+          <span style="width: {{ free_pct|int }}%;"></span>
         </div>
       </div>
+      {% endif %}
 
-      <a class="btn pf-usage-cta" href="/pricing">Desbloquear PRO • R$ 19,90/mês</a>
-    </div>
+      {% if total == 0 %}
+      <div class="card" style="padding:16px; margin: 0 0 14px;">
+        <div style="font-weight:900; font-size:16px; margin-bottom:6px;">Seu primeiro orçamento em 60 segundos</div>
+        <div class="small" style="margin-bottom:10px;">Clique no botão e siga o assistente. Depois é só copiar o link e mandar no WhatsApp.</div>
+        <div class="actions" style="flex-wrap:wrap;">
+          <a class="btn" href="/wizard">Criar meu primeiro orçamento</a>
+          <a class="btn btn-ghost" href="/start">Ver passos</a>
+        </div>
+      </div>
+      {% endif %}
 
-    <div class="pf-progress" aria-label="Uso do plano grátis">
-      <span style="width: {{ pct }}%;"></span>
-    </div>
-  </div>
-{% endif %}
-
-      <!-- Filtros -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 0 0 14px;">
         <a class="btn btn-ghost" href="/dashboard?status=all&days={{ days or 30 }}&q={{ q or '' }}"
-           style="{% if status == 'all' %}border-color: rgba(79,124,255,0.8);{% endif %}">
-          Todas
-        </a>
+           style="{% if status == 'all' %}border-color: rgba(79,124,255,0.8);{% endif %}">Todas</a>
 
         <a class="btn btn-ghost" href="/dashboard?status=pending&days={{ days or 30 }}&q={{ q or '' }}"
-           style="{% if status == 'pending' %}border-color: rgba(79,124,255,0.8);{% endif %}">
-          Pendentes
-        </a>
+           style="{% if status == 'pending' %}border-color: rgba(79,124,255,0.8);{% endif %}">Pendentes</a>
 
         <a class="btn btn-ghost" href="/dashboard?status=accepted&days={{ days or 30 }}&q={{ q or '' }}"
-           style="{% if status == 'accepted' %}border-color: rgba(79,124,255,0.8);{% endif %}">
-          Aceitos
-        </a>
+           style="{% if status == 'accepted' %}border-color: rgba(79,124,255,0.8);{% endif %}">Aceitos</a>
       </div>
 
-      <!-- Busca + período -->
       <form method="get" action="/dashboard" class="card" style="padding:14px; margin: 0 0 14px;">
         <div class="row">
           <div>
@@ -276,7 +268,6 @@
         </div>
 
         <input type="hidden" name="status" value="{{ status or 'all' }}">
-
         <div style="height:12px;"></div>
         <div class="actions">
           <button class="btn" type="submit">Aplicar</button>
@@ -287,19 +278,9 @@
       </form>
 
       {% if proposals|length == 0 %}
-      {% if (total|int) == 0 and (q or '') == '' and (status or 'all') == 'all' %}
-  <!-- CARD: Seu primeiro orçamento em 60 segundos -->
-        <div class="card" style="margin-top:12px;">
-  <h3 style="margin:0 0 6px;">Seu primeiro orçamento em 60 segundos</h3>
-  <p class="small" style="margin:0 0 12px;">Clique no botão e siga o assistente. Depois é só copiar o link e mandar no WhatsApp.</p>
-  <div class="actions">
-    <a class="btn" href="/wizard">Criar meu primeiro orçamento</a>
-    <a class="btn btn-ghost" href="/welcome">Ver passos</a>
-  </div>
-</div>
+        <p class="small">Nenhum orçamento encontrado. <a href="/wizard">Criar novo</a>.</p>
       {% else %}
 
-        <!-- MOBILE -->
         <div class="mobile-list">
           {% for p in proposals %}
             <div class="card proposal-card">
@@ -315,9 +296,7 @@
                   <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m %H:%M") }}</span>
                 {% elif p.last_viewed_at %}
                   <span class="status-pill seen">👀 Visto</span>
-                  <span class="small" style="opacity:.85;">
-                    • {{ p.last_viewed_at.strftime("%d/%m %H:%M") }} • {{ p.view_count or 0 }}x
-                  </span>
+                  <span class="small" style="opacity:.85;"> • {{ p.last_viewed_at.strftime("%d/%m %H:%M") }} • {{ p.view_count or 0 }}x</span>
                 {% else %}
                   <span class="status-pill none">Não visto</span>
                 {% endif %}
@@ -328,7 +307,7 @@
                 <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf">PDF</a>
 
                 <button class="btn btn-ghost icon-btn" type="button"
-                        onclick="openActions(this);"
+                        onclick="openActions(this)"
                         data-title="{{ p.project_name|e }}"
                         data-again="/proposals/{{ p.id }}/again"
                         data-edit="/proposals/{{ p.id }}/edit"
@@ -339,7 +318,6 @@
           {% endfor %}
         </div>
 
-        <!-- DESKTOP -->
         <div class="table-wrap">
           <table class="table">
             <tr>
@@ -355,21 +333,17 @@
               <td>{{ p.created_at.strftime("%d/%m/%Y %H:%M") }}</td>
               <td>{{ p.client_name }}</td>
               <td>{{ p.project_name }}</td>
-
               <td>
                 {% if p.accepted_at %}
                   <span class="status-pill ok">✓ Aceito</span>
                   <span class="small" style="opacity:.85;"> • {{ p.accepted_at.strftime("%d/%m %H:%M") }}</span>
                 {% elif p.last_viewed_at %}
                   <span class="status-pill seen">👀 Visto</span>
-                  <span class="small" style="opacity:.85;">
-                    • {{ p.last_viewed_at.strftime("%d/%m %H:%M") }} • {{ p.view_count or 0 }}x
-                  </span>
+                  <span class="small" style="opacity:.85;"> • {{ p.last_viewed_at.strftime("%d/%m %H:%M") }} • {{ p.view_count or 0 }}x</span>
                 {% else %}
                   <span class="status-pill none">Não visto</span>
                 {% endif %}
               </td>
-
               <td>
                 <div class="actions">
                   <a class="btn" href="/p/{{ p.public_id }}">Abrir</a>
@@ -397,16 +371,13 @@
     </p>
   </div>
 
-  <!-- OVERLAY (reutilizado) -->
   <div id="pfOverlay" class="pf-overlay" onclick="closeAll()"></div>
 
-  <!-- DRAWER MENU (☰) -->
   <aside id="pfDrawer" class="pf-drawer" aria-hidden="true">
     <div class="pf-drawer-top">
       <div style="font-weight:800;">Menu</div>
       <button class="btn btn-ghost icon-btn" type="button" onclick="closeDrawer()">✕</button>
     </div>
-
     <a href="/wizard">Assistente</a>
     <a href="/services">Meus serviços</a>
     <a href="/clients">Clientes</a>
@@ -417,7 +388,6 @@
     <a href="/logout">Sair</a>
   </aside>
 
-  <!-- ACTION SHEET (⋯) -->
   <div id="pfSheet" class="pf-sheet" aria-hidden="true">
     <div class="pf-sheet-handle"></div>
     <p id="pfSheetTitle" class="pf-sheet-title">Ações</p>
@@ -440,16 +410,10 @@
     const drawer  = document.getElementById("pfDrawer");
     const sheet   = document.getElementById("pfSheet");
 
-    function lockScroll(on){
-      document.body.classList.toggle("pf-noscroll", !!on);
-    }
+    function lockScroll(on){ document.body.classList.toggle("pf-noscroll", !!on); }
 
-    function closeAll(){
-      closeDrawer();
-      closeSheet();
-    }
+    function closeAll(){ closeDrawer(); closeSheet(); }
 
-    /* Drawer */
     function openDrawer(){
       overlay.classList.add("show");
       drawer.classList.add("show");
@@ -457,20 +421,16 @@
     }
     function closeDrawer(){
       drawer.classList.remove("show");
-      // só remove overlay se sheet não estiver aberto
       if(!sheet.classList.contains("show")){
         overlay.classList.remove("show");
         lockScroll(false);
       }
     }
 
-    /* Sheet */
     function openActions(btn){
       const title = btn.getAttribute("data-title") || "Ações";
       document.getElementById("pfSheetTitle").textContent = title;
-if (window.innerWidth > 820) {
-  // no desktop, abre o menu igual sheet mesmo? (se quiser dropdown, a gente faz depois)
-}
+
       document.getElementById("pfAgain").href = btn.getAttribute("data-again") || "#";
       document.getElementById("pfEdit").href = btn.getAttribute("data-edit") || "#";
       document.getElementById("pfDuplicate").href = btn.getAttribute("data-duplicate") || "#";
@@ -488,12 +448,7 @@ if (window.innerWidth > 820) {
       }
     }
 
-    // ESC fecha (desktop)
-    document.addEventListener("keydown", (e) => {
-      if(e.key === "Escape") closeAll();
-    });
-
-    // evita clique no sheet fechar tudo
+    document.addEventListener("keydown", (e) => { if(e.key === "Escape") closeAll(); });
     sheet.addEventListener("click", (e) => e.stopPropagation());
     drawer.addEventListener("click", (e) => e.stopPropagation());
   </script>
