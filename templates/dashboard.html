@@ -220,31 +220,36 @@
       </div>
 
       {% if not pro_active %}
-  <div class="card pf-usage">
-    <div class="pf-usage-row">
+  {# ===== BARRA DE USO (APENAS FREE) ===== #}
+{% if user and user.plan != "pro" %}
+  {# tenta pegar contadores do backend; se não existir, usa fallback seguro #}
+  {% set limit = usage_limit|default(user.proposal_limit|default(5)) %}
+  {% set used  = usage_used|default(used_count|default(total)) %}
+
+  {% if not limit or limit < 1 %}
+    {% set limit = 5 %}
+  {% endif %}
+
+  {% set pct = (used * 100 / limit) %}
+  {% if pct < 0 %}{% set pct = 0 %}{% endif %}
+  {% if pct > 100 %}{% set pct = 100 %}{% endif %}
+
+  <div class="pf-usage">
+    <div class="pf-usage-top">
       <div>
         <div class="pf-usage-title">
-          Uso do plano grátis: <span class="pf-usage-strong">{{ free_used }}/{{ free_limit }}</span>
+          Plano grátis: <b>{{ used }}/{{ limit }}</b> orçamentos
         </div>
         <div class="pf-usage-sub">
-          Ao chegar em {{ free_limit }}, trava. PRO libera ilimitado + logo + PDF melhor.
+          Desbloqueie PRO: ilimitado + logo + PDF premium.
         </div>
       </div>
 
-      <a class="btn pf-usage-cta" href="/pricing?reason=limit&used={{ free_used }}&limit={{ free_limit }}&next=/dashboard">
-        Ativar PRO
-      </a>
+      <a class="btn pf-usage-cta" href="/pricing">Desbloquear PRO • R$ 19,90/mês</a>
     </div>
 
-    <div class="pf-bar" aria-label="Barra de uso">
-      <div style="width: {{ free_pct }}%;"></div>
-    </div>
-  </div>
-{% else %}
-  <div class="card pf-usage">
-    <div class="pf-usage-row">
-      <div class="pf-usage-title">✨ PRO ativo — orçamentos ilimitados</div>
-      <a class="btn btn-ghost" href="/billing">Gerenciar</a>
+    <div class="pf-progress" aria-label="Uso do plano grátis">
+      <span style="width: {{ pct }}%;"></span>
     </div>
   </div>
 {% endif %}
@@ -296,6 +301,8 @@
       </form>
 
       {% if proposals|length == 0 %}
+      {% if (total|int) == 0 and (q or '') == '' and (status or 'all') == 'all' %}
+  <!-- CARD: Seu primeiro orçamento em 60 segundos -->
         <div class="card" style="margin-top:12px;">
   <h3 style="margin:0 0 6px;">Seu primeiro orçamento em 60 segundos</h3>
   <p class="small" style="margin:0 0 12px;">Clique no botão e siga o assistente. Depois é só copiar o link e mandar no WhatsApp.</p>
