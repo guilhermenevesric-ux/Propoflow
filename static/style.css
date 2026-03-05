@@ -725,3 +725,62 @@ details.menu .menu-panel button:hover{
     font-size: 15px;
   }
 }
+
+.pf-usage{
+  padding: 14px 16px;
+  margin: 12px 0 6px;
+}
+
+.pf-usage-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+}
+
+.pf-usage-title{
+  font-weight: 900;
+  font-size: 14px;
+  color: rgba(232,238,252,0.95);
+}
+
+.pf-usage-strong{
+  color: rgba(232,238,252,0.95);
+}
+
+.pf-usage-sub{
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(232,238,252,0.70);
+}
+
+.pf-usage-cta{
+  padding: 10px 12px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.pf-bar{
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.12);
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.pf-bar > div{
+  height: 100%;
+  background: linear-gradient(135deg, var(--primary), var(--primary2));
+}
+
+@media (max-width: 640px){
+  .pf-usage-row{
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pf-usage-cta{
+    width: 100%;
+    justify-content: center;
+  }
+}
