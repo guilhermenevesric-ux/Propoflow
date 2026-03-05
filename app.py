@@ -254,7 +254,7 @@ def create_session(user: User) -> tuple[str, UserSession]:
     sess = UserSession(user_id=user.id, token_hash=token_hash, expires_at=expires)
     return token, sess
 
-
+import urllib.parse
 from urllib.parse import urlencode
 
 def upgrade_redirect(reason: str, used: int | None = None, limit: int | None = None, next_url: str | None = None):
@@ -2280,7 +2280,19 @@ def pricing_page(
         if limit is None:
             limit = int(getattr(user, "proposal_limit", 5) or 5)
         if used is None:
-            used = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.archived.is_(False)).count()
+
+            # Conta propostas do usuário (compatível com diferentes modelos)
+            q = db.query(Proposal).filter(Proposal.owner_id == user.id)
+
+            # Se existir algum campo de "arquivado/deletado", aplica filtro.
+            if hasattr(Proposal, "archived"):
+                q = q.filter(Proposal.archived.is_(False))
+            elif hasattr(Proposal, "deleted_at"):
+                q = q.filter(Proposal.deleted_at.is_(None))
+            elif hasattr(Proposal, "is_deleted"):
+                q = q.filter(Proposal.is_deleted.is_(False))
+
+            used = q.count()
 
     return templates.TemplateResponse("pricing.html", {
         "request": request,
@@ -2306,6 +2318,26 @@ def privacy(request: Request):
 @app.get("/support", response_class=HTMLResponse)
 def support(request: Request):
     return templates.TemplateResponse("support.html", {"request": request})
+
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "guilhermenevesric@gmail.com")
+SUPPORT_WHATSAPP = os.getenv("SUPPORT_WHATSAPP", "").strip()
+
+@app.get("/support")
+def support_page(request: Request, code: str = "", db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+
+    whats_url = ""
+    if SUPPORT_WHATSAPP:
+        msg = f"Olá! Preciso de ajuda no PropoFlow. Código: {code}" if code else "Olá! Preciso de ajuda no PropoFlow."
+        whats_url = f"https://wa.me/{SUPPORT_WHATSAPP}?text={urllib.parse.quote(msg)}"
+
+    return templates.TemplateResponse("support.html", {
+        "request": request,
+        "user": user,
+        "support_email": SUPPORT_EMAIL,
+        "whats_url": whats_url,
+        "code": code,
+    })
 
 
 # ===== ASAAS =====

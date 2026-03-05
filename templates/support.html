@@ -3,35 +3,64 @@
 <head>
   <meta charset="utf-8">
   <title>PropoFlow • Suporte</title>
-  <link rel="stylesheet" href="/static/style.css?v=2100">
+  <link rel="stylesheet" href="/static/style.css?v=9999">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-<div class="container">
-  <div class="nav">
-    <div class="brand">
-      <div class="logo"></div>
-      <div>
-        <h1>PropoFlow</h1>
-        <p>Suporte</p>
+  <div class="container">
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>PropoFlow</h1>
+          <p>Suporte</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn btn-ghost" href="/dashboard">Voltar</a>
       </div>
     </div>
-    <div class="actions">
-      <a class="btn btn-ghost" href="/dashboard">Voltar</a>
+
+    <div class="card">
+      <h2 class="h2">Fale com a gente</h2>
+
+      <p class="small" style="margin-bottom:10px;">
+        Email de suporte:
+        <b><a href="mailto:{{ support_email }}">{{ support_email }}</a></b>
+      </p>
+
+      {% if code %}
+        <div class="pill" style="margin-bottom:12px;">
+          Código do erro: <b style="color: rgba(232,238,252,0.95);">{{ code }}</b>
+        </div>
+      {% endif %}
+
+      {% if whats_url %}
+        <div class="actions" style="flex-wrap:wrap;">
+          <a class="btn" href="{{ whats_url }}" target="_blank" rel="noopener">Chamar no WhatsApp</a>
+          <a class="btn btn-ghost" href="mailto:{{ support_email }}?subject=Suporte PropoFlow{% if code %} ({{ code }}){% endif %}">
+            Enviar e-mail
+          </a>
+        </div>
+      {% else %}
+        <div class="actions" style="flex-wrap:wrap;">
+          <a class="btn" href="mailto:{{ support_email }}?subject=Suporte PropoFlow{% if code %} ({{ code }}){% endif %}">
+            Enviar e-mail
+          </a>
+        </div>
+      {% endif %}
+
+      {% if user and user.email %}
+        <p class="small" style="margin-top:14px; opacity:.7;">
+          Logado como: <b>{{ user.email }}</b>
+        </p>
+      {% endif %}
     </div>
-  </div>
 
-  <div class="card">
-    <h2 class="h2">Fale com a gente</h2>
-    <p class="small">
-      Para suporte, envie mensagem para:
-      <b>SEUEMAIL@DOMINIO.COM</b>
-    </p>
-
-    <p class="small" style="margin-top:10px;">
-      (guilhermenevesric@gmail.com)
+    <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+      <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a>
     </p>
   </div>
-</div>
 </body>
 </html>
