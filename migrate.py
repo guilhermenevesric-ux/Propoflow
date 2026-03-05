@@ -194,4 +194,9 @@ with engine.begin() as conn:
         else:
             conn.execute(text("ALTER TABLE users ADD COLUMN email_verify_expires_at DATETIME"))
 
+from sqlalchemy import text
+
+# ... dentro do seu bloco engine.begin() as conn:
+conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_terms TEXT"))
+
 print("✅ migrate.py OK")
