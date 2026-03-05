@@ -219,20 +219,6 @@
         <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
       </div>
 
-      {% if not pro_active %}
-  {# ===== BARRA DE USO (APENAS FREE) ===== #}
-{% if user and user.plan != "pro" %}
-  {# tenta pegar contadores do backend; se não existir, usa fallback seguro #}
-  {% set limit = usage_limit|default(user.proposal_limit|default(5)) %}
-  {% set used  = usage_used|default(used_count|default(total)) %}
-
-  {% if not limit or limit < 1 %}
-    {% set limit = 5 %}
-  {% endif %}
-
-  {% set pct = (used * 100 / limit) %}
-  {% if pct < 0 %}{% set pct = 0 %}{% endif %}
-  {% if pct > 100 %}{% set pct = 100 %}{% endif %}
 
   <div class="pf-usage">
     <div class="pf-usage-top">
