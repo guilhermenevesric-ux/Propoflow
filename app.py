@@ -1011,6 +1011,35 @@ def welcome(request: Request, db: Session = Depends(get_db)):
         "missing_profile": missing
     })
 
+def is_profile_ok(user) -> bool:
+    # bem “tolerante” pra não quebrar se mudar nome de campo
+    display_name = (getattr(user, "display_name", "") or "").strip()
+    phone = (getattr(user, "phone", "") or "").strip()
+    pix_key = (getattr(user, "pix_key", "") or "").strip()
+    return bool(display_name and phone and pix_key)
+
+def has_any_proposal(db: Session, user_id: int) -> bool:
+    return db.query(Proposal.id).filter(Proposal.owner_id == user_id).first() is not None
+
+@app.get("/start")
+def start_page(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    # se já está tudo ok, manda pro dashboard
+    profile_ok = is_profile_ok(user)
+    has_proposal = has_any_proposal(db, user.id)
+    if profile_ok and has_proposal:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    return templates.TemplateResponse("start.html", {
+        "request": request,
+        "user": user,
+        "profile_ok": profile_ok,
+        "has_proposal": has_proposal,
+    })
+
 # ===== DASHBOARD =====
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(
@@ -1023,6 +1052,13 @@ def dashboard(
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
+
+    skip_start = request.query_params.get("skip_start") == "1"
+    if not skip_start:
+        profile_ok = is_profile_ok(user)
+        has_proposal = has_any_proposal(db, user.id)
+        if (not profile_ok) or (not has_proposal):
+            return RedirectResponse("/start", status_code=302)
 
     days = int(days or 30)
     days = 7 if days <= 7 else (30 if days <= 30 else 90)
@@ -2169,7 +2205,7 @@ def profile_save(
 
     user = get_current_user(request, db)
     if not user:
-        return RedirectResponse("/login", status_code=302)
+        return RedirectResponse("/start", status_code=302)
 
     user.display_name = display_name.strip() or None
     user.company_name = company_name.strip() or None

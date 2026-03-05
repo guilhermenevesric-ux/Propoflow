@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Começar</title>
+  <link rel="stylesheet" href="/static/style.css?v=9999">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>PropoFlow</h1>
+          <p>Comece em 60 segundos</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn btn-ghost" href="/dashboard?skip_start=1">Ir pro dashboard</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="h2">Vamos te colocar pra rodar agora</h2>
+      <p class="small">Siga esses 3 passos e pronto. Sem complicação.</p>
+
+      {% if not profile_ok %}
+        <div class="error">
+          Antes do primeiro orçamento, complete seu perfil: <b>Nome</b>, <b>WhatsApp</b>, <b>Pix</b>.
+          Isso aparece no link e ajuda a passar confiança.
+        </div>
+      {% endif %}
+
+      <div class="card" style="margin-bottom:12px;">
+        <h3 style="margin:0 0 6px; font-size:15px;">
+          1) Complete seu perfil
+          {% if profile_ok %}<span class="status-pill ok" style="margin-left:8px;">✓ OK</span>{% endif %}
+        </h3>
+        <p class="small" style="margin:0 0 10px;">Nome, WhatsApp e Pix (pro cliente saber pra quem pagar).</p>
+        <a class="btn" href="/profile">Abrir perfil</a>
+      </div>
+
+      <div class="card" style="margin-bottom:12px;">
+        <h3 style="margin:0 0 6px; font-size:15px;">
+          2) Crie seu 1º orçamento
+          {% if has_proposal %}<span class="status-pill ok" style="margin-left:8px;">✓ OK</span>{% endif %}
+        </h3>
+        <p class="small" style="margin:0 0 10px;">O assistente já te guia. Você só preenche o básico.</p>
+        <a class="btn" href="/wizard">Criar orçamento</a>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 6px; font-size:15px;">3) Envie no WhatsApp</h3>
+        <p class="small" style="margin:0 0 10px;">
+          Depois de criar, clique em <b>Copiar link</b> ou <b>PDF</b> e mande pro cliente.
+        </p>
+        <a class="btn btn-ghost" href="/dashboard">Ver meus orçamentos</a>
+      </div>
+
+      <p class="small" style="margin-top:12px; opacity:.85;">
+        Dica: no plano grátis você tem <b>5 orçamentos</b>. O objetivo é você sentir o valor rapidinho.
+      </p>
+    </div>
+
+    <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+      <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
+    </p>
+  </div>
+</body>
+</html>
