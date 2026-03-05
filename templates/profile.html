@@ -67,8 +67,21 @@
 
         <br><br>
 
-        <h3 class="h2" style="font-size:15px;">Logo (PRO)</h3>
-        <p class="small" style="margin-top:0;">Opcional. Se não quiser, pode ignorar.</p>
+        {% if user and user.plan == "pro" %}
+  <h3>Logo (PRO)</h3>
+  <p class="small">Opcional. Se não quiser, pode ignorar.</p>
+
+  <label>Enviar novo logo</label>
+  <input type="file" name="logo" accept="image/png,image/jpeg">
+
+  <p class="small">Dica: use PNG/JPG. O sistema ajusta automaticamente.</p>
+{% else %}
+  <h3>Logo (PRO)</h3>
+  <p class="small">
+    Disponível apenas no plano PRO para reforçar sua marca no PDF e link público.
+  </p>
+  <a class="btn btn-ghost" href="/pricing">Ver PRO</a>
+{% endif %}
 
         {% if user.logo_b64 %}
           <div class="card" style="padding:14px; margin-bottom:10px;">

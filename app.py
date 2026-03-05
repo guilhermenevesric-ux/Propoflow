@@ -2174,39 +2174,36 @@ def profile_save(
     logo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
-    # remover logo
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    warning = None
+
+    # remover logo (se existir)
     if (remove_logo or "").strip() == "1":
         user.logo_mime = None
         user.logo_b64 = None
 
-    # upload logo (só PRO)
+    # upload logo (só PRO) — FREE não quebra: ignora e segue
     if logo is not None and getattr(logo, "filename", ""):
         if not is_pro_active(user):
-            return templates.TemplateResponse("profile.html", {
-                "request": request,
-                "user": user,
-                "saved": False,
-                "error": "Upload de logo é disponível apenas no plano PRO.",
-            })
+            warning = "Upload de logo é disponível apenas no plano PRO."
+        else:
+            try:
+                file_bytes = logo.file.read()
+                mime, b64 = process_logo_upload(file_bytes)
+                user.logo_mime = mime
+                user.logo_b64 = b64
+            except Exception as e:
+                return templates.TemplateResponse("profile.html", {
+                    "request": request,
+                    "user": user,
+                    "saved": False,
+                    "error": f"Erro ao salvar logo: {str(e)}",
+                })
 
-        data = awaitable_read = None
-        try:
-            file_bytes = logo.file.read()
-            mime, b64 = process_logo_upload(file_bytes)
-            user.logo_mime = mime
-            user.logo_b64 = b64
-        except Exception as e:
-            return templates.TemplateResponse("profile.html", {
-                "request": request,
-                "user": user,
-                "saved": False,
-                "error": f"Erro ao salvar logo: {str(e)}",
-            })
-
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/start", status_code=302)
-
+    # salvar dados do perfil
     user.display_name = display_name.strip() or None
     user.company_name = company_name.strip() or None
     user.phone = phone.strip() or None
@@ -2216,8 +2213,14 @@ def profile_save(
 
     db.add(user)
     db.commit()
-    return templates.TemplateResponse("profile.html", {"request": request, "user": user, "saved": True, "error": None})
+    db.refresh(user)
 
+    return templates.TemplateResponse("profile.html", {
+        "request": request,
+        "user": user,
+        "saved": True,
+        "error": warning,  # aparece como aviso; não quebra o fluxo
+    })
 
 @app.get("/billing", response_class=HTMLResponse)
 def billing(request: Request, db: Session = Depends(get_db)):
