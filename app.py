@@ -1014,7 +1014,7 @@ def settings_save(
     user.default_validity_days = max(1, min(int(default_validity_days or 7), 30))
     user.default_payment_plan = (default_payment_plan or "avista").strip() or "avista"
     user.default_message_template = (default_message_template or "").strip() or None
-    user.default_terms = (default_terms or "").strip() or None
+    user.default_terms =  (getattr(user, "default_terms", "") or "").strip() or None
 
     db.add(user)
     db.commit()
@@ -1444,7 +1444,7 @@ def edit_proposal_save(
 
     # Se o orçamento é antigo e ainda não tem terms_text, congela agora (uma vez só)
     if not getattr(p, "terms_text", None):
-        p.terms_text = (user.default_terms or "").strip() or None
+        p.terms_text = (getattr(user, "default_terms", "") or "").strip() or None
 
     # snapshot antes
     snapshot = {
