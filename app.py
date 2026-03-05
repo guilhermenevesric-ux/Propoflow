@@ -799,56 +799,68 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), d
 
 
 @app.post("/register")
-def register(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    email = normalize_email(email)
+def register(request: Request,
+             email: str = Form(...),
+             password: str = Form(...),
+             db: Session = Depends(get_db)):
 
-    # 1) Rate limit por IP (cadastro)
-    #    Ex.: máx 5 cadastros por hora por IP
-    if not rate_limiter.allow_and_hit(rl_key(request, "register"), limit=5, window_sec=3600):
+    email_norm = (email or "").strip().lower()
+
+    # validações básicas
+    if not email_norm or "@" not in email_norm:
         return templates.TemplateResponse("register.html", {
             "request": request,
-            "error": "Muitas contas criadas deste IP. Tente novamente em 1 hora."
+            "error": "Digite um e-mail válido."
         })
 
-    # 2) Bloqueia e-mail temporário
-    if is_disposable_email(email):
+    if not password or len(password) < 6:
         return templates.TemplateResponse("register.html", {
             "request": request,
-            "error": "Use um e-mail real (Gmail/Outlook/etc). E-mails temporários não são aceitos."
+            "error": "Sua senha precisa ter pelo menos 6 caracteres."
         })
 
+    # já existe?
     if db.query(User).filter(User.email == email_norm).first():
-        return templates.TemplateResponse("register.html", {"request": request, "error": "Esse email já existe. Faça login."})
+        return templates.TemplateResponse("register.html", {
+            "request": request,
+            "error": "Esse email já existe. Faça login."
+        })
 
+    # cria usuário (FREE)
     user = User(
         email=email_norm,
         password_hash=pbkdf2_sha256.hash(password),
         proposal_limit=5,
         plan="free",
         delete_credits=1,
-        email_verified=False,
-        email_verify_code_hash=None,
-        email_verify_expires_at=None,
+        email_verified=False,  # garante que nasce como não verificado
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    # envia código
-    try:
-        issue_verification_code(db, user)
-    except Exception as e:
-        return templates.TemplateResponse("register.html", {"request": request, "error": f"Erro ao enviar código: {str(e)}"})
-
-    # cria sessão e manda pro verify
+    # cria sessão já logando (pra ele conseguir entrar na /verify)
     token, sess = create_session(user)
     db.add(sess)
     db.commit()
 
-    resp = RedirectResponse("/verify", status_code=302)
-    resp.set_cookie(SESSION_COOKIE, token, httponly=True, secure=COOKIE_SECURE, samesite="lax", max_age=60 * 60 * 24 * 30)
-    return resp
+    # manda código e redireciona pra verify
+    try:
+        send_email_verification_code(user, db)
+    except Exception:
+        # se der problema de e-mail, ainda assim leva pra verify (lá ele tenta reenviar)
+        pass
 
+    resp = RedirectResponse("/verify", status_code=302)
+    resp.set_cookie(
+        SESSION_COOKIE,
+        token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30
+    )
+    return resp
 
 @app.get("/verify", response_class=HTMLResponse)
 def verify_page(request: Request, db: Session = Depends(get_db)):
