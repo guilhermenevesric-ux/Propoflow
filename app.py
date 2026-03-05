@@ -410,6 +410,18 @@ def parse_money_to_cents(v: str | None) -> int | None:
     except:
         return None
 
+def parse_money(v: str, field: str):
+    s = (v or "").strip().replace(",", ".")
+    if s == "":
+        return None
+    try:
+        x = float(s)
+        if x < 0:
+            raise ValueError
+        return x
+    except Exception:
+        raise ValueError(f"{field}: use apenas números (ex: 19.90)")
+
 def parse_qty(v: str | None) -> float:
     s = (v or "").strip()
     if not s:
@@ -1508,6 +1520,17 @@ def create_proposal(
     if not user:
         return RedirectResponse("/login", status_code=302)
 
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    # BLOQUEIO FREE (6º orçamento)
+    if not is_pro_active(user):
+        used = count_user_proposals(db, user.id)
+        limit = int(getattr(user, "proposal_limit", 5) or 5)
+        if used >= limit:
+            return RedirectResponse("/pricing?reason=limit", status_code=302)
+
     # antes de criar o orçamento
     if not is_pro_active(user):
         used = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.archived.is_(False)).count()
@@ -1882,6 +1905,19 @@ def delete_proposal(proposal_id: int, request: Request, db: Session = Depends(ge
     db.delete(p)
     db.commit()
     return RedirectResponse("/dashboard", status_code=302)
+
+def count_user_proposals(db: Session, user_id: int) -> int:
+    q = db.query(Proposal).filter(Proposal.owner_id == user_id)
+
+    # Compatível com versões diferentes do model
+    if hasattr(Proposal, "archived"):
+        q = q.filter(Proposal.archived.is_(False))
+    elif hasattr(Proposal, "deleted_at"):
+        q = q.filter(Proposal.deleted_at.is_(None))
+    elif hasattr(Proposal, "is_deleted"):
+        q = q.filter(Proposal.is_deleted.is_(False))
+
+    return q.count()
 
 
 @app.post("/proposals/{proposal_id}/save_service")
