@@ -128,6 +128,35 @@
     .status-pill.seen{ border-color: rgba(79,124,255,0.35); }
     .status-pill.none{ opacity:.8; }
 
+    <style>
+  /* ...seu CSS já existente... */
+
+  .pf-usage{
+    padding: 14px;
+    margin: 12px 0;
+  }
+  .pf-usage-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .pf-bar{
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.12);
+    overflow:hidden;
+    margin-top: 10px;
+  }
+  .pf-bar > div {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(135deg, var(--primary), var(--primary2));
+  }}
+</style>
+
     /* garantir que cards não criem recorte visual no mobile */
     .proposal-card{ overflow: visible !important; }
   </style>
@@ -192,6 +221,35 @@
         <span class="pill">👀 Vistos: <b style="color: rgba(232,238,252,0.95);">{{ viewed }}</b></span>
         <span class="pill">📈 Conversão: <b style="color: rgba(232,238,252,0.95);">{{ rate }}%</b></span>
       </div>
+
+      {% if not pro_active %}
+  <div class="card pf-usage">
+    <div class="pf-usage-row">
+      <div style="font-weight:800;">
+        Você usou <span style="color: rgba(232,238,252,0.95);">{{ free_used }}/{{ free_limit }}</span> orçamentos grátis
+      </div>
+
+      <a class="btn" href="/pricing?reason=limit&used={{ free_used }}&limit={{ free_limit }}&next=/dashboard">
+        Ativar PRO
+      </a>
+    </div>
+
+    <div class="pf-bar">
+      <div style="width: {{ free_pct }}%;"></div>
+    </div>
+
+    <p class="small" style="margin:10px 0 0; opacity:.85;">
+      Quando bater {{ free_limit }}, trava. PRO libera <b>ilimitado</b> + <b>logo</b> + <b>PDF melhor</b>.
+    </p>
+  </div>
+{% else %}
+  <div class="card pf-usage">
+    <div class="pf-usage-row">
+      <div style="font-weight:800;">✨ PRO ativo — orçamentos ilimitados</div>
+      <a class="btn btn-ghost" href="/billing">Gerenciar</a>
+    </div>
+  </div>
+{% endif %}
 
       <!-- Filtros -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 0 0 14px;">

@@ -1,94 +1,132 @@
 <!doctype html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>PropoFlow • Planos</title>
-<link rel="stylesheet" href="/static/style.css?v=3000">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <title>PropoFlow • Planos</title>
+  <link rel="stylesheet" href="/static/style.css?v=9999">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    .banner-up{
+      background: rgba(79,124,255,0.12);
+      border: 1px solid rgba(79,124,255,0.35);
+      padding: 14px;
+      border-radius: 16px;
+      margin-bottom: 14px;
+    }
+    .banner-up .title{ font-weight: 900; font-size: 16px; margin: 0 0 6px; }
+    .banner-up .desc{ margin: 0; color: rgba(232,238,252,0.85); font-size: 13px; }
+    .progress{
+      height: 10px; border-radius: 999px; background: rgba(255,255,255,0.10);
+      overflow: hidden; border: 1px solid rgba(255,255,255,0.10);
+      margin-top: 10px;
+    }
+    .progress > div{
+      height: 100%;
+      background: linear-gradient(135deg, var(--primary), var(--primary2));
+      width: 0%;
+    }
+    .pricing-card ul{ padding-left: 18px; margin: 10px 0 0; }
+    .pricing-card li{ margin: 6px 0; color: rgba(232,238,252,0.85); }
+    .cta-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 12px; }
+    .note{ font-size: 12px; color: rgba(232,238,252,0.70); margin-top: 8px; }
+  </style>
 </head>
 <body>
+  <div class="container">
 
-<div class="container">
-
-  <div class="nav">
-    <div class="brand">
-      <div class="logo"></div>
-      <div>
-        <h1>PropoFlow</h1>
-        <p>Escolha seu plano</p>
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>PropoFlow</h1>
+          <p>Planos</p>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn btn-ghost" href="{{ next or '/dashboard' }}">Voltar</a>
       </div>
     </div>
 
-    <div class="actions">
-      <a class="btn btn-ghost" href="/dashboard">Voltar</a>
-    </div>
-  </div>
+    {% if reason == "limit" %}
+      <div class="banner-up">
+        <p class="title">Você chegou no limite do gratuito.</p>
+        <p class="desc">
+          Você usou <b>{{ used or 0 }}/{{ limit or 5 }}</b> orçamentos grátis.
+          Para continuar gerando orçamentos, ative o <b>PRO</b>.
+        </p>
+        <div class="progress">
+          <div style="width: {{ (100 if (limit and used and used>=limit) else ((used or 0) * 100 // (limit or 5))) }}%;"></div>
+        </div>
+        <div class="cta-row">
+          <a class="btn" href="{{ pro_cta_url }}">Ativar PRO via Pix (1 min)</a>
+          <a class="btn btn-ghost" href="/dashboard">Ver meus orçamentos</a>
+        </div>
+        <div class="note">O PRO libera na hora que o Pix confirma.</div>
+      </div>
+    {% elif reason == "delete_limit" %}
+      <div class="banner-up" style="background: rgba(255,93,93,0.08); border-color: rgba(255,93,93,0.25);">
+        <p class="title">Limite de exclusões no gratuito.</p>
+        <p class="desc">
+          No plano grátis você pode excluir apenas <b>1</b> orçamento.
+          Para editar/duplicar sem medo, ative o <b>PRO</b>.
+        </p>
+        <div class="cta-row">
+          <a class="btn" href="{{ pro_cta_url }}">Ativar PRO via Pix</a>
+          <a class="btn btn-ghost" href="/dashboard">Voltar</a>
+        </div>
+      </div>
+    {% endif %}
 
-  <div class="card" style="margin-bottom:14px;">
-    <h2 class="h2">Ative o PRO e use sem limites</h2>
-    <p class="small" style="margin:0;">
-      O PRO libera <b>orçamentos ilimitados</b> e deixa seu PDF com aparência mais profissional.
-      <span style="opacity:.85;">(Pix recomendado)</span>
+    <div class="pricing-grid">
+
+      <div class="card pricing-card">
+        <h2 class="h2">Plano Gratuito</h2>
+        <p class="small">Ideal pra sentir o valor rapidinho.</p>
+        <ul>
+          <li>Até <b>5</b> orçamentos</li>
+          <li>Link público</li>
+          <li>PDF básico</li>
+          <li>Aceite online</li>
+          <li><b>1</b> exclusão</li>
+        </ul>
+        <div class="price" style="margin-top:12px;"><b>R$ 0</b></div>
+
+        {% if user and user.plan != "pro" %}
+          <div class="note">Você está no grátis.</div>
+        {% endif %}
+      </div>
+
+      <div class="card pricing-card" style="border-color: rgba(79,124,255,0.30);">
+        <h2 class="h2">Plano PRO</h2>
+        <p class="small">Pra quem precisa enviar orçamento todo dia, rápido e com aparência profissional.</p>
+
+        <ul>
+          <li><b>Orçamentos ilimitados</b></li>
+          <li><b>PDF mais profissional</b> (melhor apresentação)</li>
+          <li><b>Logo da sua marca</b> no PDF e no link</li>
+          <li>Duplicar e “Novo igual” sem perder tempo</li>
+          <li>Sem limite de exclusões</li>
+          <li>Suporte prioritário</li>
+        </ul>
+
+        <div class="price" style="margin-top:12px;"><b>{{ pro_price }}</b></div>
+
+        <div class="cta-row">
+          <a class="btn" href="{{ pro_cta_url }}">Quero acesso PRO (Pix)</a>
+          <a class="btn btn-ghost" href="/dashboard">Agora não</a>
+        </div>
+
+        <div class="note">
+          Você paga, o sistema confirma e libera automaticamente.
+        </div>
+      </div>
+
+    </div>
+
+    <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+      <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
     </p>
-  </div>
-
-  <div class="pricing-grid">
-
-    <!-- FREE -->
-    <div class="card pricing-card">
-      <h2 class="h2">Gratuito</h2>
-      <p class="small">Para testar e começar</p>
-
-      <ul class="small" style="margin-top:14px; padding-left:18px;">
-        <li>✓ Até <b>5 orçamentos</b></li>
-        <li>✓ Link público + PDF</li>
-        <li>✓ Aceite online</li>
-        <li>✓ 1 exclusão</li>
-      </ul>
-
-      <div class="price">R$ 0</div>
-
-      {% if user and user.plan != "pro" %}
-        <button class="btn btn-ghost" style="margin-top:16px; width:100%; cursor:default;">Plano atual</button>
-      {% else %}
-        <button class="btn btn-ghost" style="margin-top:16px; width:100%; opacity:.5; cursor:default;">Disponível</button>
-      {% endif %}
-    </div>
-
-    <!-- PRO -->
-    <div class="card pricing-card" style="border:1px solid rgba(79,124,255,0.55);">
-      <h2 class="h2">Pro</h2>
-      <p class="small">Para trabalhar todo dia com isso</p>
-
-      <ul class="small" style="margin-top:14px; padding-left:18px;">
-        <li>✓ Orçamentos <b>ilimitados</b></li>
-        <li>✓ Exclusões <b>ilimitadas</b></li>
-        <li>✓ PDF mais profissional</li>
-        <li>✓ Prioridade no suporte</li>
-      </ul>
-
-      <div class="price">R$ 19,90/mês</div>
-
-      {% if user and user.plan == "pro" %}
-        <button class="btn" style="margin-top:16px; width:100%; cursor:default; background:#22c55e; border:none;">
-          Você já é PRO ✓
-        </button>
-      {% else %}
-        <a href="/upgrade/pro/pix" class="btn" style="margin-top:16px; width:100%;">Ativar PRO com Pix (recomendado)</a>
-        <a href="/upgrade/pro" class="btn btn-ghost" style="margin-top:10px; width:100%;">Ativar com cartão</a>
-      {% endif %}
-
-      <p class="small" style="margin-top:12px; opacity:.8;">
-        Pix libera rápido. Se demorar, você pode clicar em “Já paguei” na tela do Pix.
-      </p>
-    </div>
 
   </div>
-
-  <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
-    <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
-  </p>
-
-</div>
 </body>
 </html>

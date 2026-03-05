@@ -255,6 +255,15 @@ def create_session(user: User) -> tuple[str, UserSession]:
     return token, sess
 
 
+from urllib.parse import urlencode
+
+def upgrade_redirect(reason: str, used: int | None = None, limit: int | None = None, next_url: str | None = None):
+    params = {"reason": reason}
+    if used is not None: params["used"] = str(used)
+    if limit is not None: params["limit"] = str(limit)
+    if next_url: params["next"] = next_url
+    return RedirectResponse(url="/pricing?" + urlencode(params), status_code=302)
+
 def is_pro_active(user: User) -> bool:
     if user.plan == "pro":
         if user.paid_until and user.paid_until >= _now():
@@ -1095,6 +1104,15 @@ def dashboard(
 
     rate = round((accepted / total) * 100) if total else 0
 
+    pro_active = is_pro_active(user)
+    free_limit = int(getattr(user, "proposal_limit", 5) or 5)
+    free_used = int(total or 0)  # usa o total geral (mesmo do KPI)
+    free_pct = 0
+    if (not pro_active) and free_limit > 0:
+        free_pct = int((free_used * 100) / free_limit)
+        if free_pct > 100:
+            free_pct = 100
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "user": user,
@@ -1110,6 +1128,10 @@ def dashboard(
         "error": None,
         "show_upgrade": False,
         "viewed": viewed,
+        "pro_active": pro_active,
+        "free_used": free_used,
+        "free_limit": free_limit,
+        "free_pct": free_pct,
     })
 
 @app.get("/proposals/{proposal_id}/again")
@@ -1486,11 +1508,12 @@ def create_proposal(
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    # limite free
+    # antes de criar o orçamento
     if not is_pro_active(user):
-        count = db.query(Proposal).filter(Proposal.owner_id == user.id).count()
-        if count >= (user.proposal_limit or 5):
-            return RedirectResponse("/limit", status_code=302)
+        used = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.archived.is_(False)).count()
+        limit = int(getattr(user, "proposal_limit", 5) or 5)
+        if used >= limit:
+            return upgrade_redirect("limit", used=used, limit=limit, next_url="/wizard")
 
     # Prefill por serviço (se escolhido)
     if service_id:
@@ -1821,6 +1844,11 @@ def delete_proposal(proposal_id: int, request: Request, db: Session = Depends(ge
     if not p:
         return RedirectResponse("/dashboard", status_code=302)
 
+    if not is_pro_active(user):
+        credits = int(getattr(user, "delete_credits", 0) or 0)
+        if credits <= 0:
+            return upgrade_redirect("delete_limit", used=None, limit=None, next_url="/dashboard")
+
     # free: só 1 exclusão
     if not is_pro_active(user) and user.plan == "free":
         credits = user.delete_credits or 0
@@ -1844,6 +1872,10 @@ def delete_proposal(proposal_id: int, request: Request, db: Session = Depends(ge
                 "show_upgrade": True,
             })
         user.delete_credits = credits - 1
+        db.add(user)
+
+    if not is_pro_active(user):
+        user.delete_credits = max(0, (user.delete_credits or 0) - 1)
         db.add(user)
 
     # apaga tudo
@@ -2230,11 +2262,36 @@ def billing(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("billing.html", {"request": request, "user": user})
 
 
-@app.get("/pricing", response_class=HTMLResponse)
-def pricing(request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    return templates.TemplateResponse("pricing.html", {"request": request, "user": user})
+from fastapi import Query
 
+@app.get("/pricing")
+def pricing_page(
+    request: Request,
+    reason: str | None = Query(default=None),
+    used: int | None = Query(default=None),
+    limit: int | None = Query(default=None),
+    next: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user(request, db)
+
+    # fallback inteligente
+    if user and not is_pro_active(user):
+        if limit is None:
+            limit = int(getattr(user, "proposal_limit", 5) or 5)
+        if used is None:
+            used = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.archived.is_(False)).count()
+
+    return templates.TemplateResponse("pricing.html", {
+        "request": request,
+        "user": user,
+        "reason": reason,
+        "used": used,
+        "limit": limit,
+        "next": next or "/dashboard",
+        "pro_price": "R$ 19,90/mês",
+        "pro_cta_url": "/upgrade/pro/pix",
+    })
 
 @app.get("/terms", response_class=HTMLResponse)
 def terms(request: Request):
