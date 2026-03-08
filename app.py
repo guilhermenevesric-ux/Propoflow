@@ -5,11 +5,11 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
 from datetime import datetime, timedelta, date
-
+from sqlalchemy import func
 import secrets
 import smtplib
 from email.message import EmailMessage
-
+from models import Event
 import base64
 from PIL import Image
 import io
@@ -26,6 +26,7 @@ import json
 # ===== Anti-spam / Rate limit (mínimo viável, sem Redis) =====
 from collections import deque
 import time
+import timedelta
 
 DISPOSABLE_EMAIL_DOMAINS = {
     "mailinator.com", "tempmail.com", "temp-mail.org", "10minutemail.com",
@@ -408,7 +409,60 @@ def issue_verification_code(db: Session, user: User, force: bool = False):
 # HELPERS
 # ==========================
 
-import re
+def _client_ip(request: Request) -> str | None:
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return None
+
+def _attrib_from_request(request: Request) -> dict:
+    # 1) pega do cookie (se existir)
+    cookie = request.cookies.get("pf_attrib")
+    if cookie:
+        try:
+            return json.loads(cookie)
+        except:
+            return {}
+
+    # 2) pega do querystring (primeiro acesso vindo do anúncio)
+    qp = dict(request.query_params)
+    attrib = {}
+    for k in ["utm_source","utm_medium","utm_campaign","utm_content","utm_term","ttclid"]:
+        if qp.get(k):
+            attrib[k] = qp.get(k)
+    # referrer
+    ref = request.headers.get("referer")
+    if ref:
+        attrib["ref"] = ref
+    return attrib
+
+def track_event(request: Request, name: str, user_id: int | None = None, proposal_id: int | None = None, extra: dict | None = None):
+    attrib = _attrib_from_request(request)
+    meta = {**attrib}
+    if extra:
+        meta.update(extra)
+
+    db2 = SessionLocal()
+    try:
+        ev = Event(
+            name=name,
+            path=request.url.path,
+            user_id=user_id,
+            proposal_id=proposal_id,
+            ip=_client_ip(request),
+            ua=(request.headers.get("user-agent") or "")[:255],
+            ref=(request.headers.get("referer") or "")[:512],
+            meta=json.dumps(meta, ensure_ascii=False),
+        )
+        db2.add(ev)
+        db2.commit()
+    except:
+        db2.rollback()
+    finally:
+        db2.close()
+
 
 def parse_money_to_cents(v: str | None) -> int | None:
     if v is None:
@@ -766,12 +820,24 @@ def payment_plan_from_stages(stages: list[PaymentStage]) -> str:
 # ==========================
 # ROUTES
 # ==========================
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request, db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
-    if user:
-        return RedirectResponse("/dashboard", status_code=302)
-    return templates.TemplateResponse("home.html", {"request": request})
+@app.get("/")
+def home(request: Request):
+    # registra evento
+    track_event(request, "landing_view")
+
+    # render normal
+    resp = templates.TemplateResponse("home.html", {"request": request})
+
+    # salva cookie com utm/ttclid (30 dias)
+    attrib = _attrib_from_request(request)
+    if attrib:
+        resp.set_cookie(
+            "pf_attrib",
+            json.dumps(attrib, ensure_ascii=False),
+            max_age=60*60*24*30,
+            samesite="Lax"
+        )
+    return resp
 
 # ===== AUTH =====
 @app.get("/login", response_class=HTMLResponse)
@@ -874,6 +940,8 @@ def register(request: Request,
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    track_event(request, "register_success", user_id=new_user.id)
 
     # cria sessão já logando (pra ele conseguir entrar na /verify)
     token, sess = create_session(user)
@@ -978,6 +1046,8 @@ def verify_resend(request: Request, db: Session = Depends(get_db)):
     if getattr(user, "email_verified", False):
         return RedirectResponse("/dashboard", status_code=302)
 
+    track_event(request, "verify_success", user_id=user.id)
+
     try:
         issue_verification_code(db, user)
     except Exception as e:
@@ -1002,6 +1072,8 @@ def verify_resend(request: Request, db: Session = Depends(get_db)):
         "error": None,
         "info": "Código reenviado. Verifique seu e-mail.",
     })
+
+
 
 @app.get("/logout")
 def logout(request: Request, db: Session = Depends(get_db)):
@@ -2356,6 +2428,8 @@ def pricing_page(
         "pro_cta_url": "/upgrade/pro/pix",
     })
 
+track_event(request, "pricing_view", user_id=user.id if user else None)
+
 @app.get("/terms", response_class=HTMLResponse)
 def terms(request: Request):
     return templates.TemplateResponse("terms.html", {"request": request})
@@ -2558,6 +2632,7 @@ def upgrade_pro_pix_page(
         "error": error,
     })
 
+
 @app.get("/upgrade/pro/pix/check")
 def upgrade_pro_pix_check(request: Request, sub: str, pay: str, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -2582,6 +2657,8 @@ def upgrade_pro_pix_check(request: Request, sub: str, pay: str, db: Session = De
         return RedirectResponse("/billing", status_code=302)
 
     return RedirectResponse("/upgrade/pro/pix", status_code=302)
+
+
 
 @app.get("/upgrade/pro/pix/status")
 def upgrade_pro_pix_status(request: Request, pay: str, sub: str | None = None, db: Session = Depends(get_db)):
@@ -2623,6 +2700,8 @@ def upgrade_pro_pix_status(request: Request, pay: str, sub: str | None = None, d
         return {"ok": True, "status": st, "paid": True}
 
     return {"ok": True, "status": st, "paid": False}
+
+track_event(request, "pix_checkout_open", user_id=user.id)
 
 @app.get("/upgrade/pro")
 def upgrade_pro(request: Request, db: Session = Depends(get_db)):
@@ -2673,6 +2752,53 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
     if not invoice_url:
         return HTMLResponse("Assinatura criada, mas não achei invoiceUrl.", status_code=500)
     return RedirectResponse(invoice_url, status_code=302)
+
+
+
+from datetime import datetime, timedelta
+
+@app.get("/admin/metrics")
+def admin_metrics(request: Request, key: str = "", days: int = 7, db: Session = Depends(get_db)):
+    admin_key = os.getenv("ADMIN_METRICS_KEY", "")
+    if not admin_key or key != admin_key:
+        return PlainTextResponse("forbidden", status_code=403)
+
+    since = datetime.utcnow() - timedelta(days=days)
+
+    def c(name: str) -> int:
+        return db.query(Event).filter(Event.name == name, Event.created_at >= since).count()
+
+    data = {
+        "days": days,
+        "landing_view": c("landing_view"),
+        "register_success": c("register_success"),
+        "verify_success": c("verify_success"),
+        "wizard_start": c("wizard_start"),
+        "proposal_created": c("proposal_created"),
+        "pricing_view": c("pricing_view"),
+        "pix_checkout_open": c("pix_checkout_open"),
+        "pro_activated": c("pro_activated"),
+    }
+
+    # taxas básicas
+    lv = max(data["landing_view"], 1)
+    rs = data["register_success"]
+    vs = data["verify_success"]
+    pc = data["proposal_created"]
+    pro = data["pro_activated"]
+
+    rates = {
+        "reg_rate": round((rs/lv)*100, 1),
+        "verify_rate": round((vs/max(rs,1))*100, 1),
+        "first_proposal_rate": round((pc/max(vs,1))*100, 1),
+        "pro_rate_from_reg": round((pro/max(rs,1))*100, 2),
+    }
+
+    return templates.TemplateResponse("admin_metrics.html", {
+        "request": request,
+        "data": data,
+        "rates": rates
+    })
 
 
 @app.get("/wizard", response_class=HTMLResponse)
@@ -2748,6 +2874,7 @@ def wizard(request: Request, step: int = 1,
         "default_payment_plan": getattr(user, "default_payment_plan", "avista"),
     })
 
+track_event(request, "wizard_start", user_id=user.id)
 
 
 @app.post("/wizard/create")
@@ -2789,6 +2916,8 @@ def wizard_create(
         item_unit_price=item_unit_price,
         db=db
     )
+
+track_event(request, "proposal_created", user_id=user.id, proposal_id=p.id)
 
 @app.post("/wizard/step2", response_class=HTMLResponse)
 def wizard_step2(

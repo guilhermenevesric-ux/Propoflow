@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Métricas</title>
+  <link rel="stylesheet" href="/static/style.css?v=6100">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h2 class="h2">Métricas (últimos {{ data.days }} dias)</h2>
+      <p class="small">Funil básico do PropoFlow</p>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0;">
+        <span class="pill">👀 Landing: <b style="color:#e8eefc">{{ data.landing_view }}</b></span>
+        <span class="pill">🧾 Cadastros: <b style="color:#e8eefc">{{ data.register_success }}</b></span>
+        <span class="pill">✅ Verificados: <b style="color:#e8eefc">{{ data.verify_success }}</b></span>
+        <span class="pill">📄 Orçamentos: <b style="color:#e8eefc">{{ data.proposal_created }}</b></span>
+        <span class="pill">💳 Pix abriu: <b style="color:#e8eefc">{{ data.pix_checkout_open }}</b></span>
+        <span class="pill">✨ PRO: <b style="color:#e8eefc">{{ data.pro_activated }}</b></span>
+      </div>
+
+      <div class="card" style="padding:14px;">
+        <div class="small">Taxas</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+          <span class="pill">Cadastro/Landing: <b style="color:#e8eefc">{{ rates.reg_rate }}%</b></span>
+          <span class="pill">Verificação/Cadastro: <b style="color:#e8eefc">{{ rates.verify_rate }}%</b></span>
+          <span class="pill">1º orçamento/Verificado: <b style="color:#e8eefc">{{ rates.first_proposal_rate }}%</b></span>
+          <span class="pill">PRO/Cadastro: <b style="color:#e8eefc">{{ rates.pro_rate_from_reg }}%</b></span>
+        </div>
+      </div>
+
+      <p class="small" style="margin-top:14px; opacity:.7;">
+        Acesse: <b>/admin/metrics?key=SUA_CHAVE&days=7</b>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

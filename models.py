@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from db import Base
 import uuid
-from sqlalchemy import Boolean
+from sqlalchemy.sql import func
 
 class User(Base):
     __tablename__ = "users"
@@ -196,3 +196,27 @@ class PaymentStage(Base):
     paid_at = Column(DateTime, nullable=True)
 
     proposal = relationship("Proposal", back_populates="payment_stages")
+
+    class Event(Base):
+        __tablename__ = "events"
+
+        id = Column(Integer, primary_key=True)
+        created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+        # evento (landing_view, register_success etc)
+        name = Column(String(80), nullable=False, index=True)
+
+        # contexto
+        path = Column(String(255), nullable=True)
+        user_id = Column(Integer, nullable=True, index=True)
+        proposal_id = Column(Integer, nullable=True, index=True)
+
+        # request info (bem útil pra debug de campanha)
+        ip = Column(String(64), nullable=True)
+        ua = Column(String(255), nullable=True)
+        ref = Column(String(512), nullable=True)
+
+        # JSON string com utm/ttclid e extras
+        meta = Column(Text, nullable=True)
+
+
