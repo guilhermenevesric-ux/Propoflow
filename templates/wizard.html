@@ -142,7 +142,7 @@
           </div>
           <div>
             <label>Validade (dias)</label>
-            <input name="validity_days" type="number" min="1" max="30" value="{{ validity_days or (default_validity_days or 7) }}">
+            <input type="number" name="valid_days" step="1" min="1" max="365" inputmode="numeric" value="7">
           </div>
         </div>
 
@@ -313,9 +313,9 @@
         {% if items and items|length > 0 %}
           {% for it in items %}
             <input type="hidden" name="item_desc" value="{{ it.desc }}">
-            <input type="hidden" name="item_qty" value="{{ it.qty }}">
+            <input type="number" name="qty" step="0.01" min="0" inputmode="decimal" value="1.0">
             <input type="hidden" name="item_unit" value="un">
-            <input type="hidden" name="item_unit_price" value="{{ it.unit_price }}">
+            <input type="number" name="price" step="0.01" min="0" inputmode="decimal" value="5.0">
           {% endfor %}
         {% endif %}
 

@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <title>PropoFlow • Suporte</title>
-  <link rel="stylesheet" href="/static/style.css?v=9999">
+  <link rel="stylesheet" href="/static/style.css">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
   <div class="container">
+
     <div class="nav">
       <div class="brand">
         <div class="logo"></div>
@@ -24,43 +25,28 @@
 
     <div class="card">
       <h2 class="h2">Fale com a gente</h2>
+      <p class="small">Se tiver qualquer problema, chama no e-mail abaixo.</p>
 
-      <p class="small" style="margin-bottom:10px;">
-        Email de suporte:
-        <b><a href="mailto:{{ support_email }}">{{ support_email }}</a></b>
-      </p>
-
-      {% if code %}
-        <div class="pill" style="margin-bottom:12px;">
-          Código do erro: <b style="color: rgba(232,238,252,0.95);">{{ code }}</b>
+      <div class="card" style="padding:14px; margin-top:12px;">
+        <div style="font-weight:800; margin-bottom:6px;">Email de suporte</div>
+        <div class="small" style="margin-bottom:12px;">
+          <b>{{ support_email }}</b>
         </div>
-      {% endif %}
 
-      {% if whats_url %}
-        <div class="actions" style="flex-wrap:wrap;">
-          <a class="btn" href="{{ whats_url }}" target="_blank" rel="noopener">Chamar no WhatsApp</a>
-          <a class="btn btn-ghost" href="mailto:{{ support_email }}?subject=Suporte PropoFlow{% if code %} ({{ code }}){% endif %}">
-            Enviar e-mail
-          </a>
-        </div>
-      {% else %}
-        <div class="actions" style="flex-wrap:wrap;">
-          <a class="btn" href="mailto:{{ support_email }}?subject=Suporte PropoFlow{% if code %} ({{ code }}){% endif %}">
-            Enviar e-mail
-          </a>
-        </div>
-      {% endif %}
+        <a class="btn" href="mailto:{{ support_email }}?subject=Suporte%20PropoFlow">Enviar e-mail</a>
 
-      {% if user and user.email %}
-        <p class="small" style="margin-top:14px; opacity:.7;">
-          Logado como: <b>{{ user.email }}</b>
-        </p>
-      {% endif %}
+        {% if user and user.email %}
+          <p class="small" style="margin-top:10px; opacity:.75;">
+            Sua conta: {{ user.email }}
+          </p>
+        {% endif %}
+      </div>
     </div>
 
     <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
-      <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a>
+      <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
     </p>
+
   </div>
 </body>
 </html>

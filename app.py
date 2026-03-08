@@ -2358,23 +2358,21 @@ def support(request: Request):
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "guilhermenevesric@gmail.com")
 SUPPORT_WHATSAPP = os.getenv("SUPPORT_WHATSAPP", "").strip()
 
-@app.get("/support")
-def support_page(request: Request, code: str = "", db: Session = Depends(get_db)):
-    user = get_current_user(request, db)
+import os
 
-    whats_url = ""
-    if SUPPORT_WHATSAPP:
-        msg = f"Olá! Preciso de ajuda no PropoFlow. Código: {code}" if code else "Olá! Preciso de ajuda no PropoFlow."
-        whats_url = f"https://wa.me/{SUPPORT_WHATSAPP}?text={urllib.parse.quote(msg)}"
+@app.get("/support")
+def support_page(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    support_email = os.getenv("SUPPORT_EMAIL") or user.email
 
     return templates.TemplateResponse("support.html", {
         "request": request,
         "user": user,
-        "support_email": SUPPORT_EMAIL,
-        "whats_url": whats_url,
-        "code": code,
+        "support_email": support_email,
     })
-
 
 # ===== ASAAS =====
 def ensure_asaas_customer(db: Session, user: User) -> str:
