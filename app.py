@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from sqlalchemy import func
 import secrets
 import smtplib
@@ -26,7 +26,6 @@ import json
 # ===== Anti-spam / Rate limit (mínimo viável, sem Redis) =====
 from collections import deque
 import time
-import timedelta
 
 DISPOSABLE_EMAIL_DOMAINS = {
     "mailinator.com", "tempmail.com", "temp-mail.org", "10minutemail.com",
@@ -2505,7 +2504,7 @@ def ensure_asaas_customer(db: Session, user: User) -> str:
     return cid
 
 
-from datetime import date, timedelta
+from datetime import date
 from fastapi import Query
 
 def _asaas_create_pix_payment(customer_id: str, user_id: int, value: float, due_date: str):
@@ -2755,7 +2754,6 @@ def upgrade_pro(request: Request, db: Session = Depends(get_db)):
 
 
 
-from datetime import datetime, timedelta
 
 @app.get("/admin/metrics")
 def admin_metrics(request: Request, key: str = "", days: int = 7, db: Session = Depends(get_db)):
