@@ -42,7 +42,7 @@
       {% for c in clients %}{% if c.favorite %}{% set ns.has=true %}{% endif %}{% endfor %}
       {% if ns.has %}
         <p class="small" style="margin:8px 0 6px;">Favoritos</p>
-        <div class="actions" style="margin-bottom:10px;">
+        <div class="actions" style="margin-bottom:10px; flex-wrap:wrap;">
           {% for c in clients %}
             {% if c.favorite %}
               <button class="btn btn-ghost" type="button" onclick="pickClient('{{ c.id }}')">⭐ {{ c.name }}</button>
@@ -55,10 +55,11 @@
         <input type="hidden" name="step" value="2">
 
         <label>Cliente salvo (opcional)</label>
-        <select name="client_id" id="clientSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+        <select name="client_id" id="clientSelect"
+                style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           <option value="0">Escolher...</option>
           {% for c in clients %}
-            <option value="{{ c.id }}">{{ c.name }}</option>
+            <option value="{{ c.id }}" {% if client_id and (client_id|string)==(c.id|string) %}selected{% endif %}>{{ c.name }}</option>
           {% endfor %}
         </select>
 
@@ -67,11 +68,11 @@
         <div class="row">
           <div>
             <label>Nome do cliente</label>
-            <input name="client_name" placeholder="Ex: Maria Silva">
+            <input name="client_name" value="{{ client_name or '' }}" placeholder="Ex: Maria Silva">
           </div>
           <div>
             <label>WhatsApp (opcional)</label>
-            <input name="client_whatsapp" placeholder="Ex: (11) 99999-9999">
+            <input name="client_whatsapp" value="{{ client_whatsapp or '' }}" placeholder="Ex: (11) 99999-9999">
           </div>
         </div>
 
@@ -95,15 +96,15 @@
       <p class="small">Escolha um serviço salvo (recomendado) ou digite do zero.</p>
 
       <form method="post" action="/wizard/step2" id="step2Form">
-        <input type="hidden" name="client_id" value="{{ client_id }}">
-        <input type="hidden" name="client_name" value="{{ client_name }}">
-        <input type="hidden" name="client_whatsapp" value="{{ client_whatsapp }}">
+        <input type="hidden" name="client_id" value="{{ client_id or 0 }}">
+        <input type="hidden" name="client_name" value="{{ client_name or '' }}">
+        <input type="hidden" name="client_whatsapp" value="{{ client_whatsapp or '' }}">
 
         {% set ns2 = namespace(has=false) %}
         {% for s in services %}{% if s.favorite %}{% set ns2.has=true %}{% endif %}{% endfor %}
         {% if ns2.has %}
           <p class="small" style="margin:8px 0 6px;">Favoritos</p>
-          <div class="actions" style="margin-bottom:10px;">
+          <div class="actions" style="margin-bottom:10px; flex-wrap:wrap;">
             {% for s in services %}
               {% if s.favorite %}
                 <button class="btn btn-ghost" type="button" onclick="pickService('{{ s.id }}')">⭐ {{ s.title }}</button>
@@ -113,10 +114,11 @@
         {% endif %}
 
         <label>Serviço salvo (opcional)</label>
-        <select name="service_id" id="serviceSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+        <select name="service_id" id="serviceSelect"
+                style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           <option value="0">Escolher...</option>
           {% for s in services %}
-            <option value="{{ s.id }}" {% if service_id == s.id %}selected{% endif %}>{{ s.title }}</option>
+            <option value="{{ s.id }}" {% if service_id and (service_id|string)==(s.id|string) %}selected{% endif %}>{{ s.title }}</option>
           {% endfor %}
         </select>
 
@@ -138,11 +140,13 @@
         <div class="row">
           <div>
             <label>Valor total (opcional)</label>
-            <input name="price" value="{{ price or '' }}" placeholder="Ex: 250">
+            <input type="number" name="price" step="0.01" min="0" inputmode="decimal"
+                   value="{{ price or '' }}" placeholder="Ex: 250">
           </div>
           <div>
             <label>Validade (dias)</label>
-            <input type="number" name="valid_days" step="1" min="1" max="365" inputmode="numeric" value="7">
+            <input type="number" name="valid_days" step="1" min="1" max="365" inputmode="numeric"
+                   value="{{ valid_days or 7 }}">
           </div>
         </div>
 
@@ -165,13 +169,15 @@
               <th>Total</th>
             </tr>
 
-            {% for i in range(0,2) %}
+            {% for _ in range(0,2) %}
             <tr>
-              <td><input name="item_desc" placeholder="Ex: Produto/serviço..." /></td>
-              <td><input name="item_qty" placeholder="1" /></td>
-              <td><input name="item_unit_price" placeholder="100" /></td>
+              <td>
+                <input name="item_desc" placeholder="Ex: Produto/serviço..." />
+                <input type="hidden" name="item_unit" value="un">
+              </td>
+              <td><input type="number" name="item_qty" step="0.01" min="0" inputmode="decimal" placeholder="1" /></td>
+              <td><input type="number" name="item_unit_price" step="0.01" min="0" inputmode="decimal" placeholder="100" /></td>
               <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
-              <input type="hidden" name="item_unit" value="un">
             </tr>
             {% endfor %}
           </table>
@@ -185,16 +191,21 @@
         <div style="height:12px;"></div>
 
         <label>Como pagar (opcional)</label>
-        <select name="payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
-          <option value="avista" {% if (payment_plan or default_payment_plan or 'avista')=='avista' %}selected{% endif %}>À vista</option>
-          <option value="entrada_final_30" {% if (payment_plan or default_payment_plan)=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
-          <option value="entrada_final_50" {% if (payment_plan or default_payment_plan)=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
-          <option value="3x_30_40_30" {% if (payment_plan or default_payment_plan)=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+        <select name="payment_plan"
+                style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+          {% set plan = (payment_plan or default_payment_plan or 'avista') %}
+          <option value="avista" {% if plan=='avista' %}selected{% endif %}>À vista</option>
+          <option value="entrada_final_30" {% if plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+          <option value="entrada_final_50" {% if plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+          <option value="3x_30_40_30" {% if plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
         </select>
 
         <div style="height:14px;"></div>
         <div class="actions">
-          <a class="btn btn-ghost" href="/wizard?step=1">← Voltar</a>
+          <a class="btn btn-ghost"
+             href="/wizard?step=1&client_id={{ client_id or 0 }}&client_name={{ client_name|urlencode if client_name else '' }}&client_whatsapp={{ client_whatsapp|urlencode if client_whatsapp else '' }}">
+             ← Voltar
+          </a>
           <button class="btn" type="submit">Continuar →</button>
         </div>
       </form>
@@ -208,52 +219,63 @@
         }
 
         function brl(n){
-          try{
-            const v = (Math.round(n*100)/100).toFixed(2).replace('.', ',');
-            return 'R$ ' + v;
-          }catch(e){ return 'R$ 0,00'; }
+          const v = (Math.round((n || 0)*100)/100).toFixed(2).replace('.', ',');
+          return 'R$ ' + v;
         }
         function parseNum(v){
-          if(!v) return 0;
-          v = (''+v).replace(/\./g,'').replace(',', '.');
+          if(v === null || v === undefined) return 0;
+          v = (''+v).trim().replace(/\./g,'').replace(',', '.');
           const n = parseFloat(v);
           return isNaN(n) ? 0 : n;
         }
+
         function recalc(){
           const rows = document.querySelectorAll('#itemsTable tr');
           let total = 0;
+
           rows.forEach((tr, idx) => {
             if(idx === 0) return;
-            const inputs = tr.querySelectorAll('input');
-            if(inputs.length < 3) return;
-            const desc = inputs[0].value.trim();
-            const qty = parseNum(inputs[1].value) || 0;
-            const unit = parseNum(inputs[2].value) || 0;
+
+            const desc = tr.querySelector('input[name="item_desc"]')?.value?.trim() || "";
+            const qty  = parseNum(tr.querySelector('input[name="item_qty"]')?.value) || 0;
+            const unit = parseNum(tr.querySelector('input[name="item_unit_price"]')?.value) || 0;
+
             let line = 0;
             if(desc && qty > 0 && unit > 0) line = qty * unit;
+
             const td = tr.querySelector('.lineTotal');
             if(td) td.textContent = brl(line);
+
             total += line;
           });
-          document.getElementById('totalEstimado').textContent = brl(total);
+
+          const out = document.getElementById('totalEstimado');
+          if(out) out.textContent = brl(total);
         }
+
         function addRow(){
           const table = document.getElementById("itemsTable");
           const tr = document.createElement("tr");
           tr.innerHTML = `
-            <td><input name="item_desc" placeholder="Ex: Produto/serviço..." /></td>
-            <td><input name="item_qty" placeholder="1" /></td>
-            <td><input name="item_unit_price" placeholder="100" /></td>
+            <td>
+              <input name="item_desc" placeholder="Ex: Produto/serviço..." />
+              <input type="hidden" name="item_unit" value="un">
+            </td>
+            <td><input type="number" name="item_qty" step="0.01" min="0" inputmode="decimal" placeholder="1" /></td>
+            <td><input type="number" name="item_unit_price" step="0.01" min="0" inputmode="decimal" placeholder="100" /></td>
             <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
-            <input type="hidden" name="item_unit" value="un">
           `;
           table.appendChild(tr);
+          recalc();
         }
+
         document.addEventListener('input', (e) => {
-          if(e.target && (e.target.name === 'item_desc' || e.target.name === 'item_qty' || e.target.name === 'item_unit_price')){
+          if(!e.target) return;
+          if(e.target.name === 'item_desc' || e.target.name === 'item_qty' || e.target.name === 'item_unit_price'){
             recalc();
           }
         });
+
         recalc();
       </script>
     {% endif %}
@@ -274,6 +296,7 @@
         <div style="font-weight:900; font-size:16px;">{{ project_name }}</div>
         <div class="small" style="opacity:.85;">Prazo: {{ deadline }}</div>
         <div class="small" style="opacity:.85;">Valor: {{ price or "(não informado)" }}</div>
+        <div class="small" style="opacity:.85;">Validade: {{ valid_days or validity_days or 7 }} dias</div>
       </div>
 
       <div class="card" style="padding:14px; margin-bottom:12px;">
@@ -292,35 +315,46 @@
             </div>
           {% endfor %}
         </div>
-        <div style="margin-top:10px; font-weight:900;">Total estimado: {{ items_total_brl }}</div>
+        {% if items_total_brl %}
+          <div style="margin-top:10px; font-weight:900;">Total estimado: {{ items_total_brl }}</div>
+        {% endif %}
       </div>
       {% endif %}
 
       <form method="post" action="/wizard/create">
-        <input type="hidden" name="client_id" value="{{ client_id }}">
-        <input type="hidden" name="service_id" value="{{ service_id }}">
+        <input type="hidden" name="client_id" value="{{ client_id or 0 }}">
+        <input type="hidden" name="service_id" value="{{ service_id or 0 }}">
 
-        <input type="hidden" name="client_name" value="{{ client_name }}">
-        <input type="hidden" name="client_whatsapp" value="{{ client_whatsapp }}">
+        <input type="hidden" name="client_name" value="{{ client_name|e }}">
+        <input type="hidden" name="client_whatsapp" value="{{ (client_whatsapp or '')|e }}">
 
-        <input type="hidden" name="project_name" value="{{ project_name }}">
-        <input type="hidden" name="deadline" value="{{ deadline }}">
-        <input type="hidden" name="price" value="{{ price }}">
-        <input type="hidden" name="validity_days" value="{{ validity_days }}">
-        <input type="hidden" name="description" value="{{ description }}">
-        <input type="hidden" name="payment_plan" value="{{ payment_plan }}">
+        <input type="hidden" name="project_name" value="{{ (project_name or '')|e }}">
+        <input type="hidden" name="deadline" value="{{ (deadline or '')|e }}">
+        <input type="hidden" name="price" value="{{ (price or '')|e }}">
+
+        <!-- compat: manda os dois nomes -->
+        <input type="hidden" name="valid_days" value="{{ valid_days or validity_days or 7 }}">
+        <input type="hidden" name="validity_days" value="{{ valid_days or validity_days or 7 }}">
+
+        <input type="hidden" name="payment_plan" value="{{ (payment_plan or '')|e }}">
+
+        <!-- descrição em textarea hidden pra não quebrar com quebras de linha -->
+        <textarea name="description" style="display:none;">{{ description or '' }}</textarea>
 
         {% if items and items|length > 0 %}
           {% for it in items %}
-            <input type="hidden" name="item_desc" value="{{ it.desc }}">
-            <input type="number" name="qty" step="0.01" min="0" inputmode="decimal" value="1.0">
-            <input type="hidden" name="item_unit" value="un">
-            <input type="number" name="price" step="0.01" min="0" inputmode="decimal" value="5.0">
+            <input type="hidden" name="item_desc" value="{{ it.desc|e }}">
+            <input type="hidden" name="item_qty" value="{{ it.qty }}">
+            <input type="hidden" name="item_unit" value="{{ it.unit or 'un' }}">
+            <input type="hidden" name="item_unit_price" value="{{ it.unit_price }}">
           {% endfor %}
         {% endif %}
 
         <div class="actions">
-          <a class="btn btn-ghost" href="/wizard?step=2&client_id={{ client_id }}&client_name={{ client_name }}&client_whatsapp={{ client_whatsapp }}">← Voltar</a>
+          <a class="btn btn-ghost"
+             href="/wizard?step=2&client_id={{ client_id or 0 }}&client_name={{ client_name|urlencode if client_name else '' }}&client_whatsapp={{ client_whatsapp|urlencode if client_whatsapp else '' }}">
+             ← Voltar
+          </a>
           <button class="btn" type="submit">Criar orçamento</button>
         </div>
       </form>
