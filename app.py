@@ -128,6 +128,22 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
+import uuid
+from starlette.responses import HTMLResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    request_id = str(uuid.uuid4())[:8]
+    # loga no Render (pra você ver)
+    print(f"❌ ERROR {request_id}: {repr(exc)}")
+    return templates.TemplateResponse(
+        "500.html",
+        {"request": request, "request_id": request_id},
+        status_code=500
+    )
+
 @app.middleware("http")
 async def require_verified_email(request: Request, call_next):
     path = request.url.path
