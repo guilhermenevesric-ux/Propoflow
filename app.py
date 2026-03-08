@@ -2416,6 +2416,8 @@ def pricing_page(
 
             used = q.count()
 
+            track_event(request, "pricing_view", user_id=user.id if user else None)
+
     return templates.TemplateResponse("pricing.html", {
         "request": request,
         "user": user,
@@ -2427,7 +2429,7 @@ def pricing_page(
         "pro_cta_url": "/upgrade/pro/pix",
     })
 
-track_event(request, "pricing_view", user_id=user.id if user else None)
+
 
 @app.get("/terms", response_class=HTMLResponse)
 def terms(request: Request):
@@ -2696,11 +2698,13 @@ def upgrade_pro_pix_status(request: Request, pay: str, sub: str | None = None, d
             subscription_id=getattr(user, "asaas_subscription_id", None),
             customer_id=getattr(user, "asaas_customer_id", None),
         )
+        track_event(request, "pix_checkout_open", user_id=user.id)
+
         return {"ok": True, "status": st, "paid": True}
 
     return {"ok": True, "status": st, "paid": False}
 
-track_event(request, "pix_checkout_open", user_id=user.id)
+
 
 @app.get("/upgrade/pro")
 def upgrade_pro(request: Request, db: Session = Depends(get_db)):
@@ -2848,6 +2852,8 @@ def wizard(request: Request, step: int = 1,
     if step == 3 and not description.strip():
         error = "Escreva em 1 linha o que será feito."
 
+        track_event(request, "wizard_start", user_id=user.id)
+
 
     return templates.TemplateResponse("wizard.html", {
         "request": request,
@@ -2872,7 +2878,8 @@ def wizard(request: Request, step: int = 1,
         "default_payment_plan": getattr(user, "default_payment_plan", "avista"),
     })
 
-track_event(request, "wizard_start", user_id=user.id)
+
+
 
 
 @app.post("/wizard/create")
@@ -2896,6 +2903,8 @@ def wizard_create(
 
     db: Session = Depends(get_db),
 ):
+    track_event(request, "proposal_created", user_id=user.id, proposal_id=p.id)
+
     return create_proposal(
         request=request,
         service_id=service_id,
@@ -2914,8 +2923,6 @@ def wizard_create(
         item_unit_price=item_unit_price,
         db=db
     )
-
-track_event(request, "proposal_created", user_id=user.id, proposal_id=p.id)
 
 @app.post("/wizard/step2", response_class=HTMLResponse)
 def wizard_step2(

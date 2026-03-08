@@ -1,6 +1,7 @@
 from db import engine
 from sqlalchemy import text
 
+
 def is_sqlite():
     return engine.dialect.name == "sqlite"
 
@@ -197,23 +198,22 @@ with engine.begin() as conn:
         else:
             conn.execute(text("ALTER TABLE users ADD COLUMN email_verify_expires_at DATETIME"))
 
-from sqlalchemy import text
 
-def ensure_events_table(conn):
-    conn.execute(text("""
-    CREATE TABLE IF NOT EXISTS events (
-      id SERIAL PRIMARY KEY,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      name VARCHAR(80) NOT NULL,
-      path VARCHAR(255),
-      user_id INTEGER,
-      proposal_id INTEGER,
-      ip VARCHAR(64),
-      ua VARCHAR(255),
-      ref VARCHAR(512),
-      meta TEXT
-    );
-    """))
+    def ensure_events_table(conn):
+            conn.execute(text("""
+          CREATE TABLE IF NOT EXISTS events (
+          id SERIAL PRIMARY KEY,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          name VARCHAR(80) NOT NULL,
+          path VARCHAR(255),
+          user_id INTEGER,
+          proposal_id INTEGER,
+          ip VARCHAR(64),
+          ua VARCHAR(255),
+          ref VARCHAR(512),
+          meta TEXT
+          );
+          """))
 
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_events_name_created_at ON events (name, created_at);"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_events_user_created_at ON events (user_id, created_at);"))
@@ -224,10 +224,7 @@ def ensure_events_table(conn):
 #    ...
 #    ensure_events_table(conn)
 
-
-from sqlalchemy import text
-
 # ... dentro do seu bloco engine.begin() as conn:
-conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_terms TEXT"))
+    conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_terms TEXT"))
 
 print("✅ migrate.py OK")
