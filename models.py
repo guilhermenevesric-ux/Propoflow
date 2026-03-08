@@ -197,7 +197,7 @@ class PaymentStage(Base):
 
     proposal = relationship("Proposal", back_populates="payment_stages")
 
-    class Event(Base):
+class Event(Base):
         __tablename__ = "events"
 
         id = Column(Integer, primary_key=True)
