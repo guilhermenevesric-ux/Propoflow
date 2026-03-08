@@ -1615,13 +1615,6 @@ def create_proposal(
         used = count_user_proposals(db, user.id)
         limit = int(getattr(user, "proposal_limit", 5) or 5)
         if used >= limit:
-            return RedirectResponse("/pricing?reason=limit", status_code=302)
-
-    # antes de criar o orçamento
-    if not is_pro_active(user):
-        used = db.query(Proposal).filter(Proposal.owner_id == user.id, Proposal.archived.is_(False)).count()
-        limit = int(getattr(user, "proposal_limit", 5) or 5)
-        if used >= limit:
             return upgrade_redirect("limit", used=used, limit=limit, next_url="/wizard")
 
     # Prefill por serviço (se escolhido)
@@ -1679,6 +1672,8 @@ def create_proposal(
     db.commit()
     db.refresh(p)
 
+    track_event(request, "proposal_created", user_id=user.id, proposal_id=p.id)
+
     items = rebuild_items_from_form(item_desc, item_qty, item_unit, item_unit_price)
     for it in items:
         it.proposal_id = p.id
@@ -1699,7 +1694,7 @@ def create_proposal(
 
     upsert_payment_stages(db, p, plan_to_percents(payment_plan))
 
-    return RedirectResponse(f"/proposals/{p.id}/created", status_code=302)
+    return RedirectResponse(f"/proposals/{p.id}/send", status_code=302)
 
 
 @app.get("/proposals/{proposal_id}/send_whatsapp")
@@ -2903,8 +2898,7 @@ def wizard_create(
 
     db: Session = Depends(get_db),
 ):
-    track_event(request, "proposal_created", user_id=user.id, proposal_id=p.id)
-
+    # NÃO tracke aqui pq ainda não existe proposal_id
     return create_proposal(
         request=request,
         service_id=service_id,
@@ -2923,6 +2917,69 @@ def wizard_create(
         item_unit_price=item_unit_price,
         db=db
     )
+
+
+from urllib.parse import quote
+import re
+
+def normalize_whatsapp(phone: str | None) -> str | None:
+    if not phone:
+        return None
+    digits = re.sub(r"\D", "", phone)
+    if not digits:
+        return None
+    # se vier sem DDI, assume BR
+    if digits.startswith("55"):
+        return digits
+    if len(digits) <= 11:
+        return "55" + digits
+    return digits
+
+def proposal_public_link(request, public_id: str) -> str:
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/p/{public_id}"
+
+def build_whatsapp_text(user, p, link: str) -> str:
+    # se você já tem template no user, usa; senão fallback
+    template = getattr(user, "default_message_template", None) or (
+        "Olá {cliente}! Segue seu orçamento:\n{link}\n\n"
+        "Serviço: {servico}\nValor: {valor}\nPrazo: {prazo}\n\n"
+        "Se quiser, posso te explicar rapidinho aqui."
+    )
+    return (template
+        .replace("{cliente}", p.client_name or "tudo bem")
+        .replace("{link}", link)
+        .replace("{servico}", p.project_name or "")
+        .replace("{valor}", p.price or "")
+        .replace("{prazo}", p.deadline or "")
+    )
+
+@app.get("/proposals/{proposal_id}/send")
+def proposal_send_page(proposal_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    p = db.query(Proposal).filter(Proposal.id == proposal_id, Proposal.owner_id == user.id).first()
+    if not p:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    link = proposal_public_link(request, p.public_id)
+    wa_phone = normalize_whatsapp(p.client_whatsapp)
+    wa_text = build_whatsapp_text(user, p, link)
+    wa_url = None
+    if wa_phone:
+        wa_url = f"https://wa.me/{wa_phone}?text={quote(wa_text)}"
+
+    return templates.TemplateResponse("send.html", {
+        "request": request,
+        "user": user,
+        "p": p,
+        "link": link,
+        "wa_url": wa_url,
+        "wa_text": wa_text,
+    })
+
 
 @app.post("/wizard/step2", response_class=HTMLResponse)
 def wizard_step2(

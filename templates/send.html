@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Enviar orçamento</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="container">
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>Orçamento criado ✅</h1>
+        <p>Agora envie pro cliente (WhatsApp)</p>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">Voltar</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="h2">{{ p.project_name }}</h2>
+    <p class="small">Cliente: <b>{{ p.client_name }}</b></p>
+
+    <label>Link público</label>
+    <input id="pfLink" value="{{ link }}" readonly>
+
+    <div style="height:12px;"></div>
+
+    <div class="actions" style="flex-wrap:wrap;">
+      <button class="btn" type="button" onclick="copyLink()">Copiar link</button>
+      <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf" target="_blank">Baixar PDF</a>
+
+      {% if wa_url %}
+        <a class="btn btn-ghost" href="{{ wa_url }}" target="_blank">Enviar WhatsApp</a>
+      {% else %}
+        <button class="btn btn-ghost" type="button" onclick="copyMsg()">Copiar msg WhatsApp</button>
+      {% endif %}
+    </div>
+
+    <div style="height:12px;"></div>
+
+    <p class="small" style="opacity:.85;">
+      Dica: quanto mais rápido você envia, mais rápido o cliente responde.
+    </p>
+  </div>
+</div>
+
+<script>
+  async function copyLink(){
+    const v = document.getElementById("pfLink").value;
+    try{
+      await navigator.clipboard.writeText(v);
+      alert("Link copiado ✅");
+    }catch(e){
+      alert("Não consegui copiar. Copie manualmente.");
+    }
+  }
+
+  async function copyMsg(){
+    const msg = {{ wa_text|tojson }};
+    try{
+      await navigator.clipboard.writeText(msg);
+      alert("Mensagem copiada ✅");
+    }catch(e){
+      alert("Não consegui copiar. Copie manualmente.");
+    }
+  }
+</script>
+</body>
+</html>
