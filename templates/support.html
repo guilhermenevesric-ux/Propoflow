@@ -3,50 +3,117 @@
 <head>
   <meta charset="utf-8">
   <title>PropoFlow • Suporte</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=9001">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
+
 <body>
-  <div class="container">
+<div class="container">
 
-    <div class="nav">
-      <div class="brand">
-        <div class="logo"></div>
-        <div>
-          <h1>PropoFlow</h1>
-          <p>Suporte</p>
-        </div>
-      </div>
-
-      <div class="actions">
-        <a class="btn btn-ghost" href="/dashboard">Voltar</a>
+  <div class="nav">
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>PropoFlow</h1>
+        <p>Suporte</p>
       </div>
     </div>
 
-    <div class="card">
-      <h2 class="h2">Fale com a gente</h2>
-      <p class="small">Se tiver qualquer problema, chama no e-mail abaixo.</p>
+    <div class="actions">
+      <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
+    </div>
+  </div>
 
-      <div class="card" style="padding:14px; margin-top:12px;">
-        <div style="font-weight:800; margin-bottom:6px;">Email de suporte</div>
-        <div class="small" style="margin-bottom:12px;">
-          <b>{{ support_email }}</b>
-        </div>
+  <div class="card">
+    <h2 class="h2">Fale com a gente</h2>
+    <p class="small">Se deu algum problema (pagamento, login, PDF, limite), chama aqui que resolvemos rápido.</p>
 
-        <a class="btn" href="mailto:{{ support_email }}?subject=Suporte%20PropoFlow">Enviar e-mail</a>
+    <div class="grid-2" style="margin-top:12px;">
+      <!-- WhatsApp -->
+      <div class="card" style="padding:14px;">
+        <div style="font-weight:900; font-size:15px;">WhatsApp (mais rápido)</div>
+        <p class="small" style="margin-top:6px;">
+          Clique e já vai com a mensagem pronta.
+        </p>
 
-        {% if user and user.email %}
-          <p class="small" style="margin-top:10px; opacity:.75;">
-            Sua conta: {{ user.email }}
-          </p>
-        {% endif %}
+        <a class="btn" target="_blank" rel="noopener"
+           href="https://wa.me/5513988374962?text=Oi%21%20Preciso%20de%20ajuda%20no%20PropoFlow.%0A%0A-%20Meu%20email%3A%20%0A-%20O%20que%20aconteceu%3A%20%0A-%20Print%20(se%20tiver)%3A%20">
+          💬 Chamar no WhatsApp
+        </a>
+
+        <p class="small" style="margin-top:10px; opacity:.75;">
+          Número: (13) 98837-4962
+        </p>
+      </div>
+
+      <!-- Email -->
+      <div class="card" style="padding:14px;">
+        <div style="font-weight:900; font-size:15px;">E-mail</div>
+        <p class="small" style="margin-top:6px;">
+          Se preferir, pode enviar por e-mail.
+        </p>
+
+        <a class="btn btn-ghost"
+           href="mailto:nnevesoficial@gmail.com?subject=Suporte%20PropoFlow&body=Oi!%0A%0AMeu%20email%3A%20%0AO%20que%20aconteceu%3A%20%0AID%20do%20orcamento%20(se%20tiver)%3A%20%0A%0AObrigado!">
+          ✉️ Enviar e-mail
+        </a>
+
+        <p class="small" style="margin-top:10px; opacity:.75;">
+          E-mail: nnevesoficial@gmail.com
+        </p>
       </div>
     </div>
 
-    <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
-      <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
-    </p>
+    <div style="height:14px;"></div>
+    <hr style="border:0; border-top:1px solid rgba(255,255,255,0.12); margin:14px 0;">
+
+    <h3 class="h2" style="font-size:16px; margin-bottom:8px;">FAQ rápido</h3>
+    <p class="small" style="margin-top:0;">Respostas para 80% dos casos. Se não resolver, chama no WhatsApp.</p>
+
+    <div style="display:grid; gap:10px; margin-top:10px;">
+      <details class="card" style="padding:12px;">
+        <summary style="cursor:pointer; font-weight:800;">Como envio o orçamento pro cliente?</summary>
+        <div class="small" style="margin-top:8px;">
+          Abra o orçamento no dashboard e clique em <b>Abrir</b> para copiar o link, ou em <b>PDF</b> para baixar e mandar.
+        </div>
+      </details>
+
+      <details class="card" style="padding:12px;">
+        <summary style="cursor:pointer; font-weight:800;">O cliente consegue aceitar pelo link?</summary>
+        <div class="small" style="margin-top:8px;">
+          Sim. O cliente abre o link no celular e pode confirmar o aceite. Você vê como <b>Aceito</b> no dashboard.
+        </div>
+      </details>
+
+      <details class="card" style="padding:12px;">
+        <summary style="cursor:pointer; font-weight:800;">Qual a diferença do Free pro PRO?</summary>
+        <div class="small" style="margin-top:8px;">
+          No Free você tem limite (ex.: até 5 orçamentos). No PRO você libera ilimitado + logo + PDF premium e recursos completos.
+        </div>
+      </details>
+
+      <details class="card" style="padding:12px;">
+        <summary style="cursor:pointer; font-weight:800;">Paguei o Pix e não liberou na hora. E agora?</summary>
+        <div class="small" style="margin-top:8px;">
+          Normalmente libera automático. Se demorar, abre a página de assinatura e clique em <b>“Já paguei”</b>.
+          Se ainda assim não liberar, chama no WhatsApp com o print do comprovante.
+        </div>
+      </details>
+
+      <details class="card" style="padding:12px;">
+        <summary style="cursor:pointer; font-weight:800;">Deu erro (tela preta/500). O que mando no suporte?</summary>
+        <div class="small" style="margin-top:8px;">
+          Envie: seu e-mail de login + o que você clicou + print da tela + (se tiver) o ID do orçamento.
+        </div>
+      </details>
+    </div>
 
   </div>
+
+  <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+    <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
+  </p>
+
+</div>
 </body>
 </html>

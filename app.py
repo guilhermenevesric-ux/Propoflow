@@ -2441,12 +2441,12 @@ def privacy(request: Request):
     return templates.TemplateResponse("privacy.html", {"request": request})
 
 
-@app.get("/support", response_class=HTMLResponse)
-def support(request: Request):
+@app.get("/support")
+def support_page(request: Request):
     return templates.TemplateResponse("support.html", {"request": request})
 
-SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "guilhermenevesric@gmail.com")
-SUPPORT_WHATSAPP = os.getenv("SUPPORT_WHATSAPP", "").strip()
+    SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "guilhermenevesric@gmail.com")
+    SUPPORT_WHATSAPP = os.getenv("SUPPORT_WHATSAPP", "").strip()
 
 import os
 
