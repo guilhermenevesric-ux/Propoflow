@@ -233,4 +233,30 @@ with engine.begin() as conn:
 # ... dentro do seu bloco engine.begin() as conn:
     conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_terms TEXT"))
 
+# NOVO: defaults do usuário (settings)
+    if not column_exists(conn, "users", "default_validity_days"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_validity_days INTEGER DEFAULT 7"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN default_validity_days INTEGER DEFAULT 7"))
+
+    if not column_exists(conn, "users", "default_payment_plan"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_payment_plan VARCHAR(40) DEFAULT 'avista'"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN default_payment_plan VARCHAR(40) DEFAULT 'avista'"))
+
+    if not column_exists(conn, "users", "default_message_template"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_message_template TEXT"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN default_message_template TEXT"))
+
+    if not column_exists(conn, "users", "default_terms"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_terms TEXT DEFAULT ''"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN default_terms TEXT"))
+
+
 print("✅ migrate.py OK")
