@@ -198,6 +198,12 @@ with engine.begin() as conn:
         else:
             conn.execute(text("ALTER TABLE users ADD COLUMN email_verify_expires_at DATETIME"))
 
+    # users.default_message_template
+    if not column_exists(conn, "users", "default_message_template"):
+        if is_postgres():
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS default_message_template TEXT"))
+        else:
+            conn.execute(text("ALTER TABLE users ADD COLUMN default_message_template TEXT"))
 
     def ensure_events_table(conn):
             conn.execute(text("""

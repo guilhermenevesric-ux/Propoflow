@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>PropoFlow • Padrões</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=9100">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
@@ -13,7 +13,7 @@
       <div class="logo"></div>
       <div>
         <h1>PropoFlow</h1>
-        <p>Padrões (pra ficar mais rápido)</p>
+        <p>Padrões (para ganhar tempo)</p>
       </div>
     </div>
     <div class="actions">
@@ -22,47 +22,52 @@
   </div>
 
   <div class="card">
-    <h2 class="h2">Meus padrões</h2>
-    <p class="small">Isso será usado automaticamente quando você criar um orçamento.</p>
+    <h2 class="h2">Padrões</h2>
+    <p class="small">Deixe isso pronto 1 vez e o sistema já usa automaticamente.</p>
 
     {% if saved %}
       <div class="error" style="background: rgba(79,124,255,0.15); border-color: rgba(79,124,255,0.35); color: rgba(232,238,252,0.9);">
-        ✅ Salvo com sucesso
+        Salvo com sucesso ✅
       </div>
+    {% endif %}
+    {% if error %}
+      <div class="error">{{ error }}</div>
     {% endif %}
 
     <form method="post" action="/settings">
+      <label>Mensagem padrão para WhatsApp</label>
+      <textarea name="default_message_template" placeholder="Ex: Olá {cliente}! Segue seu orçamento: {link}">{{ user.default_message_template or "" }}</textarea>
+
+      <p class="small" style="margin-top:10px;">
+        Você pode usar: <b>{cliente}</b>, <b>{servico}</b>, <b>{valor}</b>, <b>{prazo}</b>, <b>{link}</b>
+      </p>
+
+      <div style="height:10px;"></div>
+
       <div class="row">
         <div>
           <label>Validade padrão (dias)</label>
-          <input name="default_validity_days" type="number" min="1" max="30" value="{{ user.default_validity_days or 7 }}">
+          <input type="number" name="default_validity_days" min="1" max="30" value="{{ user.default_validity_days or 7 }}">
         </div>
         <div>
-          <label>Como pagar (padrão)</label>
+          <label>Forma de pagamento padrão</label>
           <select name="default_payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
-            <option value="avista" {% if (user.default_payment_plan or 'avista')=='avista' %}selected{% endif %}>À vista</option>
-            <option value="entrada_final_30" {% if user.default_payment_plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
-            <option value="entrada_final_50" {% if user.default_payment_plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
-            <option value="3x_30_40_30" {% if user.default_payment_plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+            {% set plan = user.default_payment_plan or "avista" %}
+            <option value="avista" {% if plan=="avista" %}selected{% endif %}>À vista</option>
+            <option value="entrada_final_30" {% if plan=="entrada_final_30" %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+            <option value="entrada_final_50" {% if plan=="entrada_final_50" %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+            <option value="3x_30_40_30" {% if plan=="3x_30_40_30" %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
           </select>
         </div>
       </div>
 
-      <br>
-
-      <label>Mensagem padrão do WhatsApp</label>
-      <textarea name="default_message_template" placeholder="Use {cliente}, {servico}, {link}">{{ user.default_message_template or "Oi {cliente}! Segue seu orçamento do *{servico}*.\n👉 Link: {link}\n\nSe quiser ajustar algo, me avise 😊" }}</textarea>
-      <p class="small" style="margin-top:8px; opacity:.8;">
-        Dica: você pode usar <b>{cliente}</b>, <b>{servico}</b> e <b>{link}</b>.
-      </p>
-
-      <br>
+      <div style="height:12px;"></div>
 
       <label>Condições padrão (aparece no PDF)</label>
-      <textarea name="default_terms" placeholder="Ex:\n• Validade: 7 dias\n• Pagamento: à vista\n• Reagendamento com 24h">{{ user.default_terms or "" }}</textarea>
+      <textarea name="default_terms" placeholder="Ex: Pagamento na entrega. Validade 7 dias.">{{ user.default_terms or "" }}</textarea>
 
-      <br><br>
-      <button class="btn" type="submit">Salvar padrões</button>
+      <div style="height:14px;"></div>
+      <button class="btn" type="submit">Salvar</button>
     </form>
   </div>
 </div>

@@ -1337,25 +1337,30 @@ def settings_page(request: Request, saved: int = 0, db: Session = Depends(get_db
 @app.post("/settings")
 def settings_save(
     request: Request,
-    default_validity_days: int = Form(7),
-    default_payment_plan: str = Form("avista"),
     default_message_template: str = Form(""),
     default_terms: str = Form(""),
+    default_validity_days: int = Form(7),
+    default_payment_plan: str = Form("avista"),
     db: Session = Depends(get_db),
 ):
     user = get_current_user(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
-    user.default_validity_days = max(1, min(int(default_validity_days or 7), 30))
-    user.default_payment_plan = (default_payment_plan or "avista").strip() or "avista"
     user.default_message_template = (default_message_template or "").strip() or None
-    user.default_terms =  (getattr(user, "default_terms", "") or "").strip() or None
+    user.default_terms = (default_terms or "").strip() or ""
+    user.default_validity_days = int(default_validity_days or 7)
+    user.default_payment_plan = (default_payment_plan or "avista").strip()
 
     db.add(user)
     db.commit()
-    return RedirectResponse("/settings?saved=1", status_code=302)
 
+    return templates.TemplateResponse("settings.html", {
+        "request": request,
+        "user": user,
+        "saved": True,
+        "error": None
+    })
 # ===== SERVICES =====
 @app.get("/services", response_class=HTMLResponse)
 def services_page(request: Request, saved: int = 0, db: Session = Depends(get_db)):
