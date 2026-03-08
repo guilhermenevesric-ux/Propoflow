@@ -769,10 +769,9 @@ def payment_plan_from_stages(stages: list[PaymentStage]) -> str:
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-    return RedirectResponse("/dashboard", status_code=302)
-
+    if user:
+        return RedirectResponse("/dashboard", status_code=302)
+    return templates.TemplateResponse("home.html", {"request": request})
 
 # ===== AUTH =====
 @app.get("/login", response_class=HTMLResponse)

@@ -1,0 +1,232 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PropoFlow • Orçamentos profissionais em minutos</title>
+  <link rel="stylesheet" href="/static/style.css?v=9999">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    .hero{
+      display:grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 900px){ .hero{ grid-template-columns: 1fr; } }
+
+    .hero h2{
+      font-size: 26px;
+      margin: 0 0 10px;
+      letter-spacing: .2px;
+      line-height: 1.15;
+    }
+    .hero .lead{
+      color: rgba(232,238,252,0.78);
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0 0 14px;
+    }
+    .hero-box{
+      padding: 18px;
+    }
+    .hero-cta{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 10px;
+    }
+    .stamp{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.18);
+      color: rgba(232,238,252,0.78);
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .mock{
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.08));
+      box-shadow: 0 18px 45px rgba(0,0,0,0.25);
+      backdrop-filter: blur(10px);
+    }
+    .mock .line{
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.10);
+      margin: 10px 0;
+    }
+    .mock .big{ height: 16px; }
+    .grid3{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    @media (max-width: 900px){ .grid3{ grid-template-columns: 1fr; } }
+    .mini{
+      padding: 16px;
+    }
+    .mini .t{
+      font-weight: 900;
+      margin: 0 0 6px;
+    }
+    .mini .d{
+      color: rgba(232,238,252,0.75);
+      font-size: 13px;
+      margin: 0;
+      line-height: 1.55;
+    }
+    .pricing2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    @media (max-width: 900px){ .pricing2{ grid-template-columns: 1fr; } }
+    .price-tag{
+      font-weight: 900;
+      font-size: 18px;
+      margin-top: 10px;
+    }
+    .ul{
+      padding-left: 18px;
+      margin: 10px 0 0;
+      color: rgba(232,238,252,0.85);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .ul li{ margin: 6px 0; }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>PropoFlow</h1>
+          <p>Orçamentos profissionais em minutos</p>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn btn-ghost" href="/login">Entrar</a>
+        <a class="btn" href="/register">Criar conta grátis</a>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="card hero-box">
+        <span class="stamp">✅ Simples o suficiente para qualquer pessoa • ✅ Profissional para cobrar mais</span>
+        <h2>Crie e envie orçamentos com aparência profissional — sem complicação.</h2>
+        <p class="lead">
+          Você preenche em 60 segundos, gera um link e um PDF, e manda no WhatsApp.
+          Ideal para pequenos negócios: serviços, autônomos, comércio e freelancers.
+        </p>
+
+        <div class="hero-cta">
+          <a class="btn" href="/register">Criar conta grátis</a>
+          <a class="btn btn-ghost" href="/login">Já tenho conta</a>
+          <span class="pill">Plano PRO: <b style="color: rgba(232,238,252,0.95);">R$ 19,90/mês</b></span>
+        </div>
+
+        <div class="grid3">
+          <div class="card mini">
+            <p class="t">⚡ Rápido</p>
+            <p class="d">Assistente em 3 passos. Sem telas confusas. Sem planilha.</p>
+          </div>
+          <div class="card mini">
+            <p class="t">📄 Link + PDF</p>
+            <p class="d">Seu cliente abre no celular e você ainda pode baixar o PDF.</p>
+          </div>
+          <div class="card mini">
+            <p class="t">💳 Pix PRO</p>
+            <p class="d">Ativação por Pix e liberação automática quando confirmar.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mock">
+        <div style="font-weight:900; font-size:14px; margin-bottom:6px;">Prévia do orçamento</div>
+        <div class="line big"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div class="line big"></div>
+        <div class="line"></div>
+        <div class="line"></div>
+        <div style="display:flex; justify-content:space-between; gap:10px; margin-top:10px;">
+          <div class="pill">Cliente</div>
+          <div class="pill">Valor</div>
+        </div>
+        <div style="margin-top:10px; color: rgba(232,238,252,0.70); font-size:12px;">
+          *No PRO você pode colocar sua logo e deixar a cara da sua marca.
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2 class="h2">Como funciona</h2>
+      <div class="grid3">
+        <div class="card mini">
+          <p class="t">1) Preencha</p>
+          <p class="d">Cliente + serviço + valor. Se quiser, adicione itens.</p>
+        </div>
+        <div class="card mini">
+          <p class="t">2) Gere</p>
+          <p class="d">Cria um link público e um PDF pronto para enviar.</p>
+        </div>
+        <div class="card mini">
+          <p class="t">3) Envie</p>
+          <p class="d">Mande no WhatsApp. Seu cliente abre e pode aceitar.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="pricing2">
+      <div class="card">
+        <h2 class="h2">Plano Grátis</h2>
+        <p class="small">Para testar e sentir o valor.</p>
+        <ul class="ul">
+          <li>Até <b>5</b> orçamentos</li>
+          <li>Link público + PDF</li>
+          <li>Aceite online</li>
+          <li>1 exclusão</li>
+        </ul>
+        <div class="price-tag">R$ 0</div>
+        <div class="hero-cta" style="margin-top:12px;">
+          <a class="btn" href="/register">Começar grátis</a>
+        </div>
+      </div>
+
+      <div class="card" style="border-color: rgba(79,124,255,0.30);">
+        <h2 class="h2">Plano PRO</h2>
+        <p class="small">Para quem faz orçamento toda semana e quer aparência premium.</p>
+        <ul class="ul">
+          <li><b>Ilimitado</b> (orçamentos e exclusões)</li>
+          <li><b>Logo da sua marca</b> no PDF e link</li>
+          <li><b>PDF premium</b> (melhor apresentação)</li>
+          <li>Ativação por Pix</li>
+        </ul>
+        <div class="price-tag">R$ 19,90/mês</div>
+        <div class="hero-cta" style="margin-top:12px;">
+          <a class="btn" href="/register">Criar conta e ativar</a>
+        </div>
+      </div>
+    </div>
+
+    <p class="small" style="margin-top:18px; opacity:.6; text-align:center;">
+      <a href="/terms">Termos</a> • <a href="/privacy">Privacidade</a> • <a href="/support">Suporte</a>
+    </p>
+
+  </div>
+</body>
+</html>
