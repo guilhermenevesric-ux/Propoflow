@@ -45,7 +45,17 @@ class User(Base):
     default_validity_days = Column(Integer, default=7)
     default_payment_plan = Column(String(40), default="avista")  # avista/entrada_final_30/...
     default_message_template = Column(Text, nullable=True)       # msg padrão WhatsApp
-    default_terms = Column(Text, nullable=True, default="")                  # condições padrão (texto)
+    default_terms = Column(Text, nullable=True, default="")
+
+    # Defaults do usuário (precisam estar DENTRO da classe)
+    default_validity_days = Column(Integer, default=7)
+    default_payment_plan = Column(String(40), default="avista")
+    default_message_template = Column(Text, nullable=True)
+    default_terms = Column(Text, nullable=True, default="")
+
+    # Logo PRO (precisa existir no banco e no model)
+    logo_mime = Column(String(64), nullable=True)
+    logo_b64 = Column(Text, nullable=True)
 
 class UserSession(Base):
     __tablename__ = "user_sessions"

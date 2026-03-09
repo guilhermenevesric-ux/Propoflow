@@ -162,7 +162,13 @@
 
     <div class="nav">
       <div class="brand">
-        <div class="logo"></div>
+  {% if user and user.plan == "pro" and user.logo_b64 and user.logo_mime %}
+    <img class="brand-logo"
+         src="data:{{ user.logo_mime }};base64,{{ user.logo_b64 }}"
+         alt="Logo">
+  {% else %}
+    <div class="logo"></div>
+  {% endif %}
         <div>
           <h1>
             {% if owner and owner.company_name %}

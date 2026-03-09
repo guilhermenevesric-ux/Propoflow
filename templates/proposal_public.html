@@ -10,16 +10,19 @@
   <div class="container">
     <div class="nav">
       <div class="brand">
-        <div class="logo"></div>
-        <div>
-          <{% if is_pro and owner %}
-  <div style="display:flex; gap:12px; align-items:center;">
-    {% if owner.logo_b64 %}
-      <img src="data:{{ owner.logo_mime }};base64,{{ owner.logo_b64 }}"
-           style="width:40px;height:40px;border-radius:12px;object-fit:cover;">
-    {% else %}
-      <div class="logo"></div>
-    {% endif %}
+  {% if is_pro and owner and owner.logo_b64 and owner.logo_mime %}
+    <img class="brand-logo"
+         src="data:{{ owner.logo_mime }};base64,{{ owner.logo_b64 }}"
+         alt="Logo">
+  {% else %}
+    <div class="logo"></div>
+  {% endif %}
+
+  <div>
+    <h1>{{ owner.company_name or "PropoFlow" }}</h1>
+    <p>{{ owner.phone or "" }}</p>
+  </div>
+</div>
 
     <div>
       <h1 style="margin:0;">{{ owner.company_name or owner.display_name or "Orçamento" }}</h1>

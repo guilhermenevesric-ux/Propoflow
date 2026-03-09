@@ -22,6 +22,8 @@ import hashlib
 from urllib.parse import quote_plus
 import re
 import json
+import base64, io
+from reportlab.lib.utils import ImageReader
 
 # ===== Anti-spam / Rate limit (mínimo viável, sem Redis) =====
 from collections import deque
@@ -837,6 +839,18 @@ def home(request: Request):
             samesite="Lax"
         )
     return resp
+
+def draw_pdf_logo(c, owner, x, y, size=34):
+    if owner and getattr(owner, "logo_b64", None) and getattr(owner, "logo_mime", None):
+        try:
+            raw = base64.b64decode(owner.logo_b64)
+            img = ImageReader(io.BytesIO(raw))
+            c.drawImage(img, x, y, width=size, height=size, mask="auto")
+            return
+        except Exception:
+            pass
+    # fallback (nada)
+    c.roundRect(x, y, size, size, 8, stroke=0, fill=0)
 
 # ===== AUTH =====
 @app.get("/login", response_class=HTMLResponse)
