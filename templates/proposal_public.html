@@ -19,6 +19,14 @@
   {% endif %}
 
   <div>
+    <h1>{{ owner.company_name if owner and owner.company_name else "PropoFlow" }}</h1>
+    <p>
+      {% if owner and owner.phone %}{{ owner.phone }}{% endif %}
+    </p>
+  </div>
+</div>
+
+  <div>
     <h1>{{ owner.company_name or "PropoFlow" }}</h1>
     <p>{{ owner.phone or "" }}</p>
   </div>
