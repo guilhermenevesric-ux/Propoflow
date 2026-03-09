@@ -26,7 +26,7 @@
 
   <div class="card">
     <h2 class="h2">Pague com Pix para liberar o PRO</h2>
-    <p class="small">1) Abra o app do banco → 2) Escaneie o QR → 3) Pague → 4) Volte aqui e clique <b>Já paguei</b>.</p>
+    <a class="btn btn-ghost" href="/upgrade/pro/pix/status?pay={{ pay_id }}&redirect=1">Já paguei</a>
 
     {% if error %}
       <div class="error">{{ error }}</div>
@@ -64,7 +64,7 @@
       <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn btn-ghost" type="button" onclick="copyPix()">Copiar Pix</button>
         <a class="btn btn-ghost" href="/upgrade/pro/pix?new=1">Gerar novo QR</a>
-        <a class="btn" href="/upgrade/pro/pix/status?pay={{ pay_id }}">Já paguei</a>
+        <a class="btn btn-ghost" href="/upgrade/pro/pix/status?pay={{ pay_id }}&sub={{ sub_id }}&redirect=1">Já paguei</a>
       </div>
 
       <p class="small" style="margin-top:10px; opacity:.85;">

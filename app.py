@@ -2559,6 +2559,8 @@ def upgrade_pro_pix_page(
     if not user:
         return RedirectResponse("/login", status_code=302)
 
+    track_event(request, "pix_checkout_open", user_id=user.id)
+
     if not ASAAS_API_KEY:
         return HTMLResponse("ASAAS_API_KEY não configurado.", status_code=500)
 
@@ -2620,6 +2622,15 @@ def upgrade_pro_pix_page(
     value = (payment or {}).get("value") or 19.90
     due_date = (payment or {}).get("dueDate") or ""
 
+    pending = request.query_params.get("pending") == "1"
+    err = request.query_params.get("err")
+
+    if pending and not error:
+        error = "Ainda não confirmou. Se você acabou de pagar, aguarde um pouco e clique em “Já paguei” de novo."
+
+    if err and not error:
+        error = "Não consegui verificar agora. Tente novamente em instantes."
+
     return templates.TemplateResponse("upgrade_pro_pix.html", {
         "request": request,
         "user": user,
@@ -2661,13 +2672,26 @@ def upgrade_pro_pix_check(request: Request, sub: str, pay: str, db: Session = De
 
 
 
+from fastapi import Query
+from fastapi.responses import RedirectResponse
+
 @app.get("/upgrade/pro/pix/status")
-def upgrade_pro_pix_status(request: Request, pay: str, sub: str | None = None, db: Session = Depends(get_db)):
+def upgrade_pro_pix_status(
+    request: Request,
+    pay: str,
+    sub: str | None = None,
+    redirect: int = Query(0),
+    db: Session = Depends(get_db),
+):
     user = get_current_user(request, db)
     if not user:
+        if redirect:
+            return RedirectResponse("/login", status_code=302)
         return {"ok": False, "status": "UNAUTH"}
 
     if not ASAAS_API_KEY:
+        if redirect:
+            return RedirectResponse(f"/upgrade/pro/pix?pay={pay}&err=noasaas", status_code=302)
         return {"ok": False, "status": "NO_ASAAS"}
 
     # consulta o pagamento no Asaas
@@ -2678,19 +2702,27 @@ def upgrade_pro_pix_status(request: Request, pay: str, sub: str | None = None, d
             timeout=20,
         )
     except Exception:
+        if redirect:
+            return RedirectResponse(f"/upgrade/pro/pix?pay={pay}&err=net", status_code=302)
         return {"ok": False, "status": "ERROR"}
 
     if r.status_code != 200:
+        if redirect:
+            return RedirectResponse(f"/upgrade/pro/pix?pay={pay}&err=asaas", status_code=302)
         return {"ok": False, "status": "ERROR"}
 
     pj = r.json()
     st = (pj.get("status") or "").upper()
+    paid = st in ("RECEIVED", "CONFIRMED")
 
-    # pago -> libera pro (aceleração; webhook também faz)
-    if st in ("RECEIVED", "CONFIRMED"):
-        # tenta usar subscription_id se veio
+    # sempre registra que o user checou o status
+    track_event(request, "pix_status_checked", user_id=user.id)
+
+    if paid:
+        # guarda subscription id se veio (opcional)
         if sub:
             user.asaas_subscription_id = user.asaas_subscription_id or sub
+
         set_user_pro_month(
             db,
             user,
@@ -2698,9 +2730,17 @@ def upgrade_pro_pix_status(request: Request, pay: str, sub: str | None = None, d
             subscription_id=getattr(user, "asaas_subscription_id", None),
             customer_id=getattr(user, "asaas_customer_id", None),
         )
-        track_event(request, "pix_checkout_open", user_id=user.id)
+
+        track_event(request, "pro_activated_pix", user_id=user.id)
+
+        if redirect:
+            return RedirectResponse("/billing?paid=1", status_code=302)
 
         return {"ok": True, "status": st, "paid": True}
+
+    # ainda não pagou/confirmou
+    if redirect:
+        return RedirectResponse(f"/upgrade/pro/pix?pay={pay}&pending=1", status_code=302)
 
     return {"ok": True, "status": st, "paid": False}
 
