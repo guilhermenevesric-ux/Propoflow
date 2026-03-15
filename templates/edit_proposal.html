@@ -19,11 +19,12 @@
     <div class="actions">
       <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
       <a class="btn btn-ghost" href="/p/{{ p.public_id }}">Abrir link</a>
+      <form method="post" action="/proposals/{{ p.id }}/save_service" style="display:inline;">
+        <button class="btn btn-ghost" type="submit">Salvar como serviço</button>
+      </form>
     </div>
   </div>
-<form method="post" action="/proposals/{{ p.id }}/save_service" style="display:inline;">
-  <button class="btn btn-ghost" type="submit">Salvar como serviço</button>
-</form>
+
   <div class="card">
     <h2 class="h2">Editar orçamento</h2>
     <p class="small">Ao salvar, o sistema cria uma nova versão (v{{ p.revision + 1 }}).</p>
@@ -83,22 +84,26 @@
 
           {% for it in p.items %}
           <tr>
-            <td><input name="item_desc" value="{{ it.description }}" /></td>
-            <td><input name="item_qty" value="{{ it.qty }}" /></td>
-            <td><input name="item_unit_price" value="{{ (it.unit_price_cents or 0)/100 }}" /></td>
+            <td>
+              <input name="item_desc" value="{{ it.description }}">
+              <input type="hidden" name="item_unit" value="{{ it.unit or 'un' }}">
+            </td>
+            <td><input name="item_qty" value="{{ it.qty }}"></td>
+            <td><input name="item_unit_price" value="{{ (it.unit_price_cents or 0) / 100 }}"></td>
             <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
-            <input type="hidden" name="item_unit" value="{{ it.unit or 'un' }}">
           </tr>
           {% endfor %}
 
           {% if p.items|length == 0 %}
             {% for i in range(0,5) %}
             <tr>
-              <td><input name="item_desc" /></td>
-              <td><input name="item_qty" /></td>
-              <td><input name="item_unit_price" /></td>
+              <td>
+                <input name="item_desc">
+                <input type="hidden" name="item_unit" value="un">
+              </td>
+              <td><input name="item_qty"></td>
+              <td><input name="item_unit_price"></td>
               <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
-              <input type="hidden" name="item_unit" value="un">
             </tr>
             {% endfor %}
           {% endif %}
@@ -116,49 +121,15 @@
 
       <label>Forma de pagamento</label>
       <select name="payment_plan" id="paymentPlan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color: #e8eefc;">
-        <option value="avista">À vista (100%)</option>
-        <option value="entrada_final_30" selected>Entrada + na entrega (30% / 70%)</option>
-        <option value="entrada_final_50">Entrada + na entrega (50% / 50%)</option>
-        <option value="3x_30_40_30">Entrada + durante + na entrega (30% / 40% / 30%)</option>
-        <option value="personalizado">Personalizado (avançado)</option>
+        <option value="avista" {% if payment_plan == "avista" %}selected{% endif %}>À vista (100%)</option>
+        <option value="entrada_final_30" {% if payment_plan == "entrada_final_30" %}selected{% endif %}>Entrada + na entrega (30% / 70%)</option>
+        <option value="entrada_final_50" {% if payment_plan == "entrada_final_50" %}selected{% endif %}>Entrada + na entrega (50% / 50%)</option>
+        <option value="3x_30_40_30" {% if payment_plan == "3x_30_40_30" %}selected{% endif %}>Entrada + durante + na entrega (30% / 40% / 30%)</option>
       </select>
 
-      <div id="customPay" style="display:none; margin-top:12px;">
-        <div class="row">
-          <div>
-            <label>Entrada (%)</label>
-            <input name="p1_percent" type="number" min="0" max="100" value="{{ p1 }}">
-          </div>
-          <div>
-            <label>Durante o serviço (%)</label>
-            <input name="p2_percent" type="number" min="0" max="100" value="{{ p2 }}">
-          </div>
-        </div>
-        <br>
-        <div class="row">
-          <div>
-            <label>Na entrega (%)</label>
-            <input name="p3_percent" type="number" min="0" max="100" value="{{ p3 }}">
-          </div>
-          <div></div>
-        </div>
-      </div>
-
-      <details style="margin-top:14px;">
-        <summary class="small" style="cursor:pointer;">Opções avançadas (opcional)</summary>
-        <div style="margin-top:10px;">
-          <div class="row">
-            <div>
-              <label>Reserva (opcional) — % para cobrir gastos que aparecem</label>
-              <input name="reserve_percent" type="number" min="0" max="50" value="{{ p.overhead_percent or 0 }}">
-            </div>
-            <div>
-              <label>Lucro extra (opcional) — % além do valor dos itens</label>
-              <input name="profit_percent" type="number" min="0" max="80" value="{{ p.margin_percent or 0 }}">
-            </div>
-          </div>
-        </div>
-      </details>
+      <p class="small" style="margin-top:10px;">
+        Apenas estas opções são salvas pelo sistema atualmente.
+      </p>
 
       <br><br>
 
@@ -170,28 +141,49 @@
 <script>
   function brl(n){
     try{
-      const v = (Math.round(n*100)/100).toFixed(2).replace('.', ',');
+      const v = (Math.round(n * 100) / 100).toFixed(2).replace('.', ',');
       return 'R$ ' + v;
-    }catch(e){ return 'R$ 0,00'; }
+    }catch(e){
+      return 'R$ 0,00';
+    }
   }
+
   function parseNum(v){
+    if(v == null) return 0;
+    v = String(v).trim();
     if(!v) return 0;
-    v = (''+v).replace(/\./g,'').replace(',', '.');
+
+    v = v.replace(/\s/g, '').replace(/R\$\s?/gi, '');
+
+    const hasComma = v.includes(',');
+    const hasDot = v.includes('.');
+
+    if(hasComma && hasDot){
+      if(v.lastIndexOf(',') > v.lastIndexOf('.')){
+        v = v.replace(/\./g, '').replace(',', '.');
+      }else{
+        v = v.replace(/,/g, '');
+      }
+    }else if(hasComma){
+      v = v.replace(',', '.');
+    }
+
+    v = v.replace(/[^\d.-]/g, '');
+
     const n = parseFloat(v);
     return isNaN(n) ? 0 : n;
   }
+
   function recalc(){
     const rows = document.querySelectorAll('#itemsTable tr');
     let total = 0;
+
     rows.forEach((tr, idx) => {
       if(idx === 0) return;
-      const tds = tr.querySelectorAll('td');
-      const inputs = tr.querySelectorAll('input');
-      if(inputs.length < 3) return;
 
-      const desc = inputs[0].value.trim();
-      const qty = parseNum(inputs[1].value) || 0;
-      const unit = parseNum(inputs[2].value) || 0;
+      const desc = tr.querySelector('input[name="item_desc"]')?.value?.trim() || "";
+      const qty = parseNum(tr.querySelector('input[name="item_qty"]')?.value) || 0;
+      const unit = parseNum(tr.querySelector('input[name="item_unit_price"]')?.value) || 0;
 
       let line = 0;
       if(desc && qty > 0 && unit > 0) line = qty * unit;
@@ -201,30 +193,36 @@
 
       total += line;
     });
-    document.getElementById('totalEstimado').textContent = brl(total);
+
+    const out = document.getElementById('totalEstimado');
+    if(out) out.textContent = brl(total);
   }
+
   function addRow(){
     const table = document.getElementById("itemsTable");
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
-      <td><input name="item_qty" placeholder="1" /></td>
-      <td><input name="item_unit_price" placeholder="100" /></td>
+      <td>
+        <input name="item_desc" placeholder="Ex: Serviço...">
+        <input type="hidden" name="item_unit" value="un">
+      </td>
+      <td><input name="item_qty" placeholder="1"></td>
+      <td><input name="item_unit_price" placeholder="100"></td>
       <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
-      <input type="hidden" name="item_unit" value="un">
     `;
     table.appendChild(tr);
+    recalc();
   }
+
   document.addEventListener('input', (e) => {
-    if(e.target && (e.target.name === 'item_desc' || e.target.name === 'item_qty' || e.target.name === 'item_unit_price')){
+    if(!e.target) return;
+    if(
+      e.target.name === 'item_desc' ||
+      e.target.name === 'item_qty' ||
+      e.target.name === 'item_unit_price'
+    ){
       recalc();
     }
-  });
-
-  const plan = document.getElementById('paymentPlan');
-  const custom = document.getElementById('customPay');
-  plan.addEventListener('change', () => {
-    custom.style.display = (plan.value === 'personalizado') ? 'block' : 'none';
   });
 
   recalc();

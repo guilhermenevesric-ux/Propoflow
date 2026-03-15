@@ -93,7 +93,7 @@
 
                   <div class="small" style="margin-top:6px;">
                     {% if s.default_price_cents and s.default_price_cents > 0 %}
-                      Preço: <b>R$ {{ ('%.2f'|format(s.default_price_cents/100)).replace('.', ',') }}</b>
+                      Preço: <b>R$ {{ ('%.2f'|format(s.default_price_cents / 100)).replace('.', ',') }}</b>
                     {% else %}
                       Preço: <span style="opacity:.7;">(não definido)</span>
                     {% endif %}
@@ -122,7 +122,7 @@
                         <div class="row">
                           <div>
                             <label>Preço sugerido</label>
-                            <input name="default_price" value="{{ (s.default_price_cents or 0)/100 }}">
+                            <input name="default_price" value="{{ (s.default_price_cents or 0) / 100 }}">
                           </div>
                           <div>
                             <label>Prazo sugerido</label>
@@ -138,11 +138,12 @@
                         <div style="height:10px;"></div>
 
                         <label>Como pagar</label>
+                        {% set plan = s.default_payment_plan or 'avista' %}
                         <select name="default_payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
-                          <option value="avista" {% if s.default_payment_plan=='avista' %}selected{% endif %}>À vista</option>
-                          <option value="entrada_final_30" {% if s.default_payment_plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
-                          <option value="entrada_final_50" {% if s.default_payment_plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
-                          <option value="3x_30_40_30" {% if s.default_payment_plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+                          <option value="avista" {% if plan == 'avista' %}selected{% endif %}>À vista</option>
+                          <option value="entrada_final_30" {% if plan == 'entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+                          <option value="entrada_final_50" {% if plan == 'entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+                          <option value="3x_30_40_30" {% if plan == '3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
                         </select>
 
                         <div style="height:12px;"></div>
@@ -150,7 +151,7 @@
                       </form>
 
                       <form method="post" action="/services/{{ s.id }}/delete" style="margin-top:10px;"
-                        onsubmit="return confirm('Remover este serviço da lista?');">
+                            onsubmit="return confirm('Remover este serviço da lista?');">
                         <button class="btn btn-ghost" type="submit">Remover</button>
                       </form>
                     </div>

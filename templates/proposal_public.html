@@ -10,44 +10,30 @@
   <div class="container">
     <div class="nav">
       <div class="brand">
-  {% if is_pro and owner and owner.logo_b64 and owner.logo_mime %}
-    <img class="brand-logo"
-         src="data:{{ owner.logo_mime }};base64,{{ owner.logo_b64 }}"
-         alt="Logo">
-  {% else %}
-    <div class="logo"></div>
-  {% endif %}
+        {% if is_pro and owner and owner.logo_b64 and owner.logo_mime %}
+          <img class="brand-logo"
+               src="data:{{ owner.logo_mime }};base64,{{ owner.logo_b64 }}"
+               alt="Logo">
+        {% else %}
+          <div class="logo"></div>
+        {% endif %}
 
-  <div>
-    <h1>{{ owner.company_name if owner and owner.company_name else "PropoFlow" }}</h1>
-    <p>
-      {% if owner and owner.phone %}{{ owner.phone }}{% endif %}
-    </p>
-  </div>
-</div>
-
-  <div>
-    <h1>{{ owner.company_name or "PropoFlow" }}</h1>
-    <p>{{ owner.phone or "" }}</p>
-  </div>
-</div>
-
-    <div>
-      <h1 style="margin:0;">{{ owner.company_name or owner.display_name or "Orçamento" }}</h1>
-      <p style="margin:0;">
-        {% if owner.phone %}{{ owner.phone }}{% endif %}
-      </p>
-    </div>
-  </div>
-{% else %}
-  <h1>PropoFlow</h1>
-  <p>
-    {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Orçamento profissional{% endif %}
-    {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
-  </p>
-{% endif %}
+        <div>
+          {% if is_pro and owner %}
+            <h1 style="margin:0;">{{ owner.company_name or owner.display_name or "Orçamento" }}</h1>
+            <p style="margin:0;">
+              {% if owner.phone %}{{ owner.phone }}{% endif %}
+            </p>
+          {% else %}
+            <h1>PropoFlow</h1>
+            <p>
+              {% if owner and owner.company_name %}{{ owner.company_name }}{% else %}Orçamento profissional{% endif %}
+              {% if owner and owner.phone %} • {{ owner.phone }}{% endif %}
+            </p>
+          {% endif %}
         </div>
       </div>
+
       <div class="right-actions">
         <span>ID: {{ p.public_id }}</span>
       </div>
@@ -78,7 +64,6 @@
       <h3 class="h2" style="font-size:15px;">Descrição do serviço</h3>
       <p style="color: rgba(232,238,252,0.85); line-height:1.5; white-space: pre-wrap;">{{ p.description }}</p>
 
-      <!-- ITENS (se houver) -->
       {% if items and items|length > 0 %}
         <div class="card" style="margin-top:14px; padding:14px;">
           <h3 class="h2" style="font-size:15px; margin-bottom:6px;">Itens</h3>
@@ -218,6 +203,7 @@
       navigator.clipboard.writeText(url);
       alert("Link copiado!");
     }
+
     function copyPix(){
       const el = document.getElementById("pixKey");
       if(!el) return;

@@ -29,16 +29,33 @@ def _brl_from_cents(cents: int) -> str:
 
 def _parse_price_to_cents(price_str: str) -> int:
     """
-    Tenta converter "R$ 1.234,56" / "1234,56" / "1234.56" / "1234" em centavos.
+    Aceita:
+    - R$ 1.234,56
+    - 1234,56
+    - 1234.56
+    - 1234
     """
     s = _safe(price_str)
     if not s:
         return 0
+
     s = s.lower().replace("r$", "").strip()
-    s = re.sub(r"[^\d,\.]", "", s)
+    s = re.sub(r"[^\d,.\-]", "", s)
     if not s:
         return 0
-    s = s.replace(".", "").replace(",", ".")
+
+    has_comma = "," in s
+    has_dot = "." in s
+
+    if has_comma and has_dot:
+        # usa o último separador como decimal
+        if s.rfind(",") > s.rfind("."):
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            s = s.replace(",", "")
+    elif has_comma:
+        s = s.replace(",", ".")
+
     try:
         return int(round(float(s) * 100))
     except Exception:
@@ -55,26 +72,42 @@ def _fmt_qty(q):
         return str(q or "")
 
 
-def _wrap_draw(c, text, x, y, max_w, font="Helvetica", size=10, leading=12.5, color=(0.12, 0.16, 0.26)):
+def _wrap_lines(text, max_w, font="Helvetica", size=10):
+    text = text or ""
+    paragraphs = text.splitlines() if text else [""]
+    lines = []
+
+    for paragraph in paragraphs:
+        p = paragraph.strip()
+        if not p:
+            lines.append("")
+            continue
+
+        words = p.split()
+        line = ""
+        for w in words:
+            test = (line + " " + w).strip()
+            if stringWidth(test, font, size) <= max_w:
+                line = test
+            else:
+                if line:
+                    lines.append(line)
+                line = w
+
+        if line:
+            lines.append(line)
+
+    if not lines:
+        lines = [""]
+
+    return lines
+
+
+def _draw_text_lines(c, lines, x, y, font="Helvetica", size=10, leading=12.5, color=(0.12, 0.16, 0.26)):
     c.setFont(font, size)
     c.setFillColorRGB(*color)
-    words = (text or "").split()
-    if not words:
-        return y
-
-    line = ""
-    for w in words:
-        test = (line + " " + w).strip()
-        if stringWidth(test, font, size) <= max_w:
-            line = test
-        else:
-            if line:
-                c.drawString(x, y, line)
-                y -= leading
-            line = w
-
-    if line:
-        c.drawString(x, y, line)
+    for ln in lines:
+        c.drawString(x, y, ln)
         y -= leading
     return y
 
@@ -87,15 +120,65 @@ def _ensure_space(c, y, needed, width, height, draw_header_fn):
     return y
 
 
+def _draw_box(c, x, y_top, w, h, fill_rgb=(1, 1, 1), stroke_rgb=(0.86, 0.89, 0.96), radius=0.25 * cm, stroke=1):
+    c.setFillColorRGB(*fill_rgb)
+    c.setStrokeColorRGB(*stroke_rgb)
+    c.roundRect(x, y_top - h, w, h, radius, fill=1, stroke=stroke)
+
+
+def _normalize_items(items):
+    out = []
+    for it in items or []:
+        desc = _safe(it.get("description") or it.get("desc"))
+        qty = _fmt_qty(it.get("qty") or 1)
+
+        unit_price_cents = it.get("unit_price_cents")
+        if unit_price_cents is None:
+            unit_price_cents = _parse_price_to_cents(str(it.get("unit_price") or ""))
+
+        line_total_cents = int(it.get("line_total_cents") or 0)
+        if line_total_cents <= 0:
+            try:
+                line_total_cents = int(round(float(qty) * int(unit_price_cents or 0)))
+            except Exception:
+                line_total_cents = 0
+
+        out.append({
+            "left": f"{desc} ({qty}x)",
+            "right": _brl_from_cents(line_total_cents) if line_total_cents > 0 else "—"
+        })
+    return out
+
+
+def _normalize_stages(stages):
+    out = []
+    for st in stages or []:
+        title = _safe(st.get("title"))
+        amt = _brl_from_cents(int(st.get("amount_cents") or 0))
+        pct = st.get("percent")
+        if pct is not None:
+            out.append(f"{title}: {amt} ({pct}%)")
+        else:
+            out.append(f"{title}: {amt}")
+    return out
+
+
+def _normalize_terms(terms):
+    out = []
+    for t in terms or []:
+        t = _safe(t)
+        if t:
+            out.append(t)
+    return out
+
+
 # =========================
 # Header
 # =========================
 def _draw_header(c, width, height, is_pro: bool, brand_title: str, subtitle: str, logo_img=None):
-    # barra topo
     c.setFillColorRGB(0.06, 0.10, 0.18)
     c.roundRect(2 * cm, height - 2.55 * cm, width - 4 * cm, 1.75 * cm, 0.28 * cm, fill=1, stroke=0)
 
-    # logo / ícone
     if is_pro and logo_img is not None:
         try:
             c.drawImage(logo_img, 2.35 * cm, height - 2.25 * cm, 1.05 * cm, 1.05 * cm, mask="auto")
@@ -106,7 +189,6 @@ def _draw_header(c, width, height, is_pro: bool, brand_title: str, subtitle: str
         c.setFillColorRGB(0.31, 0.49, 1.00)
         c.roundRect(2.35 * cm, height - 2.15 * cm, 0.95 * cm, 0.95 * cm, 0.24 * cm, fill=1, stroke=0)
 
-    # título esquerdo
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 11.5)
     c.drawString(3.55 * cm, height - 1.88 * cm, brand_title)
@@ -116,10 +198,134 @@ def _draw_header(c, width, height, is_pro: bool, brand_title: str, subtitle: str
     if subtitle:
         c.drawString(3.55 * cm, height - 2.20 * cm, subtitle)
 
-    # título direita
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 14)
     c.drawRightString(width - 2.35 * cm, height - 1.90 * cm, "ORÇAMENTO")
+
+
+# =========================
+# Seções
+# =========================
+def _draw_paragraph_section(c, title, lines, x, y, w, width, height, draw_header_fn):
+    title_gap = 0.45 * cm
+    pad_x = 0.6 * cm
+    pad_y = 0.45 * cm
+    line_h = 12.5
+
+    idx = 0
+    first = True
+
+    while idx < len(lines):
+        title_text = title if first else f"{title} (continuação)"
+        y = _ensure_space(c, y, needed=2.4 * cm, width=width, height=height, draw_header_fn=draw_header_fn)
+
+        c.setFont("Helvetica-Bold", 10)
+        c.setFillColorRGB(0.06, 0.10, 0.18)
+        c.drawString(x, y, title_text)
+        y -= title_gap
+
+        available_h = y - 2.2 * cm
+        max_lines = max(1, int((available_h - (pad_y * 2)) / line_h))
+        chunk = lines[idx: idx + max_lines]
+        idx += len(chunk)
+
+        box_h = (pad_y * 2) + (len(chunk) * line_h) + 0.15 * cm
+        _draw_box(c, x, y, w, box_h, fill_rgb=(1, 1, 1), stroke_rgb=(0.86, 0.89, 0.96), stroke=1)
+
+        text_y = y - pad_y - 0.15 * cm
+        _draw_text_lines(c, chunk, x + pad_x, text_y, size=10, leading=line_h)
+
+        y -= box_h + 0.5 * cm
+        first = False
+
+    return y
+
+
+def _draw_list_section(c, title, rows, x, y, w, width, height, draw_header_fn, shaded=False):
+    title_gap = 0.45 * cm
+    pad_x = 0.6 * cm
+    pad_y = 0.45 * cm
+    row_h = 0.42 * cm
+
+    idx = 0
+    first = True
+
+    while idx < len(rows):
+        title_text = title if first else f"{title} (continuação)"
+        y = _ensure_space(c, y, needed=2.2 * cm, width=width, height=height, draw_header_fn=draw_header_fn)
+
+        c.setFont("Helvetica-Bold", 10)
+        c.setFillColorRGB(0.06, 0.10, 0.18)
+        c.drawString(x, y, title_text)
+        y -= title_gap
+
+        available_h = y - 2.2 * cm
+        max_rows = max(1, int((available_h - (pad_y * 2)) / (row_h + 2)))
+        chunk = rows[idx: idx + max_rows]
+        idx += len(chunk)
+
+        box_h = (pad_y * 2) + (len(chunk) * row_h) + 0.35 * cm
+        if shaded:
+            _draw_box(c, x, y, w, box_h, fill_rgb=(0.97, 0.98, 1.0), stroke_rgb=(0.97, 0.98, 1.0), stroke=0)
+        else:
+            _draw_box(c, x, y, w, box_h, fill_rgb=(1, 1, 1), stroke_rgb=(0.86, 0.89, 0.96), stroke=1)
+
+        yy = y - pad_y - 0.10 * cm
+        c.setFont("Helvetica", 9.2)
+        c.setFillColorRGB(0.12, 0.16, 0.26)
+        for ln in chunk:
+            c.drawString(x + pad_x, yy, "• " + ln[:110])
+            yy -= row_h
+
+        y -= box_h + 0.5 * cm
+        first = False
+
+    return y
+
+
+def _draw_items_section(c, title, rows, x, y, w, width, height, draw_header_fn):
+    title_gap = 0.45 * cm
+    pad_x = 0.6 * cm
+    pad_y = 0.45 * cm
+    row_h = 0.42 * cm
+    header_h = 0.55 * cm
+
+    idx = 0
+    first = True
+
+    while idx < len(rows):
+        title_text = title if first else f"{title} (continuação)"
+        y = _ensure_space(c, y, needed=2.6 * cm, width=width, height=height, draw_header_fn=draw_header_fn)
+
+        c.setFont("Helvetica-Bold", 10)
+        c.setFillColorRGB(0.06, 0.10, 0.18)
+        c.drawString(x, y, title_text)
+        y -= title_gap
+
+        available_h = y - 2.2 * cm
+        max_rows = max(1, int((available_h - (pad_y * 2) - header_h) / row_h))
+        chunk = rows[idx: idx + max_rows]
+        idx += len(chunk)
+
+        box_h = (pad_y * 2) + header_h + (len(chunk) * row_h) + 0.25 * cm
+        _draw_box(c, x, y, w, box_h, fill_rgb=(0.97, 0.98, 1.0), stroke_rgb=(0.97, 0.98, 1.0), stroke=0)
+
+        c.setFillColorRGB(0.12, 0.16, 0.26)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(x + pad_x, y - pad_y - 0.10 * cm, "Descrição")
+        c.drawRightString(x + w - pad_x, y - pad_y - 0.10 * cm, "Total")
+
+        yy = y - pad_y - header_h
+        c.setFont("Helvetica", 9.5)
+        for row in chunk:
+            c.drawString(x + pad_x, yy, row["left"][:70])
+            c.drawRightString(x + w - pad_x, yy, row["right"])
+            yy -= row_h
+
+        y -= box_h + 0.5 * cm
+        first = False
+
+    return y
 
 
 # =========================
@@ -141,7 +347,6 @@ def generate_proposal_pdf(data: dict) -> bytes:
         except Exception:
             logo_img = None
 
-    # marca
     company_name = _safe(data.get("company_name"))
     author_name = _safe(data.get("author_name"))
     phone = _safe(data.get("phone"))
@@ -162,10 +367,11 @@ def generate_proposal_pdf(data: dict) -> bytes:
     w = width - 4 * cm
     y = height - 3.4 * cm
 
-    # Dados
+    # =========================
+    # Dados principais
+    # =========================
     y = _ensure_space(c, y, needed=3.2 * cm, width=width, height=height, draw_header_fn=draw_header)
-    c.setFillColorRGB(0.97, 0.98, 1.0)
-    c.roundRect(x, y - 3.0 * cm, w, 3.0 * cm, 0.25 * cm, fill=1, stroke=0)
+    _draw_box(c, x, y, w, 3.0 * cm, fill_rgb=(0.97, 0.98, 1.0), stroke_rgb=(0.97, 0.98, 1.0), stroke=0)
 
     gen_dt = datetime.now().strftime("%d/%m/%Y %H:%M")
     emit = company_name or author_name or _safe(data.get("author_email"))
@@ -182,7 +388,6 @@ def generate_proposal_pdf(data: dict) -> bytes:
     proj = _safe(data.get("project_name")) or "-"
     deadline = _safe(data.get("deadline")) or "-"
 
-    # total
     total_cents = int(data.get("total_cents") or 0)
     if total_cents <= 0:
         total_cents = _parse_price_to_cents(data.get("price") or "")
@@ -191,7 +396,7 @@ def generate_proposal_pdf(data: dict) -> bytes:
     c.setFont("Helvetica-Bold", 10)
     c.drawString(x + 0.6 * cm, y - 1.35 * cm, "Cliente")
     c.setFont("Helvetica", 10)
-    c.drawString(x + 0.6 * cm, y - 1.85 * cm, client)
+    c.drawString(x + 0.6 * cm, y - 1.85 * cm, client[:60])
 
     c.setFont("Helvetica-Bold", 10)
     c.drawString(x + 0.6 * cm, y - 2.40 * cm, "Serviço")
@@ -210,136 +415,53 @@ def generate_proposal_pdf(data: dict) -> bytes:
 
     y -= 3.6 * cm
 
+    # =========================
     # Descrição
-    desc = _safe(data.get("description"))
-    y = _ensure_space(c, y, needed=2.9 * cm, width=width, height=height, draw_header_fn=draw_header)
+    # =========================
+    desc = _safe(data.get("description")) or "—"
+    desc_lines = _wrap_lines(desc, w - 1.2 * cm, font="Helvetica", size=10)
+    y = _draw_paragraph_section(c, "Descrição do serviço", desc_lines, x, y, w, width, height, draw_header)
 
-    c.setFont("Helvetica-Bold", 10)
-    c.setFillColorRGB(0.06, 0.10, 0.18)
-    c.drawString(x, y, "Descrição do serviço")
-    y -= 0.45 * cm
-
-    c.setFillColorRGB(1, 1, 1)
-    c.setStrokeColorRGB(0.86, 0.89, 0.96)
-    c.roundRect(x, y - 2.35 * cm, w, 2.35 * cm, 0.25 * cm, fill=1, stroke=1)
-
-    y_text = y - 0.55 * cm
-    y_text = _wrap_draw(c, desc or "—", x + 0.6 * cm, y_text, w - 1.2 * cm, size=10, leading=12.5)
-    y -= 2.85 * cm
-
+    # =========================
     # Itens
-    items = data.get("items") or []
-    if isinstance(items, list) and len(items) > 0:
-        y = _ensure_space(c, y, needed=3.4 * cm, width=width, height=height, draw_header_fn=draw_header)
-        c.setFont("Helvetica-Bold", 10)
-        c.setFillColorRGB(0.06, 0.10, 0.18)
-        c.drawString(x, y, "Itens")
-        y -= 0.45 * cm
+    # =========================
+    items_rows = _normalize_items(data.get("items") or [])
+    if items_rows:
+        y = _draw_items_section(c, "Itens", items_rows, x, y, w, width, height, draw_header)
 
-        c.setFillColorRGB(0.97, 0.98, 1.0)
-        c.roundRect(x, y - 2.4 * cm, w, 2.4 * cm, 0.25 * cm, fill=1, stroke=0)
-
-        c.setFillColorRGB(0.12, 0.16, 0.26)
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(x + 0.6 * cm, y - 0.55 * cm, "Descrição")
-        c.drawRightString(x + w - 0.6 * cm, y - 0.55 * cm, "Total")
-
-        yy = y - 1.05 * cm
-        c.setFont("Helvetica", 9.5)
-
-        for it in items[:6]:
-            d = _safe(it.get("description") or it.get("desc"))
-            qty = _fmt_qty(it.get("qty") or 1)
-            unit_price_cents = int(it.get("unit_price_cents") or it.get("unit_price") or 0)
-            line_total_cents = int(it.get("line_total_cents") or 0)
-
-            if line_total_cents <= 0:
-                try:
-                    line_total_cents = int(round(float(qty) * unit_price_cents))
-                except Exception:
-                    line_total_cents = 0
-
-            left = f"{d} ({qty}x)"
-            right = _brl_from_cents(line_total_cents) if line_total_cents > 0 else "—"
-
-            c.drawString(x + 0.6 * cm, yy, left[:65])
-            c.drawRightString(x + w - 0.6 * cm, yy, right)
-            yy -= 0.42 * cm
-            if yy < y - 2.1 * cm:
-                break
-
-        y -= 2.85 * cm
-
+    # =========================
     # Como pagar
-    stages = data.get("payment_stages") or []
-    if isinstance(stages, list) and len(stages) > 0:
-        y = _ensure_space(c, y, needed=2.2 * cm, width=width, height=height, draw_header_fn=draw_header)
-        c.setFont("Helvetica-Bold", 10)
-        c.setFillColorRGB(0.06, 0.10, 0.18)
-        c.drawString(x, y, "Como pagar")
-        y -= 0.45 * cm
+    # =========================
+    stage_rows = _normalize_stages(data.get("payment_stages") or [])
+    if stage_rows:
+        y = _draw_list_section(c, "Como pagar", stage_rows, x, y, w, width, height, draw_header, shaded=False)
 
-        c.setFillColorRGB(1, 1, 1)
-        c.setStrokeColorRGB(0.86, 0.89, 0.96)
-        c.roundRect(x, y - 1.35 * cm, w, 1.35 * cm, 0.25 * cm, fill=1, stroke=1)
-
-        yy = y - 0.55 * cm
-        c.setFont("Helvetica", 9.5)
-        c.setFillColorRGB(0.12, 0.16, 0.26)
-
-        for st in stages[:4]:
-            title = _safe(st.get("title"))
-            amt = _brl_from_cents(int(st.get("amount_cents") or 0))
-            pct = st.get("percent")
-            if pct is not None:
-                ln = f"{title}: {amt} ({pct}%)"
-            else:
-                ln = f"{title}: {amt}"
-            c.drawString(x + 0.6 * cm, yy, "• " + ln[:95])
-            yy -= 0.42 * cm
-
-        y -= 1.85 * cm
-
+    # =========================
     # Condições
-    terms = data.get("payment_terms") or []
-    if isinstance(terms, list) and len(terms) > 0:
-        y = _ensure_space(c, y, needed=2.2 * cm, width=width, height=height, draw_header_fn=draw_header)
-        c.setFont("Helvetica-Bold", 10)
-        c.setFillColorRGB(0.06, 0.10, 0.18)
-        c.drawString(x, y, "Condições")
-        y -= 0.45 * cm
+    # =========================
+    terms_rows = _normalize_terms(data.get("payment_terms") or [])
+    if terms_rows:
+        y = _draw_list_section(c, "Condições", terms_rows, x, y, w, width, height, draw_header, shaded=True)
 
-        c.setFillColorRGB(0.97, 0.98, 1.0)
-        c.roundRect(x, y - 1.5 * cm, w, 1.5 * cm, 0.25 * cm, fill=1, stroke=0)
-
-        yy = y - 0.55 * cm
-        c.setFont("Helvetica", 9.2)
-        c.setFillColorRGB(0.12, 0.16, 0.26)
-
-        for ln in terms[:4]:
-            c.drawString(x + 0.6 * cm, yy, "• " + _safe(ln)[:95])
-            yy -= 0.40 * cm
-
-        y -= 1.85 * cm
-
-    # Aceite online
+    # =========================
+    # Aceite online / Rodapé
+    # =========================
     accept_url = _safe(data.get("accept_url"))
+    footer_y = 2.1 * cm
+
     if accept_url:
         c.setFont("Helvetica-Bold", 9.3)
         c.setFillColorRGB(0.06, 0.10, 0.18)
-        c.drawString(x, 2.35 * cm, "Aceite online:")
+        c.drawString(x, footer_y + 0.25 * cm, "Aceite online:")
         c.setFont("Helvetica", 8.6)
         c.setFillColorRGB(0.12, 0.16, 0.26)
-        c.drawString(x, 1.95 * cm, accept_url[:110])
+        c.drawString(x, footer_y - 0.15 * cm, accept_url[:110])
 
-    # Rodapé (apenas FREE)
     if not is_pro:
         c.setFont("Helvetica", 8)
         c.setFillColorRGB(0.45, 0.50, 0.62)
         c.drawRightString(width - 2 * cm, 1.15 * cm, "Gerado com PropoFlow • Remova no PRO")
 
-    c.showPage()
     c.save()
-
     buffer.seek(0)
     return buffer.getvalue()

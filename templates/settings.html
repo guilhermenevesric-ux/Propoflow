@@ -30,6 +30,7 @@
         Salvo com sucesso ✅
       </div>
     {% endif %}
+
     {% if error %}
       <div class="error">{{ error }}</div>
     {% endif %}
@@ -51,12 +52,12 @@
         </div>
         <div>
           <label>Forma de pagamento padrão</label>
+          {% set plan = user.default_payment_plan or "avista" %}
           <select name="default_payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
-            {% set plan = user.default_payment_plan or "avista" %}
-            <option value="avista" {% if plan=="avista" %}selected{% endif %}>À vista</option>
-            <option value="entrada_final_30" {% if plan=="entrada_final_30" %}selected{% endif %}>Entrada + na entrega (30/70)</option>
-            <option value="entrada_final_50" {% if plan=="entrada_final_50" %}selected{% endif %}>Entrada + na entrega (50/50)</option>
-            <option value="3x_30_40_30" {% if plan=="3x_30_40_30" %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+            <option value="avista" {% if plan == "avista" %}selected{% endif %}>À vista</option>
+            <option value="entrada_final_30" {% if plan == "entrada_final_30" %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+            <option value="entrada_final_50" {% if plan == "entrada_final_50" %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+            <option value="3x_30_40_30" {% if plan == "3x_30_40_30" %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
           </select>
         </div>
       </div>

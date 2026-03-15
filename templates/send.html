@@ -32,10 +32,10 @@
 
     <div class="actions" style="flex-wrap:wrap;">
       <button class="btn" type="button" onclick="copyLink()">Copiar link</button>
-      <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf" target="_blank">Baixar PDF</a>
+      <a class="btn btn-ghost" href="/proposals/{{ p.id }}/pdf" target="_blank" rel="noopener noreferrer">Baixar PDF</a>
 
       {% if wa_url %}
-        <a class="btn btn-ghost" href="{{ wa_url }}" target="_blank">Enviar WhatsApp</a>
+        <a class="btn btn-ghost" href="{{ wa_url }}" target="_blank" rel="noopener noreferrer">Enviar WhatsApp</a>
       {% else %}
         <button class="btn btn-ghost" type="button" onclick="copyMsg()">Copiar msg WhatsApp</button>
       {% endif %}

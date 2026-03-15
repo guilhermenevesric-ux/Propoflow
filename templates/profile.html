@@ -67,26 +67,10 @@
 
         <br><br>
 
-        {% if user and user.plan == "pro" %}
-  <h3>Logo (PRO)</h3>
-  <p class="small">Opcional. Se não quiser, pode ignorar.</p>
-
-  <label>Enviar novo logo</label>
-  <input type="file" name="logo" accept="image/png,image/jpeg">
-
-  <p class="small">Dica: use PNG/JPG. O sistema ajusta automaticamente.</p>
-{% else %}
-  <h3>Logo (PRO)</h3>
-  <p class="small">
-    Disponível apenas no plano PRO para reforçar sua marca no PDF e link público.
-  </p>
-  <a class="btn btn-ghost" href="/pricing">Ver PRO</a>
-{% endif %}
-
         {% if user.logo_b64 %}
           <div class="card" style="padding:14px; margin-bottom:10px;">
             <div class="small">Logo atual:</div>
-            <img src="data:{{ user.logo_mime }};base64,{{ user.logo_b64 }}" style="max-width:140px; border-radius:12px; margin-top:10px;">
+            <img src="data:{{ user.logo_mime }};base64,{{ user.logo_b64 }}" alt="Logo atual" style="max-width:140px; border-radius:12px; margin-top:10px;">
             <div style="margin-top:10px;">
               <label style="display:flex; gap:8px; align-items:center;">
                 <input type="checkbox" name="remove_logo" value="1">
@@ -96,12 +80,23 @@
           </div>
         {% endif %}
 
-        <label>Enviar novo logo</label>
-        <input type="file" name="logo" accept="image/png,image/jpeg">
+        {% if user and user.plan == "pro" %}
+          <h3>Logo (PRO)</h3>
+          <p class="small">Opcional. Se não quiser, pode ignorar.</p>
 
-        <p class="small" style="opacity:.8; margin-top:8px;">
-          Dica: use uma imagem simples (PNG/JPG). O sistema ajusta o tamanho automaticamente.
-        </p>
+          <label>Enviar novo logo</label>
+          <input type="file" name="logo" accept="image/png,image/jpeg">
+
+          <p class="small" style="opacity:.8; margin-top:8px;">
+            Dica: use uma imagem simples (PNG/JPG). O sistema ajusta o tamanho automaticamente.
+          </p>
+        {% else %}
+          <h3>Logo (PRO)</h3>
+          <p class="small">
+            Disponível apenas no plano PRO para reforçar sua marca no PDF e link público.
+          </p>
+          <a class="btn btn-ghost" href="/pricing">Ver PRO</a>
+        {% endif %}
 
         <br>
         <button class="btn" type="submit">Salvar</button>

@@ -40,32 +40,25 @@
       </select>
 
       <div style="height:12px;"></div>
-<label>Cliente salvo (opcional)</label>
-<select name="client_id" id="clientSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
-  <option value="0">Escolher...</option>
-  {% for c in clients %}
-    <option value="{{ c.id }}" {% if selected_client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
-  {% endfor %}
-</select>
-<div style="height:12px;"></div>
 
-<script>
-document.getElementById('clientSelect').addEventListener('change', function(){
-  const id = this.value;
-  const url = new URL(window.location.href);
-  if(id && id !== "0") url.searchParams.set('client_id', id);
-  else url.searchParams.delete('client_id');
-  window.location.href = url.toString();
-});
-</script>
+      <label>Cliente salvo (opcional)</label>
+      <select name="client_id" id="clientSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+        <option value="0">Escolher...</option>
+        {% for c in clients %}
+          <option value="{{ c.id }}" {% if selected_client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+
+      <div style="height:12px;"></div>
+
       <div class="row">
         <div>
           <label>Nome do cliente</label>
-          <input name="client_name" required placeholder="Ex: Maria Silva">
+          <input name="client_name" required value="{{ prefill.client_name or '' }}" placeholder="Ex: Maria Silva">
         </div>
         <div>
           <label>WhatsApp do cliente (opcional)</label>
-          <input name="client_whatsapp" placeholder="Ex: (11) 99999-9999">
+          <input name="client_whatsapp" value="{{ prefill.client_whatsapp or '' }}" placeholder="Ex: (11) 99999-9999">
         </div>
       </div>
 
@@ -116,11 +109,13 @@ document.getElementById('clientSelect').addEventListener('change', function(){
 
           {% for i in range(0,5) %}
           <tr>
-            <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
+            <td>
+              <input name="item_desc" placeholder="Ex: Serviço..." />
+              <input type="hidden" name="item_unit" value="un">
+            </td>
             <td><input name="item_qty" placeholder="1" /></td>
             <td><input name="item_unit_price" placeholder="100" /></td>
             <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
-            <input type="hidden" name="item_unit" value="un">
           </tr>
           {% endfor %}
         </table>
@@ -135,10 +130,10 @@ document.getElementById('clientSelect').addEventListener('change', function(){
 
       <h3 class="h2" style="font-size:15px;">Como pagar (opcional)</h3>
       <select name="payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
-        <option value="avista" {% if prefill.payment_plan=='avista' %}selected{% endif %}>À vista</option>
-        <option value="entrada_final_30" {% if prefill.payment_plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
-        <option value="entrada_final_50" {% if prefill.payment_plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
-        <option value="3x_30_40_30" {% if prefill.payment_plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+        <option value="avista" {% if prefill.payment_plan == 'avista' %}selected{% endif %}>À vista</option>
+        <option value="entrada_final_30" {% if prefill.payment_plan == 'entrada_final_30' or not prefill.payment_plan %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+        <option value="entrada_final_50" {% if prefill.payment_plan == 'entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+        <option value="3x_30_40_30" {% if prefill.payment_plan == '3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
       </select>
 
       <div style="height:16px;"></div>
@@ -150,43 +145,76 @@ document.getElementById('clientSelect').addEventListener('change', function(){
 <script>
   function brl(n){
     try{
-      const v = (Math.round(n*100)/100).toFixed(2).replace('.', ',');
+      const v = (Math.round(n * 100) / 100).toFixed(2).replace('.', ',');
       return 'R$ ' + v;
-    }catch(e){ return 'R$ 0,00'; }
+    }catch(e){
+      return 'R$ 0,00';
+    }
   }
+
   function parseNum(v){
+    if(v == null) return 0;
+    v = String(v).trim();
     if(!v) return 0;
-    v = (''+v).replace(/\./g,'').replace(',', '.');
+
+    v = v.replace(/\s/g, '').replace(/R\$\s?/gi, '');
+
+    const hasComma = v.includes(',');
+    const hasDot = v.includes('.');
+
+    if(hasComma && hasDot){
+      if(v.lastIndexOf(',') > v.lastIndexOf('.')){
+        v = v.replace(/\./g, '').replace(',', '.');
+      }else{
+        v = v.replace(/,/g, '');
+      }
+    }else if(hasComma){
+      v = v.replace(',', '.');
+    }
+
+    v = v.replace(/[^\d.-]/g, '');
+
     const n = parseFloat(v);
     return isNaN(n) ? 0 : n;
   }
+
   function recalc(){
     const rows = document.querySelectorAll('#itemsTable tr');
     let total = 0;
+
     rows.forEach((tr, idx) => {
       if(idx === 0) return;
+
       const inputs = tr.querySelectorAll('input');
       if(inputs.length < 3) return;
+
       const desc = inputs[0].value.trim();
-      const qty = parseNum(inputs[1].value) || 0;
-      const unit = parseNum(inputs[2].value) || 0;
+      const qty = parseNum(inputs[2]?.name === 'item_unit' ? inputs[1].value : inputs[1].value) || 0;
+      const unit = parseNum(inputs[2]?.name === 'item_unit' ? inputs[3]?.value : inputs[2].value) || 0;
+
       let line = 0;
       if(desc && qty > 0 && unit > 0) line = qty * unit;
+
       const td = tr.querySelector('.lineTotal');
       if(td) td.textContent = brl(line);
+
       total += line;
     });
+
     document.getElementById('totalEstimado').textContent = brl(total);
   }
+
   function addRow(){
     const table = document.getElementById("itemsTable");
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><input name="item_desc" placeholder="Ex: Serviço..." /></td>
+      <td>
+        <input name="item_desc" placeholder="Ex: Serviço..." />
+        <input type="hidden" name="item_unit" value="un">
+      </td>
       <td><input name="item_qty" placeholder="1" /></td>
       <td><input name="item_unit_price" placeholder="100" /></td>
       <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
-      <input type="hidden" name="item_unit" value="un">
     `;
     table.appendChild(tr);
   }
@@ -202,6 +230,14 @@ document.getElementById('clientSelect').addEventListener('change', function(){
     const url = new URL(window.location.href);
     if(id && id !== "0") url.searchParams.set('service_id', id);
     else url.searchParams.delete('service_id');
+    window.location.href = url.toString();
+  });
+
+  document.getElementById('clientSelect').addEventListener('change', function(){
+    const id = this.value;
+    const url = new URL(window.location.href);
+    if(id && id !== "0") url.searchParams.set('client_id', id);
+    else url.searchParams.delete('client_id');
     window.location.href = url.toString();
   });
 

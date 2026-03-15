@@ -59,7 +59,10 @@
 
       {% if qr_image %}
         <div style="display:flex; justify-content:center;">
-          <img src="data:image/png;base64,{{ qr_image }}" style="max-width:280px; width:100%; border-radius:16px; border:1px solid rgba(255,255,255,0.12);">
+          <img
+            src="data:image/png;base64,{{ qr_image }}"
+            alt="QR Code Pix"
+            style="max-width:280px; width:100%; border-radius:16px; border:1px solid rgba(255,255,255,0.12);">
         </div>
       {% else %}
         <p class="small">Não consegui gerar o QR agora. Tente “Gerar novo QR”.</p>
@@ -72,15 +75,13 @@
 
       <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" type="button" onclick="copyPix()">Copiar Pix</button>
-
         <a class="btn btn-ghost" href="/upgrade/pro/pix?refresh=1">Gerar novo QR</a>
-
         <a class="btn" href="/upgrade/pro/pix/check?sub={{ sub_id }}&pay={{ pay_id }}">Já paguei</a>
       </div>
 
       <p class="small" id="autoStatus" style="margin-top:10px; opacity:.8;">
-  Estamos verificando o pagamento automaticamente…
-</p>
+        Estamos verificando o pagamento automaticamente…
+      </p>
 
       <p class="small" style="margin-top:10px; opacity:.75;">
         Se o pagamento foi aprovado, o PRO libera automaticamente (webhook). Se demorar, clique em “Já paguei”.
@@ -114,13 +115,13 @@ function copyPix(){
   if(!payId) return;
 
   let tries = 0;
-  const maxTries = 45; // ~7-8 min (45 * 10s)
+  const maxTries = 45;
 
   async function check(){
     tries++;
     try{
       const res = await fetch(`/upgrade/pro/pix/status?pay=${encodeURIComponent(payId)}&sub=${encodeURIComponent(subId)}`, {
-        headers: { "accept": "application/json" }
+        headers: { accept: "application/json" }
       });
       const data = await res.json();
 
@@ -139,7 +140,7 @@ function copyPix(){
     }
 
     if(tries < maxTries){
-      setTimeout(check, 10000); // 10s
+      setTimeout(check, 10000);
     }else{
       if(el) el.textContent = "Se você já pagou, clique em “Já paguei” para atualizar.";
     }

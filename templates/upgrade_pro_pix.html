@@ -26,7 +26,7 @@
 
   <div class="card">
     <h2 class="h2">Pague com Pix para liberar o PRO</h2>
-    <a class="btn btn-ghost" href="/upgrade/pro/pix/status?pay={{ pay_id }}&redirect=1">Já paguei</a>
+    <a class="btn btn-ghost" href="/upgrade/pro/pix/status?pay={{ pay_id }}&sub={{ sub_id }}&redirect=1">Já paguei</a>
 
     {% if error %}
       <div class="error">{{ error }}</div>
@@ -82,7 +82,10 @@
   function copyPix(){
     const el = document.getElementById("pix");
     const txt = (el && el.value) ? el.value : "";
-    if(!txt){ alert("Pix não disponível."); return; }
+    if(!txt){
+      alert("Pix não disponível.");
+      return;
+    }
     navigator.clipboard.writeText(txt);
     alert("Pix copiado!");
   }

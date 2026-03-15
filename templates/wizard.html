@@ -33,7 +33,6 @@
       <div class="error">{{ error }}</div>
     {% endif %}
 
-    <!-- PASSO 1: CLIENTE -->
     {% if step == 1 %}
       <h2 class="h2">Quem é o cliente?</h2>
       <p class="small">Escolha um cliente salvo ou digite na hora.</p>
@@ -59,7 +58,7 @@
                 style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           <option value="0">Escolher...</option>
           {% for c in clients %}
-            <option value="{{ c.id }}" {% if client_id and (client_id|string)==(c.id|string) %}selected{% endif %}>{{ c.name }}</option>
+            <option value="{{ c.id }}" {% if client_id and (client_id|string) == (c.id|string) %}selected{% endif %}>{{ c.name }}</option>
           {% endfor %}
         </select>
 
@@ -90,7 +89,6 @@
       </script>
     {% endif %}
 
-    <!-- PASSO 2: SERVIÇO -->
     {% if step == 2 %}
       <h2 class="h2">Qual é o serviço?</h2>
       <p class="small">Escolha um serviço salvo (recomendado) ou digite do zero.</p>
@@ -118,7 +116,7 @@
                 style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           <option value="0">Escolher...</option>
           {% for s in services %}
-            <option value="{{ s.id }}" {% if service_id and (service_id|string)==(s.id|string) %}selected{% endif %}>{{ s.title }}</option>
+            <option value="{{ s.id }}" {% if service_id and (service_id|string) == (s.id|string) %}selected{% endif %}>{{ s.title }}</option>
           {% endfor %}
         </select>
 
@@ -194,10 +192,10 @@
         <select name="payment_plan"
                 style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           {% set plan = (payment_plan or default_payment_plan or 'avista') %}
-          <option value="avista" {% if plan=='avista' %}selected{% endif %}>À vista</option>
-          <option value="entrada_final_30" {% if plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
-          <option value="entrada_final_50" {% if plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
-          <option value="3x_30_40_30" {% if plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+          <option value="avista" {% if plan == 'avista' %}selected{% endif %}>À vista</option>
+          <option value="entrada_final_30" {% if plan == 'entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+          <option value="entrada_final_50" {% if plan == 'entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+          <option value="3x_30_40_30" {% if plan == '3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
         </select>
 
         <div style="height:14px;"></div>
@@ -219,12 +217,32 @@
         }
 
         function brl(n){
-          const v = (Math.round((n || 0)*100)/100).toFixed(2).replace('.', ',');
+          const v = (Math.round((n || 0) * 100) / 100).toFixed(2).replace('.', ',');
           return 'R$ ' + v;
         }
+
         function parseNum(v){
-          if(v === null || v === undefined) return 0;
-          v = (''+v).trim().replace(/\./g,'').replace(',', '.');
+          if(v == null) return 0;
+          v = String(v).trim();
+          if(!v) return 0;
+
+          v = v.replace(/\s/g, '').replace(/R\$\s?/gi, '');
+
+          const hasComma = v.includes(',');
+          const hasDot = v.includes('.');
+
+          if(hasComma && hasDot){
+            if(v.lastIndexOf(',') > v.lastIndexOf('.')){
+              v = v.replace(/\./g, '').replace(',', '.');
+            }else{
+              v = v.replace(/,/g, '');
+            }
+          }else if(hasComma){
+            v = v.replace(',', '.');
+          }
+
+          v = v.replace(/[^\d.-]/g, '');
+
           const n = parseFloat(v);
           return isNaN(n) ? 0 : n;
         }
@@ -280,7 +298,6 @@
       </script>
     {% endif %}
 
-    <!-- PASSO 3: REVISÃO -->
     {% if step == 3 %}
       <h2 class="h2">Revisar e criar</h2>
       <p class="small">Confira. Se estiver ok, crie o orçamento.</p>
@@ -332,13 +349,11 @@
         <input type="hidden" name="deadline" value="{{ (deadline or '')|e }}">
         <input type="hidden" name="price" value="{{ (price or '')|e }}">
 
-        <!-- compat: manda os dois nomes -->
         <input type="hidden" name="valid_days" value="{{ valid_days or validity_days or 7 }}">
         <input type="hidden" name="validity_days" value="{{ valid_days or validity_days or 7 }}">
 
         <input type="hidden" name="payment_plan" value="{{ (payment_plan or '')|e }}">
 
-        <!-- descrição em textarea hidden pra não quebrar com quebras de linha -->
         <textarea name="description" style="display:none;">{{ description or '' }}</textarea>
 
         {% if items and items|length > 0 %}

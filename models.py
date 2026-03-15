@@ -1,22 +1,24 @@
+from datetime import datetime
+import uuid
+
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float
 from sqlalchemy.orm import relationship
-from datetime import datetime
-from db import Base
-import uuid
 from sqlalchemy.sql import func
+
+from db import Base
+
 
 class User(Base):
     __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
 
     email_verified = Column(Boolean, default=False)
     email_verify_code_hash = Column(String(255), nullable=True)
     email_verify_expires_at = Column(DateTime, nullable=True)
     email_verify_last_sent_at = Column(DateTime, nullable=True)
-
-
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
 
     display_name = Column(String(255), nullable=True)
     company_name = Column(String(255), nullable=True)
@@ -27,7 +29,7 @@ class User(Base):
     pix_key = Column(String(120), nullable=True)
     pix_name = Column(String(120), nullable=True)
 
-    plan = Column(String(20), default="free")          # free | pro
+    plan = Column(String(20), default="free")  # free | pro
     proposal_limit = Column(Integer, default=5)
     delete_credits = Column(Integer, default=1)
 
@@ -38,24 +40,18 @@ class User(Base):
 
     plan_updated_at = Column(DateTime, nullable=True)
 
-    proposals = relationship("Proposal", back_populates="owner")
-    sessions = relationship("UserSession", back_populates="user")
-    services = relationship("Service", back_populates="owner", cascade="all, delete-orphan")
-
-    default_validity_days = Column(Integer, default=7)
-    default_payment_plan = Column(String(40), default="avista")  # avista/entrada_final_30/...
-    default_message_template = Column(Text, nullable=True)       # msg padrão WhatsApp
-    default_terms = Column(Text, nullable=True, default="")
-
-    # Defaults do usuário (precisam estar DENTRO da classe)
     default_validity_days = Column(Integer, default=7)
     default_payment_plan = Column(String(40), default="avista")
     default_message_template = Column(Text, nullable=True)
     default_terms = Column(Text, nullable=True, default="")
 
-    # Logo PRO (precisa existir no banco e no model)
     logo_mime = Column(String(64), nullable=True)
     logo_b64 = Column(Text, nullable=True)
+
+    proposals = relationship("Proposal", back_populates="owner")
+    sessions = relationship("UserSession", back_populates="user")
+    services = relationship("Service", back_populates="owner", cascade="all, delete-orphan")
+
 
 class UserSession(Base):
     __tablename__ = "user_sessions"
@@ -87,6 +83,7 @@ class Client(Base):
     owner = relationship("User")
     proposals = relationship("Proposal", back_populates="client")
 
+
 class Service(Base):
     """
     Catálogo pessoal do usuário (universal).
@@ -97,11 +94,11 @@ class Service(Base):
     id = Column(Integer, primary_key=True, index=True)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
-    title = Column(String(160), nullable=False)                # nome do serviço
-    default_description = Column(Text, nullable=True)          # "o que será feito"
-    default_price_cents = Column(Integer, default=0)           # preço sugerido
-    default_deadline = Column(String(100), nullable=True)      # prazo sugerido
-    default_payment_plan = Column(String(40), default="avista")  # avista/entrada_final_30/etc (opcional)
+    title = Column(String(160), nullable=False)
+    default_description = Column(Text, nullable=True)
+    default_price_cents = Column(Integer, default=0)
+    default_deadline = Column(String(100), nullable=True)
+    default_payment_plan = Column(String(40), default="avista")
     favorite = Column(Boolean, default=False)
     archived = Column(Boolean, default=False)
 
@@ -125,7 +122,7 @@ class Proposal(Base):
 
     project_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
-    terms_text = Column(Text, nullable=True)  # condições congeladas deste orçamento
+    terms_text = Column(Text, nullable=True)
 
     price = Column(String(50), nullable=False, default="")
     deadline = Column(String(100), nullable=False)
@@ -150,9 +147,6 @@ class Proposal(Base):
     accepted_at = Column(DateTime, nullable=True)
     accepted_name = Column(String(255), nullable=True)
     accepted_email = Column(String(255), nullable=True)
-    view_count = Column(Integer, default=0)
-    first_viewed_at = Column(DateTime, nullable=True)
-    last_viewed_at = Column(DateTime, nullable=True)
 
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     owner = relationship("User", back_populates="proposals")
@@ -207,26 +201,25 @@ class PaymentStage(Base):
 
     proposal = relationship("Proposal", back_populates="payment_stages")
 
+
 class Event(Base):
-        __tablename__ = "events"
+    __tablename__ = "events"
 
-        id = Column(Integer, primary_key=True)
-        created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-        # evento (landing_view, register_success etc)
-        name = Column(String(80), nullable=False, index=True)
+    # evento (landing_view, register_success etc)
+    name = Column(String(80), nullable=False, index=True)
 
-        # contexto
-        path = Column(String(255), nullable=True)
-        user_id = Column(Integer, nullable=True, index=True)
-        proposal_id = Column(Integer, nullable=True, index=True)
+    # contexto
+    path = Column(String(255), nullable=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    proposal_id = Column(Integer, nullable=True, index=True)
 
-        # request info (bem útil pra debug de campanha)
-        ip = Column(String(64), nullable=True)
-        ua = Column(String(255), nullable=True)
-        ref = Column(String(512), nullable=True)
+    # request info
+    ip = Column(String(64), nullable=True)
+    ua = Column(String(255), nullable=True)
+    ref = Column(String(512), nullable=True)
 
-        # JSON string com utm/ttclid e extras
-        meta = Column(Text, nullable=True)
-
-
+    # JSON string com utm/ttclid e extras
+    meta = Column(Text, nullable=True)
