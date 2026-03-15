@@ -38,6 +38,7 @@
       {% endif %}
 
       <form method="post" action="/services/new">
+        {{ csrf_input(request) }}
         <label>Nome do serviço</label>
         <input name="title" required placeholder="Ex: Faxina 2 quartos / Limpeza de sofá 3 lugares">
 
@@ -105,6 +106,7 @@
                   <a class="btn" href="/wizard?step=2&service_id={{ s.id }}">Usar</a>
 
                   <form method="post" action="/services/{{ s.id }}/favorite" style="display:inline;">
+                    {{ csrf_input(request) }}
                     <button class="btn btn-ghost" type="submit" title="Favoritar">
                       {% if s.favorite %}⭐{% else %}☆{% endif %}
                     </button>
@@ -114,6 +116,7 @@
                     <summary class="btn btn-ghost" style="cursor:pointer;">Editar</summary>
                     <div style="margin-top:10px;">
                       <form method="post" action="/services/{{ s.id }}/update">
+                        {{ csrf_input(request) }}
                         <label>Nome</label>
                         <input name="title" value="{{ s.title }}" required>
 
@@ -152,6 +155,7 @@
 
                       <form method="post" action="/services/{{ s.id }}/delete" style="margin-top:10px;"
                             onsubmit="return confirm('Remover este serviço da lista?');">
+                        {{ csrf_input(request) }}
                         <button class="btn btn-ghost" type="submit">Remover</button>
                       </form>
                     </div>

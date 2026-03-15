@@ -37,6 +37,7 @@
       {% endif %}
 
       <form method="post" action="/profile" enctype="multipart/form-data">
+        {{ csrf_input(request) }}
         <label>Seu nome (responsável)</label>
         <input name="display_name" placeholder="Ex: João Silva" value="{{ user.display_name or '' }}">
 

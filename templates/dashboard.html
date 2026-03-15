@@ -407,6 +407,7 @@
       <a id="pfDuplicate" href="#">Duplicar</a>
 
       <form id="pfDeleteForm" method="post" action="#" onsubmit="return confirm('Tem certeza que deseja excluir este orçamento?');">
+        {{ csrf_input(request) }}
         <button class="pf-danger" type="submit">Excluir</button>
       </form>
 

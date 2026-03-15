@@ -13,6 +13,10 @@ from PIL import Image
 from reportlab.lib.utils import ImageReader
 from models import Event
 
+import hmac
+from urllib.parse import urlparse
+from markupsafe import Markup, escape
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 import base64
 import hashlib
 import io
@@ -160,8 +164,86 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["csrf_input"] = csrf_input
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+if COOKIE_SECURE:
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+
+@app.middleware("http")
+async def csrf_and_security_headers_middleware(request: Request, call_next):
+        method = request.method.upper()
+        path = request.url.path
+
+        existing_csrf = request.cookies.get(CSRF_COOKIE)
+        csrf_token = existing_csrf or _new_csrf_token()
+        request.state.csrf_token = csrf_token
+
+        is_exempt = path.startswith("/static") or path == "/favicon.ico" or any(
+            path.startswith(prefix) for prefix in CSRF_EXEMPT_PREFIXES
+        )
+
+        if method in STATE_CHANGING_METHODS and not is_exempt:
+            sent_token = request.headers.get("x-csrf-token")
+
+            if not sent_token:
+                ctype = (request.headers.get("content-type") or "").lower()
+                if "application/x-www-form-urlencoded" in ctype or "multipart/form-data" in ctype:
+                    try:
+                        form = await request.form()
+                        sent_token = form.get(CSRF_FORM_FIELD)
+                    except Exception:
+                        sent_token = None
+
+            valid_by_token = bool(
+                existing_csrf and sent_token and hmac.compare_digest(str(existing_csrf), str(sent_token))
+            )
+            valid_by_origin = _same_origin_ok(request)
+
+            if not (valid_by_token or valid_by_origin):
+                return HTMLResponse("Sessão inválida. Atualize a página e tente novamente.", status_code=403)
+
+        response = await call_next(request)
+
+        if not existing_csrf or existing_csrf != csrf_token:
+            response.set_cookie(
+                CSRF_COOKIE,
+                csrf_token,
+                httponly=True,
+                secure=COOKIE_SECURE,
+                samesite="strict",
+                max_age=60 * 60 * 24 * 30,
+                path="/",
+            )
+
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy",
+                                    "camera=(), microphone=(), geolocation=(), interest-cohort=()")
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "img-src 'self' data: https:; "
+            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'; "
+            "frame-ancestors 'none';"
+        )
+
+        if COOKIE_SECURE:
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+
+        ctype = (response.headers.get("content-type") or "").lower()
+        if request.cookies.get(SESSION_COOKIE) and ctype.startswith("text/html"):
+            response.headers.setdefault("Cache-Control", "no-store")
+
+        return response
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -226,6 +308,65 @@ COOKIE_SECURE = True if APP_BASE_URL.startswith("https://") else False
 ASAAS_API_KEY = os.getenv("ASAAS_API_KEY", "").strip()
 ASAAS_ENV = os.getenv("ASAAS_ENV", "sandbox").strip().lower()
 ASAAS_WEBHOOK_TOKEN = os.getenv("ASAAS_WEBHOOK_TOKEN", "").strip()
+
+CSRF_COOKIE = "csrf_token"
+CSRF_FORM_FIELD = "_csrf"
+STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+CSRF_EXEMPT_PREFIXES = ("/webhooks/",)
+
+
+def _new_csrf_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def _target_origin(request: Request) -> str:
+    if APP_BASE_URL:
+        p = urlparse(APP_BASE_URL)
+        return f"{p.scheme}://{p.netloc}"
+    p = urlparse(str(request.base_url))
+    return f"{p.scheme}://{p.netloc}"
+
+
+def _origin_from_header(value: str | None) -> str | None:
+    if not value:
+        return None
+    p = urlparse(value)
+    if not p.scheme or not p.netloc:
+        return None
+    return f"{p.scheme}://{p.netloc}"
+
+
+def _same_origin_ok(request: Request) -> bool:
+    target = _target_origin(request)
+
+    origin = _origin_from_header(request.headers.get("origin"))
+    if origin:
+        return hmac.compare_digest(origin, target)
+
+    referer = _origin_from_header(request.headers.get("referer"))
+    if referer:
+        return hmac.compare_digest(referer, target)
+
+    return False
+
+
+def set_session_cookie(resp: Response, token: str):
+    resp.set_cookie(
+        SESSION_COOKIE,
+        token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30,
+        path="/",
+    )
+
+
+def csrf_input(request: Request):
+    token = getattr(request.state, "csrf_token", None) or request.cookies.get(CSRF_COOKIE) or ""
+    return Markup(
+        f'<input type="hidden" name="{CSRF_FORM_FIELD}" value="{escape(token)}">'
+    )
 
 
 def asaas_api_base() -> str:
@@ -973,25 +1114,11 @@ def login(
                 })
 
         resp = RedirectResponse("/verify", status_code=302)
-        resp.set_cookie(
-            SESSION_COOKIE,
-            token,
-            httponly=True,
-            secure=COOKIE_SECURE,
-            samesite="lax",
-            max_age=60 * 60 * 24 * 30
-        )
+        resp.set_cookie(resp, token)
         return resp
 
     resp = RedirectResponse("/dashboard", status_code=302)
-    resp.set_cookie(
-        SESSION_COOKIE,
-        token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 30
-    )
+    resp.set_cookie(resp, token)
     return resp
 
 
@@ -1047,14 +1174,7 @@ def register(
         pass
 
     resp = RedirectResponse("/verify", status_code=302)
-    resp.set_cookie(
-        SESSION_COOKIE,
-        token,
-        httponly=True,
-        secure=COOKIE_SECURE,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 30
-    )
+    resp.set_cookie(resp, token)
     return resp
 
 
@@ -1186,7 +1306,7 @@ def logout(request: Request, db: Session = Depends(get_db)):
             db.commit()
 
     resp = RedirectResponse("/login", status_code=302)
-    resp.delete_cookie(SESSION_COOKIE)
+    resp.delete_cookie(SESSION_COOKIE, path="/")
     return resp
 
 
@@ -3395,8 +3515,8 @@ def wizard_step2(
 @app.post("/webhooks/asaas")
 async def webhooks_asaas(request: Request, db: Session = Depends(get_db)):
     if ASAAS_WEBHOOK_TOKEN:
-        token = request.headers.get("asaas-access-token") or request.headers.get("Asaas-Access-Token")
-        if token != ASAAS_WEBHOOK_TOKEN:
+        token = (request.headers.get("asaas-access-token") or request.headers.get("Asaas-Access-Token") or "")
+        if not hmac.compare_digest(token, ASAAS_WEBHOOK_TOKEN):)
             return HTMLResponse("unauthorized", status_code=401)
 
     try:

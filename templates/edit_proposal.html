@@ -20,6 +20,7 @@
       <a class="btn btn-ghost" href="/dashboard">← Voltar</a>
       <a class="btn btn-ghost" href="/p/{{ p.public_id }}">Abrir link</a>
       <form method="post" action="/proposals/{{ p.id }}/save_service" style="display:inline;">
+        {{ csrf_input(request) }}
         <button class="btn btn-ghost" type="submit">Salvar como serviço</button>
       </form>
     </div>
@@ -30,6 +31,7 @@
     <p class="small">Ao salvar, o sistema cria uma nova versão (v{{ p.revision + 1 }}).</p>
 
     <form method="post" action="/proposals/{{ p.id }}/edit" id="formOrc">
+      {{ csrf_input(request) }}
       <div class="row">
         <div>
           <label>Nome do cliente</label>

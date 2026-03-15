@@ -94,6 +94,7 @@
       <p class="small">Escolha um serviço salvo (recomendado) ou digite do zero.</p>
 
       <form method="post" action="/wizard/step2" id="step2Form">
+        {{ csrf_input(request) }}
         <input type="hidden" name="client_id" value="{{ client_id or 0 }}">
         <input type="hidden" name="client_name" value="{{ client_name or '' }}">
         <input type="hidden" name="client_whatsapp" value="{{ client_whatsapp or '' }}">
@@ -339,6 +340,7 @@
       {% endif %}
 
       <form method="post" action="/wizard/create">
+        {{ csrf_input(request) }}
         <input type="hidden" name="client_id" value="{{ client_id or 0 }}">
         <input type="hidden" name="service_id" value="{{ service_id or 0 }}">
 

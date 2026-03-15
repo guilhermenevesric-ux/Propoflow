@@ -36,6 +36,7 @@
     {% endif %}
 
     <form method="post" action="/settings">
+      {{ csrf_input(request) }}
       <label>Mensagem padrão para WhatsApp</label>
       <textarea name="default_message_template" placeholder="Ex: Olá {cliente}! Segue seu orçamento: {link}">{{ user.default_message_template or "" }}</textarea>
 

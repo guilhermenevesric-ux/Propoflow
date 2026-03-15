@@ -31,6 +31,7 @@
     {% endif %}
 
     <form method="post" action="/proposals/new" id="formOrc">
+      {{ csrf_input(request) }}
       <label>Serviço salvo (opcional)</label>
       <select name="service_id" id="serviceSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
         <option value="0">Escolher...</option>

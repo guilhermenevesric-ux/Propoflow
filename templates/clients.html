@@ -32,6 +32,7 @@
       {% endif %}
 
       <form method="post" action="/clients/new">
+        {{ csrf_input(request) }}
         <label>Nome</label>
         <input name="name" required placeholder="Ex: Maria Silva">
 
@@ -70,6 +71,7 @@
                   <a class="btn" href="/wizard?step=2&client_id={{ c.id }}">Orçar</a>
 
                   <form method="post" action="/clients/{{ c.id }}/favorite" style="display:inline;">
+                    {{ csrf_input(request) }}
                     <button class="btn btn-ghost" type="submit" title="Favoritar">
                       {% if c.favorite %}⭐{% else %}☆{% endif %}
                     </button>
@@ -79,6 +81,7 @@
                     <summary class="btn btn-ghost" style="cursor:pointer;">Editar</summary>
                     <div style="margin-top:10px;">
                       <form method="post" action="/clients/{{ c.id }}/update">
+                        {{ csrf_input(request) }}
                         <label>Nome</label>
                         <input name="name" value="{{ c.name }}" required>
 
@@ -93,6 +96,7 @@
 
                       <form method="post" action="/clients/{{ c.id }}/delete" style="margin-top:10px;"
                             onsubmit="return confirm('Remover este cliente?');">
+                        {{ csrf_input(request) }}
                         <button class="btn btn-ghost" type="submit">Remover</button>
                       </form>
                     </div>
