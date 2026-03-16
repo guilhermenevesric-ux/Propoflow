@@ -169,77 +169,87 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.middleware("http")
 async def csrf_and_security_headers_middleware(request: Request, call_next):
-        method = request.method.upper()
-        path = request.url.path
+    method = request.method.upper()
+    path = request.url.path
 
-        existing_csrf = request.cookies.get(CSRF_COOKIE)
-        csrf_token = existing_csrf or _new_csrf_token()
-        request.state.csrf_token = csrf_token
+    # preserva o body para o FastAPI conseguir ler depois nas rotas com Form(...)
+    body = await request.body()
 
-        is_exempt = path.startswith("/static") or path == "/favicon.ico" or any(
-            path.startswith(prefix) for prefix in CSRF_EXEMPT_PREFIXES
+    async def receive():
+        return {
+            "type": "http.request",
+            "body": body,
+            "more_body": False,
+        }
+
+    request = Request(request.scope, receive)
+    existing_csrf = request.cookies.get(CSRF_COOKIE)
+    csrf_token = existing_csrf or _new_csrf_token()
+    request.state.csrf_token = csrf_token
+
+    is_exempt = path.startswith("/static") or path == "/favicon.ico" or any(
+        path.startswith(prefix) for prefix in CSRF_EXEMPT_PREFIXES
+    )
+
+    if method in STATE_CHANGING_METHODS and not is_exempt:
+        sent_token = request.headers.get("x-csrf-token")
+
+        if not sent_token:
+            ctype = (request.headers.get("content-type") or "").lower()
+            if "application/x-www-form-urlencoded" in ctype or "multipart/form-data" in ctype:
+                try:
+                    form = await request.form()
+                    sent_token = form.get(CSRF_FORM_FIELD)
+                except Exception:
+                    sent_token = None
+
+        valid_by_token = bool(
+            existing_csrf and sent_token and hmac.compare_digest(str(existing_csrf), str(sent_token))
+        )
+        valid_by_origin = _same_origin_ok(request)
+
+        if not (valid_by_token or valid_by_origin):
+            return HTMLResponse("Sessão inválida. Atualize a página e tente novamente.", status_code=403)
+
+    response = await call_next(request)
+
+    if not existing_csrf or existing_csrf != csrf_token:
+        response.set_cookie(
+            CSRF_COOKIE,
+            csrf_token,
+            httponly=True,
+            secure=COOKIE_SECURE,
+            samesite="strict",
+            max_age=60 * 60 * 24 * 30,
+            path="/",
         )
 
-        if method in STATE_CHANGING_METHODS and not is_exempt:
-            sent_token = request.headers.get("x-csrf-token")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "img-src 'self' data: https:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none';"
+    )
 
-            if not sent_token:
-                ctype = (request.headers.get("content-type") or "").lower()
-                if "application/x-www-form-urlencoded" in ctype or "multipart/form-data" in ctype:
-                    try:
-                        form = await request.form()
-                        sent_token = form.get(CSRF_FORM_FIELD)
-                    except Exception:
-                        sent_token = None
+    if COOKIE_SECURE:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
-            valid_by_token = bool(
-                existing_csrf and sent_token and hmac.compare_digest(str(existing_csrf), str(sent_token))
-            )
-            valid_by_origin = _same_origin_ok(request)
+    ctype = (response.headers.get("content-type") or "").lower()
+    if request.cookies.get(SESSION_COOKIE) and ctype.startswith("text/html"):
+        response.headers.setdefault("Cache-Control", "no-store")
 
-            if not (valid_by_token or valid_by_origin):
-                return HTMLResponse("Sessão inválida. Atualize a página e tente novamente.", status_code=403)
-
-        response = await call_next(request)
-
-        if not existing_csrf or existing_csrf != csrf_token:
-            response.set_cookie(
-                CSRF_COOKIE,
-                csrf_token,
-                httponly=True,
-                secure=COOKIE_SECURE,
-                samesite="strict",
-                max_age=60 * 60 * 24 * 30,
-                path="/",
-            )
-
-        response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        response.headers.setdefault("Permissions-Policy",
-                                    "camera=(), microphone=(), geolocation=(), interest-cohort=()")
-        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
-        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
-        response.headers.setdefault(
-            "Content-Security-Policy",
-            "default-src 'self'; "
-            "img-src 'self' data: https:; "
-            "style-src 'self' 'unsafe-inline'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "object-src 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'; "
-            "frame-ancestors 'none';"
-        )
-
-        if COOKIE_SECURE:
-            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-
-        ctype = (response.headers.get("content-type") or "").lower()
-        if request.cookies.get(SESSION_COOKIE) and ctype.startswith("text/html"):
-            response.headers.setdefault("Cache-Control", "no-store")
-
-        return response
+    return response
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
