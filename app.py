@@ -1124,11 +1124,11 @@ def login(
                 })
 
         resp = RedirectResponse("/verify", status_code=302)
-        resp.set_cookie(resp, token)
+        set_session_cookie(resp, token)
         return resp
 
     resp = RedirectResponse("/dashboard", status_code=302)
-    resp.set_cookie(resp, token)
+    set_session_cookie(resp, token)
     return resp
 
 
@@ -1184,7 +1184,7 @@ def register(
         pass
 
     resp = RedirectResponse("/verify", status_code=302)
-    resp.set_cookie(resp, token)
+    set_session_cookie(resp, token)
     return resp
 
 
