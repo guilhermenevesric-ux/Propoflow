@@ -44,7 +44,7 @@
         <div class="actions" style="margin-bottom:10px; flex-wrap:wrap;">
           {% for c in clients %}
             {% if c.favorite %}
-              <button class="btn btn-ghost" type="button" onclick="pickClient('{{ c.id }}')">⭐ {{ c.name }}</button>
+              <button class="btn btn-ghost" type="button" onclick="applyClientById('{{ c.id }}')">⭐ {{ c.name }}</button>
             {% endif %}
           {% endfor %}
         </div>
@@ -58,7 +58,7 @@
                 style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           <option value="0">Escolher...</option>
           {% for c in clients %}
-            <option value="{{ c.id }}" {% if client_id and (client_id|string) == (c.id|string) %}selected{% endif %}>{{ c.name }}</option>
+            <option value="{{ c.id }}" {% if client_id and (client_id|string)==(c.id|string) %}selected{% endif %}>{{ c.name }}</option>
           {% endfor %}
         </select>
 
@@ -67,11 +67,11 @@
         <div class="row">
           <div>
             <label>Nome do cliente</label>
-            <input name="client_name" value="{{ client_name or '' }}" placeholder="Ex: Maria Silva">
+            <input id="clientNameInput" name="client_name" value="{{ client_name or '' }}" placeholder="Ex: Maria Silva">
           </div>
           <div>
             <label>WhatsApp (opcional)</label>
-            <input name="client_whatsapp" value="{{ client_whatsapp or '' }}" placeholder="Ex: (11) 99999-9999">
+            <input id="clientWhatsappInput" name="client_whatsapp" value="{{ client_whatsapp or '' }}" placeholder="Ex: (11) 99999-9999">
           </div>
         </div>
 
@@ -80,12 +80,32 @@
       </form>
 
       <script>
-        function pickClient(id){
+        const clientsMap = {
+          {% for c in clients %}
+          "{{ c.id }}": {
+            name: {{ (c.name or '')|tojson }},
+            whatsapp: {{ (c.whatsapp or '')|tojson }}
+          }{% if not loop.last %},{% endif %}
+          {% endfor %}
+        };
+
+        function syncClientFromSelect(){
+          const sel = document.getElementById("clientSelect");
+          const id = sel ? sel.value : "0";
+          if(!id || id === "0" || !clientsMap[id]) return;
+
+          document.getElementById("clientNameInput").value = clientsMap[id].name || "";
+          document.getElementById("clientWhatsappInput").value = clientsMap[id].whatsapp || "";
+        }
+
+        function applyClientById(id){
           const sel = document.getElementById("clientSelect");
           if(!sel) return;
           sel.value = id;
-          sel.focus();
+          syncClientFromSelect();
         }
+
+        document.getElementById("clientSelect")?.addEventListener("change", syncClientFromSelect);
       </script>
     {% endif %}
 
@@ -95,6 +115,7 @@
 
       <form method="post" action="/wizard/step2" id="step2Form">
         {{ csrf_input(request) }}
+
         <input type="hidden" name="client_id" value="{{ client_id or 0 }}">
         <input type="hidden" name="client_name" value="{{ client_name or '' }}">
         <input type="hidden" name="client_whatsapp" value="{{ client_whatsapp or '' }}">
@@ -106,7 +127,7 @@
           <div class="actions" style="margin-bottom:10px; flex-wrap:wrap;">
             {% for s in services %}
               {% if s.favorite %}
-                <button class="btn btn-ghost" type="button" onclick="pickService('{{ s.id }}')">⭐ {{ s.title }}</button>
+                <button class="btn btn-ghost" type="button" onclick="applyServiceById('{{ s.id }}')">⭐ {{ s.title }}</button>
               {% endif %}
             {% endfor %}
           </div>
@@ -117,7 +138,7 @@
                 style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           <option value="0">Escolher...</option>
           {% for s in services %}
-            <option value="{{ s.id }}" {% if service_id and (service_id|string) == (s.id|string) %}selected{% endif %}>{{ s.title }}</option>
+            <option value="{{ s.id }}" {% if service_id and (service_id|string)==(s.id|string) %}selected{% endif %}>{{ s.title }}</option>
           {% endfor %}
         </select>
 
@@ -126,11 +147,11 @@
         <div class="row">
           <div>
             <label>Serviço / Projeto</label>
-            <input name="project_name" value="{{ project_name or '' }}" placeholder="Ex: Limpeza de sofá">
+            <input id="projectNameInput" name="project_name" value="{{ project_name or '' }}" placeholder="Ex: Limpeza de sofá">
           </div>
           <div>
             <label>Prazo</label>
-            <input name="deadline" value="{{ deadline or '' }}" placeholder="Ex: 1 dia / 2 dias">
+            <input id="deadlineInput" name="deadline" value="{{ deadline or '' }}" placeholder="Ex: 1 dia / 2 dias">
           </div>
         </div>
 
@@ -139,20 +160,20 @@
         <div class="row">
           <div>
             <label>Valor total (opcional)</label>
-            <input type="number" name="price" step="0.01" min="0" inputmode="decimal"
+            <input id="priceInput" type="number" name="price" step="0.01" min="0" inputmode="decimal"
                    value="{{ price or '' }}" placeholder="Ex: 250">
           </div>
           <div>
             <label>Validade (dias)</label>
             <input type="number" name="valid_days" step="1" min="1" max="365" inputmode="numeric"
-                   value="{{ valid_days or 7 }}">
+                   value="{{ valid_days or validity_days or 7 }}">
           </div>
         </div>
 
         <div style="height:12px;"></div>
 
         <label>Descrição do serviço</label>
-        <textarea name="description" placeholder="Explique em 1–3 linhas o que será feito.">{{ description or '' }}</textarea>
+        <textarea id="descriptionInput" name="description" placeholder="Explique em 1–3 linhas o que será feito.">{{ description or '' }}</textarea>
 
         <div style="height:12px;"></div>
 
@@ -160,23 +181,25 @@
         <p class="small" style="margin-top:0;">Se não quiser itens, pode deixar em branco e usar só “Valor total”.</p>
 
         <div class="table-wrap">
-          <table class="table" id="itemsTable" style="min-width: 680px;">
+          <table class="table" id="itemsTable" style="min-width: 760px;">
             <tr>
               <th>Item</th>
               <th>Quantidade</th>
               <th>Valor (R$)</th>
               <th>Total</th>
+              <th>Ações</th>
             </tr>
 
             {% for _ in range(0,2) %}
             <tr>
               <td>
-                <input name="item_desc" placeholder="Ex: Produto/serviço..." />
+                <input name="item_desc" placeholder="Ex: Produto/serviço...">
                 <input type="hidden" name="item_unit" value="un">
               </td>
-              <td><input type="number" name="item_qty" step="0.01" min="0" inputmode="decimal" placeholder="1" /></td>
-              <td><input type="number" name="item_unit_price" step="0.01" min="0" inputmode="decimal" placeholder="100" /></td>
+              <td><input type="number" name="item_qty" step="0.01" min="0" inputmode="decimal" placeholder="1"></td>
+              <td><input type="number" name="item_unit_price" step="0.01" min="0" inputmode="decimal" placeholder="100"></td>
               <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+              <td><button class="btn btn-ghost" type="button" onclick="removeRow(this)">Remover</button></td>
             </tr>
             {% endfor %}
           </table>
@@ -190,13 +213,13 @@
         <div style="height:12px;"></div>
 
         <label>Como pagar (opcional)</label>
-        <select name="payment_plan"
+        <select name="payment_plan" id="paymentPlanSelect"
                 style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
           {% set plan = (payment_plan or default_payment_plan or 'avista') %}
-          <option value="avista" {% if plan == 'avista' %}selected{% endif %}>À vista</option>
-          <option value="entrada_final_30" {% if plan == 'entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
-          <option value="entrada_final_50" {% if plan == 'entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
-          <option value="3x_30_40_30" {% if plan == '3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+          <option value="avista" {% if plan=='avista' %}selected{% endif %}>À vista</option>
+          <option value="entrada_final_30" {% if plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+          <option value="entrada_final_50" {% if plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+          <option value="3x_30_40_30" {% if plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
         </select>
 
         <div style="height:14px;"></div>
@@ -210,11 +233,36 @@
       </form>
 
       <script>
-        function pickService(id){
+        const servicesMap = {
+          {% for s in services %}
+          "{{ s.id }}": {
+            title: {{ (s.title or '')|tojson }},
+            deadline: {{ (s.default_deadline or '')|tojson }},
+            description: {{ (s.default_description or '')|tojson }},
+            price: {{ ('%.2f'|format((s.default_price_cents or 0)/100) if (s.default_price_cents or 0) > 0 else '')|tojson }},
+            payment_plan: {{ (s.default_payment_plan or 'avista')|tojson }}
+          }{% if not loop.last %},{% endif %}
+          {% endfor %}
+        };
+
+        function applyServiceById(id){
           const sel = document.getElementById("serviceSelect");
           if(!sel) return;
           sel.value = id;
-          sel.focus();
+          syncServiceFromSelect();
+        }
+
+        function syncServiceFromSelect(){
+          const sel = document.getElementById("serviceSelect");
+          const id = sel ? sel.value : "0";
+          if(!id || id === "0" || !servicesMap[id]) return;
+
+          const s = servicesMap[id];
+          document.getElementById("projectNameInput").value = s.title || "";
+          document.getElementById("deadlineInput").value = s.deadline || "";
+          document.getElementById("descriptionInput").value = s.description || "";
+          document.getElementById("priceInput").value = s.price || "";
+          document.getElementById("paymentPlanSelect").value = s.payment_plan || "avista";
         }
 
         function brl(n){
@@ -223,27 +271,8 @@
         }
 
         function parseNum(v){
-          if(v == null) return 0;
-          v = String(v).trim();
-          if(!v) return 0;
-
-          v = v.replace(/\s/g, '').replace(/R\$\s?/gi, '');
-
-          const hasComma = v.includes(',');
-          const hasDot = v.includes('.');
-
-          if(hasComma && hasDot){
-            if(v.lastIndexOf(',') > v.lastIndexOf('.')){
-              v = v.replace(/\./g, '').replace(',', '.');
-            }else{
-              v = v.replace(/,/g, '');
-            }
-          }else if(hasComma){
-            v = v.replace(',', '.');
-          }
-
-          v = v.replace(/[^\d.-]/g, '');
-
+          if(v === null || v === undefined) return 0;
+          v = ('' + v).trim().replace(/\./g,'').replace(',', '.');
           const n = parseFloat(v);
           return isNaN(n) ? 0 : n;
         }
@@ -277,14 +306,22 @@
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td>
-              <input name="item_desc" placeholder="Ex: Produto/serviço..." />
+              <input name="item_desc" placeholder="Ex: Produto/serviço...">
               <input type="hidden" name="item_unit" value="un">
             </td>
-            <td><input type="number" name="item_qty" step="0.01" min="0" inputmode="decimal" placeholder="1" /></td>
-            <td><input type="number" name="item_unit_price" step="0.01" min="0" inputmode="decimal" placeholder="100" /></td>
+            <td><input type="number" name="item_qty" step="0.01" min="0" inputmode="decimal" placeholder="1"></td>
+            <td><input type="number" name="item_unit_price" step="0.01" min="0" inputmode="decimal" placeholder="100"></td>
             <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+            <td><button class="btn btn-ghost" type="button" onclick="removeRow(this)">Remover</button></td>
           `;
           table.appendChild(tr);
+          recalc();
+        }
+
+        function removeRow(btn){
+          const tr = btn.closest("tr");
+          if(!tr) return;
+          tr.remove();
           recalc();
         }
 
@@ -294,6 +331,8 @@
             recalc();
           }
         });
+
+        document.getElementById("serviceSelect")?.addEventListener("change", syncServiceFromSelect);
 
         recalc();
       </script>
@@ -341,6 +380,7 @@
 
       <form method="post" action="/wizard/create">
         {{ csrf_input(request) }}
+
         <input type="hidden" name="client_id" value="{{ client_id or 0 }}">
         <input type="hidden" name="service_id" value="{{ service_id or 0 }}">
 
@@ -376,7 +416,6 @@
         </div>
       </form>
     {% endif %}
-
   </div>
 </div>
 </body>

@@ -24,7 +24,7 @@
 
   <div class="card">
     <h2 class="h2">Criar orçamento</h2>
-    <p class="small">Se você escolher um serviço salvo, o orçamento já vem preenchido.</p>
+    <p class="small">Se você escolher um serviço ou cliente salvo, os campos serão preenchidos automaticamente.</p>
 
     {% if error %}
       <div class="error">{{ error }}</div>
@@ -32,6 +32,7 @@
 
     <form method="post" action="/proposals/new" id="formOrc">
       {{ csrf_input(request) }}
+
       <label>Serviço salvo (opcional)</label>
       <select name="service_id" id="serviceSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
         <option value="0">Escolher...</option>
@@ -55,11 +56,11 @@
       <div class="row">
         <div>
           <label>Nome do cliente</label>
-          <input name="client_name" required value="{{ prefill.client_name or '' }}" placeholder="Ex: Maria Silva">
+          <input id="clientNameInput" name="client_name" required value="{{ prefill.client_name or '' }}" placeholder="Ex: Maria Silva">
         </div>
         <div>
           <label>WhatsApp do cliente (opcional)</label>
-          <input name="client_whatsapp" value="{{ prefill.client_whatsapp or '' }}" placeholder="Ex: (11) 99999-9999">
+          <input id="clientWhatsappInput" name="client_whatsapp" value="{{ prefill.client_whatsapp or '' }}" placeholder="Ex: (11) 99999-9999">
         </div>
       </div>
 
@@ -68,11 +69,11 @@
       <div class="row">
         <div>
           <label>Serviço / Projeto</label>
-          <input name="project_name" required value="{{ prefill.project_name or '' }}" placeholder="Ex: Limpeza de sofá">
+          <input id="projectNameInput" name="project_name" required value="{{ prefill.project_name or '' }}" placeholder="Ex: Limpeza de sofá">
         </div>
         <div>
           <label>Prazo</label>
-          <input name="deadline" required value="{{ prefill.deadline or '' }}" placeholder="Ex: 1 dia / 2 dias">
+          <input id="deadlineInput" name="deadline" required value="{{ prefill.deadline or '' }}" placeholder="Ex: 1 dia / 2 dias">
         </div>
       </div>
 
@@ -85,14 +86,14 @@
         </div>
         <div>
           <label>Valor total (opcional — se já sabe)</label>
-          <input name="price" value="{{ prefill.price or '' }}" placeholder="Ex: R$ 250,00">
+          <input id="priceInput" name="price" value="{{ prefill.price or '' }}" placeholder="Ex: R$ 250,00">
         </div>
       </div>
 
       <br>
 
       <label>O que será feito</label>
-      <textarea name="description" required placeholder="Escreva do jeito que você falaria.">{{ prefill.description or '' }}</textarea>
+      <textarea id="descriptionInput" name="description" required placeholder="Escreva do jeito que você falaria.">{{ prefill.description or '' }}</textarea>
 
       <br><br>
 
@@ -100,23 +101,25 @@
       <p class="small" style="margin-top:0;">Se não quiser itens, deixe vazio e use só “Valor total”.</p>
 
       <div class="table-wrap">
-        <table class="table" id="itemsTable" style="min-width: 680px;">
+        <table class="table" id="itemsTable" style="min-width: 760px;">
           <tr>
             <th>Item</th>
             <th>Quantidade</th>
             <th>Valor (R$)</th>
             <th>Total</th>
+            <th>Ações</th>
           </tr>
 
           {% for i in range(0,5) %}
           <tr>
             <td>
-              <input name="item_desc" placeholder="Ex: Serviço..." />
+              <input name="item_desc" placeholder="Ex: Serviço...">
               <input type="hidden" name="item_unit" value="un">
             </td>
-            <td><input name="item_qty" placeholder="1" /></td>
-            <td><input name="item_unit_price" placeholder="100" /></td>
+            <td><input name="item_qty" placeholder="1"></td>
+            <td><input name="item_unit_price" placeholder="100"></td>
             <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+            <td><button class="btn btn-ghost" type="button" onclick="removeRow(this)">Remover</button></td>
           </tr>
           {% endfor %}
         </table>
@@ -130,11 +133,11 @@
       <br>
 
       <h3 class="h2" style="font-size:15px;">Como pagar (opcional)</h3>
-      <select name="payment_plan" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
-        <option value="avista" {% if prefill.payment_plan == 'avista' %}selected{% endif %}>À vista</option>
-        <option value="entrada_final_30" {% if prefill.payment_plan == 'entrada_final_30' or not prefill.payment_plan %}selected{% endif %}>Entrada + na entrega (30/70)</option>
-        <option value="entrada_final_50" {% if prefill.payment_plan == 'entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
-        <option value="3x_30_40_30" {% if prefill.payment_plan == '3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
+      <select name="payment_plan" id="paymentPlanSelect" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.22); color:#e8eefc;">
+        <option value="avista" {% if prefill.payment_plan=='avista' %}selected{% endif %}>À vista</option>
+        <option value="entrada_final_30" {% if prefill.payment_plan=='entrada_final_30' %}selected{% endif %}>Entrada + na entrega (30/70)</option>
+        <option value="entrada_final_50" {% if prefill.payment_plan=='entrada_final_50' %}selected{% endif %}>Entrada + na entrega (50/50)</option>
+        <option value="3x_30_40_30" {% if prefill.payment_plan=='3x_30_40_30' %}selected{% endif %}>Entrada + durante + na entrega (30/40/30)</option>
       </select>
 
       <div style="height:16px;"></div>
@@ -144,37 +147,55 @@
 </div>
 
 <script>
+  const clientsMap = {
+    {% for c in clients %}
+    "{{ c.id }}": {
+      name: {{ (c.name or '')|tojson }},
+      whatsapp: {{ (c.whatsapp or '')|tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  };
+
+  const servicesMap = {
+    {% for s in services %}
+    "{{ s.id }}": {
+      title: {{ (s.title or '')|tojson }},
+      deadline: {{ (s.default_deadline or '')|tojson }},
+      description: {{ (s.default_description or '')|tojson }},
+      price: {{ (('%.2f'|format((s.default_price_cents or 0)/100)) if (s.default_price_cents or 0) > 0 else '')|tojson }},
+      payment_plan: {{ (s.default_payment_plan or 'avista')|tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  };
+
+  function syncClientFromSelect(){
+    const id = document.getElementById("clientSelect").value;
+    if(!id || id === "0" || !clientsMap[id]) return;
+    document.getElementById("clientNameInput").value = clientsMap[id].name || "";
+    document.getElementById("clientWhatsappInput").value = clientsMap[id].whatsapp || "";
+  }
+
+  function syncServiceFromSelect(){
+    const id = document.getElementById("serviceSelect").value;
+    if(!id || id === "0" || !servicesMap[id]) return;
+    const s = servicesMap[id];
+    document.getElementById("projectNameInput").value = s.title || "";
+    document.getElementById("deadlineInput").value = s.deadline || "";
+    document.getElementById("descriptionInput").value = s.description || "";
+    document.getElementById("priceInput").value = s.price || "";
+    document.getElementById("paymentPlanSelect").value = s.payment_plan || "avista";
+  }
+
   function brl(n){
     try{
-      const v = (Math.round(n * 100) / 100).toFixed(2).replace('.', ',');
+      const v = (Math.round(n*100)/100).toFixed(2).replace('.', ',');
       return 'R$ ' + v;
-    }catch(e){
-      return 'R$ 0,00';
-    }
+    }catch(e){ return 'R$ 0,00'; }
   }
 
   function parseNum(v){
-    if(v == null) return 0;
-    v = String(v).trim();
     if(!v) return 0;
-
-    v = v.replace(/\s/g, '').replace(/R\$\s?/gi, '');
-
-    const hasComma = v.includes(',');
-    const hasDot = v.includes('.');
-
-    if(hasComma && hasDot){
-      if(v.lastIndexOf(',') > v.lastIndexOf('.')){
-        v = v.replace(/\./g, '').replace(',', '.');
-      }else{
-        v = v.replace(/,/g, '');
-      }
-    }else if(hasComma){
-      v = v.replace(',', '.');
-    }
-
-    v = v.replace(/[^\d.-]/g, '');
-
+    v = (''+v).replace(/\./g,'').replace(',', '.');
     const n = parseFloat(v);
     return isNaN(n) ? 0 : n;
   }
@@ -182,26 +203,17 @@
   function recalc(){
     const rows = document.querySelectorAll('#itemsTable tr');
     let total = 0;
-
     rows.forEach((tr, idx) => {
       if(idx === 0) return;
-
-      const inputs = tr.querySelectorAll('input');
-      if(inputs.length < 3) return;
-
-      const desc = inputs[0].value.trim();
-      const qty = parseNum(inputs[2]?.name === 'item_unit' ? inputs[1].value : inputs[1].value) || 0;
-      const unit = parseNum(inputs[2]?.name === 'item_unit' ? inputs[3]?.value : inputs[2].value) || 0;
-
+      const desc = tr.querySelector('input[name="item_desc"]')?.value?.trim() || "";
+      const qty = parseNum(tr.querySelector('input[name="item_qty"]')?.value) || 0;
+      const unit = parseNum(tr.querySelector('input[name="item_unit_price"]')?.value) || 0;
       let line = 0;
       if(desc && qty > 0 && unit > 0) line = qty * unit;
-
       const td = tr.querySelector('.lineTotal');
       if(td) td.textContent = brl(line);
-
       total += line;
     });
-
     document.getElementById('totalEstimado').textContent = brl(total);
   }
 
@@ -210,14 +222,23 @@
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
-        <input name="item_desc" placeholder="Ex: Serviço..." />
+        <input name="item_desc" placeholder="Ex: Serviço...">
         <input type="hidden" name="item_unit" value="un">
       </td>
-      <td><input name="item_qty" placeholder="1" /></td>
-      <td><input name="item_unit_price" placeholder="100" /></td>
+      <td><input name="item_qty" placeholder="1"></td>
+      <td><input name="item_unit_price" placeholder="100"></td>
       <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+      <td><button class="btn btn-ghost" type="button" onclick="removeRow(this)">Remover</button></td>
     `;
     table.appendChild(tr);
+    recalc();
+  }
+
+  function removeRow(btn){
+    const tr = btn.closest("tr");
+    if(!tr) return;
+    tr.remove();
+    recalc();
   }
 
   document.addEventListener('input', (e) => {
@@ -226,21 +247,8 @@
     }
   });
 
-  document.getElementById('serviceSelect').addEventListener('change', function(){
-    const id = this.value;
-    const url = new URL(window.location.href);
-    if(id && id !== "0") url.searchParams.set('service_id', id);
-    else url.searchParams.delete('service_id');
-    window.location.href = url.toString();
-  });
-
-  document.getElementById('clientSelect').addEventListener('change', function(){
-    const id = this.value;
-    const url = new URL(window.location.href);
-    if(id && id !== "0") url.searchParams.set('client_id', id);
-    else url.searchParams.delete('client_id');
-    window.location.href = url.toString();
-  });
+  document.getElementById('clientSelect').addEventListener('change', syncClientFromSelect);
+  document.getElementById('serviceSelect').addEventListener('change', syncServiceFromSelect);
 
   recalc();
 </script>

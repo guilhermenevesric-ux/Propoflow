@@ -38,6 +38,7 @@
 
       <form method="post" action="/profile" enctype="multipart/form-data">
         {{ csrf_input(request) }}
+
         <label>Seu nome (responsável)</label>
         <input name="display_name" placeholder="Ex: João Silva" value="{{ user.display_name or '' }}">
 
@@ -68,22 +69,29 @@
 
         <br><br>
 
-        {% if user.logo_b64 %}
-          <div class="card" style="padding:14px; margin-bottom:10px;">
-            <div class="small">Logo atual:</div>
-            <img src="data:{{ user.logo_mime }};base64,{{ user.logo_b64 }}" alt="Logo atual" style="max-width:140px; border-radius:12px; margin-top:10px;">
-            <div style="margin-top:10px;">
-              <label style="display:flex; gap:8px; align-items:center;">
-                <input type="checkbox" name="remove_logo" value="1">
-                Remover logo
-              </label>
-            </div>
-          </div>
-        {% endif %}
+        <h3 class="h2" style="font-size:15px;">Logo (PRO)</h3>
 
         {% if user and user.plan == "pro" %}
-          <h3>Logo (PRO)</h3>
           <p class="small">Opcional. Se não quiser, pode ignorar.</p>
+
+          {% if user.logo_b64 %}
+            <div class="card" style="padding:14px; margin-bottom:12px;">
+              <div class="small" style="margin-bottom:10px;">Logo atual</div>
+
+              <div style="display:flex; gap:16px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;">
+                <div>
+                  <img src="data:{{ user.logo_mime }};base64,{{ user.logo_b64 }}"
+                       alt="Logo atual"
+                       style="max-width:140px; max-height:140px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); display:block;">
+                </div>
+
+                <label style="display:flex; gap:10px; align-items:center; cursor:pointer; user-select:none; margin-top:4px;">
+                  <input type="checkbox" name="remove_logo" value="1" style="width:auto;">
+                  <span class="small" style="margin:0;">Remover logo atual</span>
+                </label>
+              </div>
+            </div>
+          {% endif %}
 
           <label>Enviar novo logo</label>
           <input type="file" name="logo" accept="image/png,image/jpeg">
@@ -92,7 +100,6 @@
             Dica: use uma imagem simples (PNG/JPG). O sistema ajusta o tamanho automaticamente.
           </p>
         {% else %}
-          <h3>Logo (PRO)</h3>
           <p class="small">
             Disponível apenas no plano PRO para reforçar sua marca no PDF e link público.
           </p>

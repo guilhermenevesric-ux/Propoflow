@@ -32,6 +32,7 @@
 
     <form method="post" action="/proposals/{{ p.id }}/edit" id="formOrc">
       {{ csrf_input(request) }}
+
       <div class="row">
         <div>
           <label>Nome do cliente</label>
@@ -76,12 +77,13 @@
       <h3 class="h2" style="font-size:15px;">Itens (opcional)</h3>
 
       <div class="table-wrap">
-        <table class="table" id="itemsTable" style="min-width: 680px;">
+        <table class="table" id="itemsTable" style="min-width: 760px;">
           <tr>
             <th>Item</th>
             <th>Quantidade</th>
             <th>Valor (R$)</th>
             <th>Total</th>
+            <th>Ações</th>
           </tr>
 
           {% for it in p.items %}
@@ -93,6 +95,7 @@
             <td><input name="item_qty" value="{{ it.qty }}"></td>
             <td><input name="item_unit_price" value="{{ (it.unit_price_cents or 0) / 100 }}"></td>
             <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+            <td><button class="btn btn-ghost" type="button" onclick="removeRow(this)">Remover</button></td>
           </tr>
           {% endfor %}
 
@@ -106,6 +109,7 @@
               <td><input name="item_qty"></td>
               <td><input name="item_unit_price"></td>
               <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+              <td><button class="btn btn-ghost" type="button" onclick="removeRow(this)">Remover</button></td>
             </tr>
             {% endfor %}
           {% endif %}
@@ -211,8 +215,16 @@
       <td><input name="item_qty" placeholder="1"></td>
       <td><input name="item_unit_price" placeholder="100"></td>
       <td style="font-weight:800;" class="lineTotal">R$ 0,00</td>
+      <td><button class="btn btn-ghost" type="button" onclick="removeRow(this)">Remover</button></td>
     `;
     table.appendChild(tr);
+    recalc();
+  }
+
+  function removeRow(btn){
+    const tr = btn.closest("tr");
+    if(!tr) return;
+    tr.remove();
     recalc();
   }
 
