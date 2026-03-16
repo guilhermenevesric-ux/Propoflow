@@ -925,7 +925,6 @@ input[type="file"]:focus{
   display:flex;
   gap:16px;
   align-items:flex-start;
-  justify-content:space-between;
   flex-wrap:wrap;
 }
 

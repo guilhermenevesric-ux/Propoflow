@@ -79,18 +79,13 @@
               <div class="small" style="margin-bottom:10px;">Logo atual</div>
 
               <div class="logo-box-inner">
-                <div>
-                  <img
-                    src="data:{{ user.logo_mime }};base64,{{ user.logo_b64 }}"
-                    alt="Logo atual"
-                    class="logo-preview">
-                </div>
-
-                <label class="logo-remove-wrap">
-                  <input type="checkbox" name="remove_logo" value="1">
-                  <span>Remover logo atual</span>
-                </label>
-              </div>
+  <div>
+    <img
+      src="data:{{ user.logo_mime }};base64,{{ user.logo_b64 }}"
+      alt="Logo atual"
+      class="logo-preview">
+  </div>
+</div>
 
               <div class="logo-upload-wrap">
                 <label>Trocar logo</label>
