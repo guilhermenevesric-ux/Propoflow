@@ -74,31 +74,39 @@
         {% if user and user.plan == "pro" %}
           <p class="small">Opcional. Se não quiser, pode ignorar.</p>
 
-          {% if user.logo_b64 %}
-            <div class="card" style="padding:14px; margin-bottom:12px;">
+          <div class="card logo-box">
+            {% if user.logo_b64 %}
               <div class="small" style="margin-bottom:10px;">Logo atual</div>
 
-              <div style="display:flex; gap:16px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;">
+              <div class="logo-box-inner">
                 <div>
-                  <img src="data:{{ user.logo_mime }};base64,{{ user.logo_b64 }}"
-                       alt="Logo atual"
-                       style="max-width:140px; max-height:140px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); display:block;">
+                  <img
+                    src="data:{{ user.logo_mime }};base64,{{ user.logo_b64 }}"
+                    alt="Logo atual"
+                    class="logo-preview">
                 </div>
 
-                <label style="display:flex; gap:10px; align-items:center; cursor:pointer; user-select:none; margin-top:4px;">
-                  <input type="checkbox" name="remove_logo" value="1" style="width:auto;">
-                  <span class="small" style="margin:0;">Remover logo atual</span>
+                <label class="logo-remove-wrap">
+                  <input type="checkbox" name="remove_logo" value="1">
+                  <span>Remover logo atual</span>
                 </label>
               </div>
-            </div>
-          {% endif %}
 
-          <label>Enviar novo logo</label>
-          <input type="file" name="logo" accept="image/png,image/jpeg">
-
-          <p class="small" style="opacity:.8; margin-top:8px;">
-            Dica: use uma imagem simples (PNG/JPG). O sistema ajusta o tamanho automaticamente.
-          </p>
+              <div class="logo-upload-wrap">
+                <label>Trocar logo</label>
+                <input type="file" name="logo" accept="image/png,image/jpeg">
+                <p class="small" style="opacity:.8; margin-top:8px;">
+                  Dica: use uma imagem simples (PNG/JPG). O sistema ajusta o tamanho automaticamente.
+                </p>
+              </div>
+            {% else %}
+              <label>Enviar logo</label>
+              <input type="file" name="logo" accept="image/png,image/jpeg">
+              <p class="small" style="opacity:.8; margin-top:8px;">
+                Dica: use uma imagem simples (PNG/JPG). O sistema ajusta o tamanho automaticamente.
+              </p>
+            {% endif %}
+          </div>
         {% else %}
           <p class="small">
             Disponível apenas no plano PRO para reforçar sua marca no PDF e link público.
