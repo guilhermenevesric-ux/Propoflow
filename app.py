@@ -166,9 +166,6 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-if COOKIE_SECURE:
-    app.add_middleware(HTTPSRedirectMiddleware)
-
 
 @app.middleware("http")
 async def csrf_and_security_headers_middleware(request: Request, call_next):
@@ -303,6 +300,9 @@ SESSION_COOKIE = "session_token"
 
 APP_BASE_URL = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
 COOKIE_SECURE = True if APP_BASE_URL.startswith("https://") else False
+
+if COOKIE_SECURE:
+    app.add_middleware(HTTPSRedirectMiddleware)
 
 ASAAS_API_KEY = os.getenv("ASAAS_API_KEY", "").strip()
 ASAAS_ENV = os.getenv("ASAAS_ENV", "sandbox").strip().lower()
