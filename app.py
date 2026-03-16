@@ -3516,7 +3516,7 @@ def wizard_step2(
 async def webhooks_asaas(request: Request, db: Session = Depends(get_db)):
     if ASAAS_WEBHOOK_TOKEN:
         token = (request.headers.get("asaas-access-token") or request.headers.get("Asaas-Access-Token") or "")
-        if not hmac.compare_digest(token, ASAAS_WEBHOOK_TOKEN):)
+        if not hmac.compare_digest(token, ASAAS_WEBHOOK_TOKEN):
             return HTMLResponse("unauthorized", status_code=401)
 
     try:
