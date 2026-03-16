@@ -164,7 +164,6 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
-templates.env.globals["csrf_input"] = csrf_input
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if COOKIE_SECURE:
@@ -367,6 +366,7 @@ def csrf_input(request: Request):
     return Markup(
         f'<input type="hidden" name="{CSRF_FORM_FIELD}" value="{escape(token)}">'
     )
+templates.env.globals["csrf_input"] = csrf_input
 
 
 def asaas_api_base() -> str:
