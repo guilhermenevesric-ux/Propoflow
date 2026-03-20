@@ -175,7 +175,7 @@ def _normalize_terms(terms):
 # =========================
 # Header
 # =========================
-def _draw_header(c, width, height, is_pro: bool, brand_title: str, subtitle: str, logo_img=None):
+def _draw_header(c, width, height, is_pro: bool, brand_title: str, subtitle: str, public_id: str, logo_img=None):
     c.setFillColorRGB(0.06, 0.10, 0.18)
     c.roundRect(2 * cm, height - 2.55 * cm, width - 4 * cm, 1.75 * cm, 0.28 * cm, fill=1, stroke=0)
 
@@ -197,10 +197,19 @@ def _draw_header(c, width, height, is_pro: bool, brand_title: str, subtitle: str
     c.setFillColorRGB(0.86, 0.90, 1.00)
     if subtitle:
         c.drawString(3.55 * cm, height - 2.20 * cm, subtitle)
+        c.setFillColorRGB(0.31, 0.49, 1.00)
+        c.roundRect(width - 7 * cm, height - 2.2 * cm, 4.5 * cm, 0.8 * cm, 0.2 * cm, fill=1, stroke=0)
 
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawRightString(width - 2.35 * cm, height - 1.90 * cm, "ORÇAMENTO")
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(width - 4.75 * cm, height - 1.85 * cm, f"{public_id}")
+
+    c.setFont("Helvetica-Bold", 13)
+    c.drawRightString(
+        width - 2.35 * cm,
+        height - 1.90 * cm,
+        f"ORÇAMENTO Nº {public_id}"
+    )
 
 
 # =========================
@@ -358,8 +367,19 @@ def generate_proposal_pdf(data: dict) -> bytes:
         brand_title = "PropoFlow"
         subtitle = "Orçamentos profissionais em minutos"
 
+    public_id = str(data.get("public_id", "0001"))
+
     def draw_header():
-        _draw_header(c, width, height, is_pro=is_pro, brand_title=brand_title, subtitle=subtitle, logo_img=logo_img)
+        _draw_header(
+            c,
+            width,
+            height,
+            is_pro=is_pro,
+            brand_title=brand_title,
+            subtitle=subtitle,
+            public_id=public_id,
+            logo_img=logo_img
+        )
 
     draw_header()
 
@@ -393,6 +413,17 @@ def generate_proposal_pdf(data: dict) -> bytes:
         total_cents = _parse_price_to_cents(data.get("price") or "")
     total_brl = _brl_from_cents(total_cents) if total_cents > 0 else (_safe(data.get("price")) or "-")
 
+    # =========================
+    # DADOS DO CLIENTE
+    # =========================
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(x, y, "Dados do Cliente")
+    y -= 15
+
+    c.setFont("Helvetica", 10)
+    c.drawString(x, y, f"Cliente: {client}")
+    y -= 12
+
     c.setFont("Helvetica-Bold", 10)
     c.drawString(x + 0.6 * cm, y - 1.35 * cm, "Cliente")
     c.setFont("Helvetica", 10)
@@ -408,12 +439,24 @@ def generate_proposal_pdf(data: dict) -> bytes:
     c.setFont("Helvetica", 10)
     c.drawRightString(x + w - 0.6 * cm, y - 1.85 * cm, deadline)
 
-    c.setFont("Helvetica-Bold", 10)
-    c.drawRightString(x + w - 0.6 * cm, y - 2.40 * cm, "Total")
-    c.setFont("Helvetica-Bold", 14)
-    c.drawRightString(x + w - 0.6 * cm, y - 2.95 * cm, total_brl)
+    # =========================
+    # TOTAL PROFISSIONAL
+    # =========================
+    box_w = 7 * cm
+    box_h = 2 * cm
+    box_x = x + w - box_w
+    box_y = y
 
-    y -= 3.6 * cm
+    _draw_box(c, box_x, box_y, box_w, box_h, fill_rgb=(0.06, 0.10, 0.18), stroke=0)
+
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica", 9)
+    c.drawString(box_x + 0.5 * cm, box_y - 0.7 * cm, "TOTAL")
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawRightString(box_x + box_w - 0.5 * cm, box_y - 0.7 * cm, total_brl)
+
+    y -= box_h + 0.6 * cm
 
     # =========================
     # Descrição
@@ -423,31 +466,93 @@ def generate_proposal_pdf(data: dict) -> bytes:
     y = _draw_paragraph_section(c, "Descrição do serviço", desc_lines, x, y, w, width, height, draw_header)
 
     # =========================
-    # Itens
+    # TABELA DE ITENS PROFISSIONAL
     # =========================
-    items_rows = _normalize_items(data.get("items") or [])
-    if items_rows:
-        y = _draw_items_section(c, "Itens", items_rows, x, y, w, width, height, draw_header)
+    items = data.get("items") or []
 
+    if items:
+        y -= 20
+
+        # Título
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(x, y, "Itens do Orçamento")
+        y -= 15
+
+        # Fundo do cabeçalho
+        c.setFillColorRGB(0.9, 0.9, 0.9)
+        c.rect(x, y - 5, w, 18, fill=1, stroke=0)
+
+        # Cabeçalho
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont("Helvetica-Bold", 9)
+
+        c.drawString(x + 5, y, "Descrição")
+        c.drawString(x + 250, y, "Qtd")
+        c.drawString(x + 300, y, "Preço Unit.")
+        c.drawString(x + 400, y, "Subtotal")
+
+        y -= 18
+
+        c.setFont("Helvetica", 9)
+
+        for it in items:
+            desc = _safe(it.get("description"))
+            qty = _fmt_qty(it.get("qty") or 1)
+
+            unit_price_cents = int(it.get("unit_price_cents") or 0)
+            total_cents = int(it.get("line_total_cents") or 0)
+
+            unit_price = _brl_from_cents(unit_price_cents)
+            subtotal = _brl_from_cents(total_cents)
+
+            # Linha
+            desc_lines = _wrap_lines(desc, 230, font="Helvetica", size=9)
+
+            start_y = y
+            for line in desc_lines:
+                c.drawString(x + 5, y, line)
+                y -= 10
+            c.drawString(x + 250, start_y, qty)
+            c.drawString(x + 300, start_y, unit_price)
+            c.drawString(x + 400, start_y, subtotal)
+
+            # Linha separadora
+            c.setStrokeColorRGB(0.85, 0.85, 0.85)
+            c.line(x, y - 5, x + w, y - 5)
+
+            y -= 18
+
+            if y < 100:
+                c.showPage()
+                draw_header()
+                y = height - 100
     # =========================
     # Como pagar
     # =========================
     stage_rows = _normalize_stages(data.get("payment_stages") or [])
     if stage_rows:
         y = _draw_list_section(c, "Como pagar", stage_rows, x, y, w, width, height, draw_header, shaded=False)
-
+    footer_y = 2.1 * cm
     # =========================
     # Condições
     # =========================
     terms_rows = _normalize_terms(data.get("payment_terms") or [])
     if terms_rows:
-        y = _draw_list_section(c, "Condições", terms_rows, x, y, w, width, height, draw_header, shaded=True)
+        y = _draw_list_section(c, "Observações", terms_rows, x, y, w, width, height, draw_header, shaded=True)
+
+
+        # Assinatura
+        c.setStrokeColorRGB(0.7, 0.7, 0.7)
+        c.line(x, footer_y + 1.5 * cm, x + 6 * cm, footer_y + 1.5 * cm)
+
+        c.setFont("Helvetica", 8)
+        c.setFillColorRGB(0.3, 0.3, 0.3)
+        c.drawString(x, footer_y + 1.2 * cm, "Assinatura do responsável")
 
     # =========================
     # Aceite online / Rodapé
     # =========================
     accept_url = _safe(data.get("accept_url"))
-    footer_y = 2.1 * cm
 
     if accept_url:
         c.setFont("Helvetica-Bold", 9.3)
@@ -465,3 +570,4 @@ def generate_proposal_pdf(data: dict) -> bytes:
     c.save()
     buffer.seek(0)
     return buffer.getvalue()
+
