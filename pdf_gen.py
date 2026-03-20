@@ -59,6 +59,29 @@ def _fmt_qty(q):
         return str(q or "")
 
 
+def _wrap_lines(text, max_w, font="Helvetica", size=9):
+    text = text or ""
+    lines = []
+    for paragraph in text.splitlines():
+        p = paragraph.strip()
+        if not p:
+            lines.append("")
+            continue
+        words = p.split()
+        line = ""
+        for w in words:
+            test = (line + " " + w).strip()
+            if stringWidth(test, font, size) <= max_w:
+                line = test
+            else:
+                if line:
+                    lines.append(line)
+                line = w
+        if line:
+            lines.append(line)
+    return lines or [""]
+
+
 # =========================
 # Color palette
 # =========================
@@ -252,11 +275,19 @@ def _draw_items_section(cv, items, x, y, w, width, height, draw_hdr_fn):
     col_desc  = w * 0.44
     col_qty   = w * 0.10
     col_price = w * 0.23
-    col_sub   = w * 0.23
+    # col_sub uses remaining width
     header_h  = 0.65 * cm
     row_h_base = 0.72 * cm
 
-    # Normalise
+    xs = [
+        x,
+        x + col_desc,
+        x + col_desc + col_qty,
+        x + col_desc + col_qty + col_price,
+        x + w,
+    ]
+
+    # Normalise items
     norm = []
     for it in items:
         desc     = _safe(it.get("description") or it.get("desc"))
@@ -266,6 +297,7 @@ def _draw_items_section(cv, items, x, y, w, width, height, draw_hdr_fn):
         unit_price_cents = it.get("unit_price_cents")
         if unit_price_cents is None:
             unit_price_cents = _parse_price_to_cents(str(it.get("unit_price") or ""))
+        unit_price_cents = int(unit_price_cents or 0)
 
         discount_pct = 0.0
         try:
@@ -294,24 +326,15 @@ def _draw_items_section(cv, items, x, y, w, width, height, draw_hdr_fn):
             "has_extra":  has_extra,
         })
 
-    y = _ensure_space(cv, y, 1.2 * cm + header_h + row_h_base * 2,
-                      width, height, draw_hdr_fn)
+    y = _ensure_space(cv, y, 1.2 * cm + header_h + row_h_base * 2, width, height, draw_hdr_fn)
     y = _section_heading(cv, "Itens do Orçamento", x, y, w)
-
-    xs = [
-        x,
-        x + col_desc,
-        x + col_desc + col_qty,
-        x + col_desc + col_qty + col_price,
-        x + w
-    ]
 
     # Header row
     _rect(cv, x, y, w, header_h, fill=HEADER_BG, stroke_color=BORDER, stroke=1)
     hdr_y = y - header_h + 0.18 * cm
     _text(cv, "Descrição do Item/Serviço",  xs[0] + 0.4 * cm,          hdr_y, "Helvetica-Bold", 8.5, TEXT_MAIN)
     _text(cv, "Qtde.",                       xs[1] + col_qty / 2,       hdr_y, "Helvetica-Bold", 8.5, TEXT_MAIN, "center")
-    _text(cv, "Preço Unit. / Desc.",         xs[2] + col_price / 2,     hdr_y, "Helvetica-Bold", 8.5, TEXT_MAIN, "center")
+    _text(cv, "Preço Unit. / Desc.",         xs[2] + (xs[3]-xs[2]) / 2, hdr_y, "Helvetica-Bold", 8.5, TEXT_MAIN, "center")
     _text(cv, "Subtotal",                    xs[4] - 0.4 * cm,          hdr_y, "Helvetica-Bold", 8.5, TEXT_MAIN, "right")
     for xi in xs[1:-1]:
         _vline(cv, xi, y, y - header_h, COL_BORDER)
@@ -319,25 +342,25 @@ def _draw_items_section(cv, items, x, y, w, width, height, draw_hdr_fn):
 
     # Data rows
     for i, row in enumerate(norm):
-        rh = row_h_base * 1.55 if row["has_extra"] else row_h_base
+        rh = row_h_base * 1.6 if row["has_extra"] else row_h_base
         y = _ensure_space(cv, y, rh + 0.2 * cm, width, height, draw_hdr_fn)
 
         fill = ROW_BG if i % 2 == 0 else WHITE
         _rect(cv, x, y, w, rh, fill=fill, stroke_color=BORDER, stroke=1)
 
         ry = y - 0.23 * cm
-        _text(cv, row["desc"][:65],     xs[0] + 0.4 * cm,      ry, "Helvetica-Bold", 9, TEXT_MAIN)
+        _text(cv, row["desc"][:65],     xs[0] + 0.4 * cm,          ry, "Helvetica-Bold", 9, TEXT_MAIN)
         if row["sub_desc"]:
             _text(cv, row["sub_desc"][:75], xs[0] + 0.4 * cm, ry - 0.38 * cm, "Helvetica", 7.5, TEXT_GRAY)
 
-        _text(cv, row["qty"],            xs[1] + col_qty / 2,   ry, "Helvetica", 9, TEXT_MAIN, "center")
+        _text(cv, row["qty"],            xs[1] + col_qty / 2,       ry, "Helvetica", 9, TEXT_MAIN, "center")
 
-        pc = xs[2] + col_price / 2
-        _text(cv, row["unit_price"],     pc,                     ry, "Helvetica", 9, TEXT_MAIN, "center")
+        pc = xs[2] + (xs[3] - xs[2]) / 2
+        _text(cv, row["unit_price"],     pc, ry, "Helvetica", 9, TEXT_MAIN, "center")
         if row["discount"]:
-            _text(cv, row["discount"],   pc,   ry - 0.38 * cm, "Helvetica", 7.5, RED_DISC, "center")
+            _text(cv, row["discount"],   pc, ry - 0.38 * cm, "Helvetica", 7.5, RED_DISC, "center")
 
-        _text(cv, row["line_total"],     xs[4] - 0.4 * cm,      ry, "Helvetica-Bold", 9, TEXT_MAIN, "right")
+        _text(cv, row["line_total"],     xs[4] - 0.4 * cm, ry, "Helvetica-Bold", 9, TEXT_MAIN, "right")
 
         for xi in xs[1:-1]:
             _vline(cv, xi, y, y - rh, COL_BORDER)
@@ -383,24 +406,30 @@ def _draw_observations(cv, lines, x, y, w, width, height, draw_hdr_fn):
 
 
 # =========================
-# Signatures
+# Client signature (single line)
 # =========================
-def _draw_signatures(cv, author, client, x, y, w):
-    sig_y = y - 0.5 * cm
-    mid   = x + w / 2
-    sig_w = 6.5 * cm
-    lx    = x + 0.5 * cm
-    rx    = mid + 0.5 * cm
+def _draw_signature(cv, client_name, x, y, w):
+    sig_y  = y - 0.8 * cm
+    sig_w  = 7.0 * cm
+    sig_cx = x + w / 2  # centered on page
 
-    _hline(cv, lx, lx + sig_w, sig_y, TEXT_GRAY, 0.6)
-    _text(cv, author or "Emitente", lx + sig_w / 2, sig_y - 0.35 * cm, "Helvetica", 8.5, TEXT_GRAY, "center")
-
-    _hline(cv, rx, rx + sig_w, sig_y, TEXT_GRAY, 0.6)
-    _text(cv, client or "Cliente", rx + sig_w / 2, sig_y - 0.35 * cm, "Helvetica", 8.5, TEXT_GRAY, "center")
+    _hline(cv, sig_cx - sig_w / 2, sig_cx + sig_w / 2, sig_y, TEXT_GRAY, 0.6)
+    _text(cv, client_name or "Assinatura do Cliente",
+          sig_cx, sig_y - 0.40 * cm, "Helvetica", 8.5, TEXT_GRAY, "center")
 
 
 # =========================
-# Watermark
+# Accept URL footer
+# =========================
+def _draw_accept_url(cv, accept_url, x, y, footer_y=1.8 * cm):
+    if not accept_url:
+        return
+    _text(cv, "Aceite online:", x, footer_y + 0.45 * cm, "Helvetica-Bold", 9, TEXT_MAIN)
+    _text(cv, accept_url[:110],  x, footer_y + 0.05 * cm, "Helvetica", 8, TEXT_GRAY)
+
+
+# =========================
+# Watermark (free tier)
 # =========================
 def _draw_watermark(cv, width):
     cv.setFont("Helvetica", 8)
@@ -416,7 +445,8 @@ def generate_proposal_pdf(data: dict) -> bytes:
     cv = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    is_pro = bool(data.get("is_pro", False))
+    is_pro    = bool(data.get("is_pro", False))
+    public_id = str(data.get("public_id", "0001"))
 
     logo_img = None
     if data.get("logo_b64"):
@@ -425,8 +455,6 @@ def generate_proposal_pdf(data: dict) -> bytes:
             logo_img = ImageReader(io.BytesIO(logo_bytes))
         except Exception:
             logo_img = None
-
-    public_id = str(data.get("public_id", "0001"))
 
     x = ML
     w = _cw(width)
@@ -437,13 +465,18 @@ def generate_proposal_pdf(data: dict) -> bytes:
     y = draw_header()
     y -= 0.5 * cm
 
+    # ── Dados do Cliente ──────────────────────────────────────
     y = _draw_client_section(cv, data, x, y, w, width, height, draw_header)
+
+    # ── Detalhes do Orçamento ─────────────────────────────────
     y = _draw_details_section(cv, data, x, y, w, width, height, draw_header)
 
+    # ── Itens do Orçamento ────────────────────────────────────
     items = data.get("items") or []
     if items:
         y = _draw_items_section(cv, items, x, y, w, width, height, draw_header)
 
+    # ── Total Geral ───────────────────────────────────────────
     try:
         total_cents = int(data.get("total_cents") or 0)
     except Exception:
@@ -452,7 +485,7 @@ def generate_proposal_pdf(data: dict) -> bytes:
     if total_cents > 0 or data.get("price"):
         y = _draw_total(cv, total_cents, data.get("price"), x, y, w, width, height, draw_header)
 
-    # Observations = payment stages + payment_terms
+    # ── Observações (etapas de pagamento + termos) ─────────────
     obs_lines = []
     for st in (data.get("payment_stages") or []):
         title = _safe(st.get("title"))
@@ -467,10 +500,16 @@ def generate_proposal_pdf(data: dict) -> bytes:
     if obs_lines:
         y = _draw_observations(cv, obs_lines, x, y, w, width, height, draw_header)
 
-    author = _safe(data.get("author_name")) or _safe(data.get("company_name"))
-    client = _safe(data.get("client_name"))
-    _draw_signatures(cv, author, client, x, y, w)
+    # ── Assinatura do Cliente (única linha, centralizada) ──────
+    client_name = _safe(data.get("client_name"))
+    _draw_signature(cv, client_name, x, y, w)
 
+    # ── Aceite online ─────────────────────────────────────────
+    accept_url = _safe(data.get("accept_url"))
+    if accept_url:
+        _draw_accept_url(cv, accept_url, x, y)
+
+    # ── Marca d'água (plano gratuito) ─────────────────────────
     if not is_pro:
         _draw_watermark(cv, width)
 
