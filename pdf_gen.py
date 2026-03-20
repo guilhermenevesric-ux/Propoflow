@@ -408,46 +408,51 @@ def generate_proposal_pdf(data: dict) -> bytes:
     proj = _safe(data.get("project_name")) or "-"
     deadline = _safe(data.get("deadline")) or "-"
 
-    total_cents = int(data.get("total_cents") or 0)
-    if total_cents <= 0:
+    try:
+        total_cents = int(data.get("total_cents") or 0)
+    except:
         total_cents = _parse_price_to_cents(data.get("price") or "")
     total_brl = _brl_from_cents(total_cents) if total_cents > 0 else (_safe(data.get("price")) or "-")
 
     # =========================
     # DADOS DO CLIENTE
     # =========================
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(x, y, "Dados do Cliente")
-    y -= 15
+    info_lines = [
+        f"Cliente: {client}",
+        f"Serviço: {proj}",
+        f"Prazo: {deadline}",
+    ]
 
-    c.setFont("Helvetica", 10)
-    c.drawString(x, y, f"Cliente: {client}")
-    y -= 12
+    y = _draw_list_section(
+        c,
+        "Dados do Cliente",
+        info_lines,
+        x,
+        y,
+        w,
+        width,
+        height,
+        draw_header,
+        shaded=False
+    )
 
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(x + 0.6 * cm, y - 1.35 * cm, "Cliente")
-    c.setFont("Helvetica", 10)
-    c.drawString(x + 0.6 * cm, y - 1.85 * cm, client[:60])
-
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(x + 0.6 * cm, y - 2.40 * cm, "Serviço")
-    c.setFont("Helvetica", 10)
-    c.drawString(x + 0.6 * cm, y - 2.90 * cm, proj[:60])
-
-    c.setFont("Helvetica-Bold", 10)
-    c.drawRightString(x + w - 0.6 * cm, y - 1.35 * cm, "Prazo")
-    c.setFont("Helvetica", 10)
-    c.drawRightString(x + w - 0.6 * cm, y - 1.85 * cm, deadline)
+    y = _ensure_space(c, y, needed=3 * cm, width=width, height=height, draw_header_fn=draw_header)
 
     # =========================
     # TOTAL PROFISSIONAL
     # =========================
     box_w = 7 * cm
     box_h = 2 * cm
+    y -= 0.3 * cm
     box_x = x + w - box_w
+    y -= 0.8 * cm
     box_y = y
 
     _draw_box(c, box_x, box_y, box_w, box_h, fill_rgb=(0.06, 0.10, 0.18), stroke=0)
+
+    c.setFont("Helvetica-Bold", 9)
+    c.setFillColorRGB(0.12, 0.16, 0.26)
+    c.drawString(box_x, box_y + 0.4 * cm, "Valor total do projeto")
 
     c.setFillColorRGB(1, 1, 1)
     c.setFont("Helvetica", 9)
@@ -471,12 +476,18 @@ def generate_proposal_pdf(data: dict) -> bytes:
     items = data.get("items") or []
 
     if items:
-        y -= 20
-
-        # Título
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(x, y, "Itens do Orçamento")
-        y -= 15
+        rows = _normalize_items(items)
+        y = _draw_items_section(
+            c,
+            "Itens do Orçamento",
+            rows,
+            x,
+            y,
+            w,
+            width,
+            height,
+            draw_header
+        )
 
         # Fundo do cabeçalho
         c.setFillColorRGB(0.9, 0.9, 0.9)
@@ -526,13 +537,45 @@ def generate_proposal_pdf(data: dict) -> bytes:
                 c.showPage()
                 draw_header()
                 y = height - 100
+
+                # redesenha cabeçalho da tabela
+                c.setFont("Helvetica-Bold", 11)
+                c.drawString(x, y, "Itens do Orçamento")
+                y -= 15
+
+                c.setFillColorRGB(0.9, 0.9, 0.9)
+                c.rect(x, y - 5, w, 18, fill=1, stroke=0)
+
+                c.setFillColorRGB(0, 0, 0)
+                c.setFont("Helvetica-Bold", 9)
+
+                c.drawString(x + 5, y, "Descrição")
+                c.drawString(x + 250, y, "Qtd")
+                c.drawString(x + 300, y, "Preço Unit.")
+                c.drawString(x + 400, y, "Subtotal")
+
+                y -= 18
+                c.setFont("Helvetica", 9)
     # =========================
     # Como pagar
     # =========================
     stage_rows = _normalize_stages(data.get("payment_stages") or [])
     if stage_rows:
-        y = _draw_list_section(c, "Como pagar", stage_rows, x, y, w, width, height, draw_header, shaded=False)
+        y = _draw_list_section(
+            c,
+            "Como pagar",
+            stage_rows,
+            x,
+            y,
+            w,
+            width,
+            height,
+            draw_header,
+            shaded=False
+        )
+
     footer_y = 2.1 * cm
+
     # =========================
     # Condições
     # =========================
@@ -548,6 +591,7 @@ def generate_proposal_pdf(data: dict) -> bytes:
         c.setFont("Helvetica", 8)
         c.setFillColorRGB(0.3, 0.3, 0.3)
         c.drawString(x, footer_y + 1.2 * cm, "Assinatura do responsável")
+
 
     # =========================
     # Aceite online / Rodapé
