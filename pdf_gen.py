@@ -348,7 +348,15 @@ def _draw_items_section(cv, items, x, y, w, width, height, draw_hdr_fn):
         fill = ROW_BG if i % 2 == 0 else WHITE
         _rect(cv, x, y, w, rh, fill=fill, stroke_color=BORDER, stroke=1)
 
-        ry = y - 0.23 * cm
+        # Vertical center: baseline offset = rh/2 - font_size/2 (approx 3.2pt for size 9)
+        font_offset = 0.11 * cm  # ~3pt, half of 9pt font
+        if row["has_extra"]:
+            # two-line rows: center the pair, main text above mid, sub below
+            pair_h = 0.38 * cm  # gap between main and sub line
+            ry = y - rh / 2 + pair_h / 2 + font_offset
+        else:
+            ry = y - rh / 2 + font_offset
+
         _text(cv, row["desc"][:65],     xs[0] + 0.4 * cm,          ry, "Helvetica-Bold", 9, TEXT_MAIN)
         if row["sub_desc"]:
             _text(cv, row["sub_desc"][:75], xs[0] + 0.4 * cm, ry - 0.38 * cm, "Helvetica", 7.5, TEXT_GRAY)
