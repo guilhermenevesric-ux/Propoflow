@@ -452,11 +452,10 @@ def generate_proposal_pdf(data: dict) -> bytes:
 
     c.setFont("Helvetica", 8)
     c.setFillColorRGB(1, 1, 1)
-    c.drawString(box_x + 0.5 * cm, box_y - 0.5 * cm, "Valor total do projeto")
+    c.drawString(box_x + 0.5 * cm, box_y - 0.4 * cm, "Valor total do projeto")
 
-    c.setFillColorRGB(1, 1, 1)
-    c.setFont("Helvetica", 9)
-    c.drawString(box_x + 0.5 * cm, box_y - 0.7 * cm, "TOTAL")
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(box_x + 0.5 * cm, box_y - 1.0 * cm, "TOTAL")
 
     c.setFont("Helvetica-Bold", 16)
     c.drawRightString(box_x + box_w - 0.5 * cm, box_y - 0.7 * cm, total_brl)
