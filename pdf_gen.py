@@ -144,8 +144,8 @@ def _normalize_items(items):
                 line_total_cents = 0
 
         out.append({
-            "left": f"{desc} ({qty}x)",
-            "right": _brl_from_cents(line_total_cents) if line_total_cents > 0 else "—"
+            "left": f"{desc} • {qty}x",
+            "right": f"{_brl_from_cents(line_total_cents)}"
         })
     return out
 
@@ -452,7 +452,7 @@ def generate_proposal_pdf(data: dict) -> bytes:
 
     c.setFont("Helvetica", 8)
     c.setFillColorRGB(1, 1, 1)
-    c.drawString(box_x + 0.5 * cm, box_y - 0.3 * cm, "Valor total do projeto")
+    c.drawString(box_x + 0.5 * cm, box_y - 0.5 * cm, "Valor total do projeto")
 
     c.setFillColorRGB(1, 1, 1)
     c.setFont("Helvetica", 9)
