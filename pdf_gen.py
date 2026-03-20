@@ -450,9 +450,9 @@ def generate_proposal_pdf(data: dict) -> bytes:
 
     _draw_box(c, box_x, box_y, box_w, box_h, fill_rgb=(0.06, 0.10, 0.18), stroke=0)
 
-    c.setFont("Helvetica-Bold", 9)
-    c.setFillColorRGB(0.12, 0.16, 0.26)
-    c.drawString(box_x, box_y + 0.4 * cm, "Valor total do projeto")
+    c.setFont("Helvetica", 8)
+    c.setFillColorRGB(1, 1, 1)
+    c.drawString(box_x + 0.5 * cm, box_y - 0.3 * cm, "Valor total do projeto")
 
     c.setFillColorRGB(1, 1, 1)
     c.setFont("Helvetica", 9)
@@ -489,73 +489,8 @@ def generate_proposal_pdf(data: dict) -> bytes:
             draw_header
         )
 
-        # Fundo do cabeçalho
-        c.setFillColorRGB(0.9, 0.9, 0.9)
-        c.rect(x, y - 5, w, 18, fill=1, stroke=0)
+        y -= 0.5 * cm
 
-        # Cabeçalho
-        c.setFillColorRGB(0, 0, 0)
-        c.setFont("Helvetica-Bold", 9)
-
-        c.drawString(x + 5, y, "Descrição")
-        c.drawString(x + 250, y, "Qtd")
-        c.drawString(x + 300, y, "Preço Unit.")
-        c.drawString(x + 400, y, "Subtotal")
-
-        y -= 18
-
-        c.setFont("Helvetica", 9)
-
-        for it in items:
-            desc = _safe(it.get("description"))
-            qty = _fmt_qty(it.get("qty") or 1)
-
-            unit_price_cents = int(it.get("unit_price_cents") or 0)
-            total_cents = int(it.get("line_total_cents") or 0)
-
-            unit_price = _brl_from_cents(unit_price_cents)
-            subtotal = _brl_from_cents(total_cents)
-
-            # Linha
-            desc_lines = _wrap_lines(desc, 230, font="Helvetica", size=9)
-
-            start_y = y
-            for line in desc_lines:
-                c.drawString(x + 5, y, line)
-                y -= 10
-            c.drawString(x + 250, start_y, qty)
-            c.drawString(x + 300, start_y, unit_price)
-            c.drawString(x + 400, start_y, subtotal)
-
-            # Linha separadora
-            c.setStrokeColorRGB(0.85, 0.85, 0.85)
-            c.line(x, y - 5, x + w, y - 5)
-
-            y -= 18
-
-            if y < 100:
-                c.showPage()
-                draw_header()
-                y = height - 100
-
-                # redesenha cabeçalho da tabela
-                c.setFont("Helvetica-Bold", 11)
-                c.drawString(x, y, "Itens do Orçamento")
-                y -= 15
-
-                c.setFillColorRGB(0.9, 0.9, 0.9)
-                c.rect(x, y - 5, w, 18, fill=1, stroke=0)
-
-                c.setFillColorRGB(0, 0, 0)
-                c.setFont("Helvetica-Bold", 9)
-
-                c.drawString(x + 5, y, "Descrição")
-                c.drawString(x + 250, y, "Qtd")
-                c.drawString(x + 300, y, "Preço Unit.")
-                c.drawString(x + 400, y, "Subtotal")
-
-                y -= 18
-                c.setFont("Helvetica", 9)
     # =========================
     # Como pagar
     # =========================
